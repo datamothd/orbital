@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use std::{io, process::Command as ProcessCommand};
+use std::{
+    io::{self, Write},
+    process::Command as ProcessCommand,
+};
 use sysinfo::System;
 use winreg::{
     HKCU, HKLM,
@@ -7,7 +10,7 @@ use winreg::{
 };
 
 #[derive(Parser)]
-#[command(name = "orbital", about = "System information and Windows preferences")]
+#[command(name = "orbital", about = "Basic framework of a Windows optimization tool. Only displays system information and Windows preferences for the time being.")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -16,17 +19,39 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Sysinfo,
-    TaskbarAlignment,
+    TaskbarAlignment {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
 }
 
-fn toggle_taskbar_alignment() -> io::Result<()> {
+fn confirm() -> io::Result<bool> {
+    loop {
+        print!("Toggle alignment and restart Explorer? [Y/n] ");
+        io::stdout().flush()?;
+        let mut answer = String::new();
+        if io::stdin().read_line(&mut answer)? == 0 {
+            return Ok(false);
+        }
+        match answer.trim().to_ascii_lowercase().as_str() {
+            "" | "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => println!("Please enter y or n."),
+        }
+    }
+}
+
+fn toggle_taskbar_alignment(yes: bool) -> io::Result<()> {
     let key = HKCU.open_subkey_with_flags(
         r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
         KEY_QUERY_VALUE | KEY_SET_VALUE,
     )?;
     let current: u32 = match key.get_value("TaskbarAl") {
         Ok(value) => value,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => 1,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            println!("TaskbarAl is missing; using the centered default.");
+            1
+        }
         Err(error) => return Err(error),
     };
     let next = match current {
@@ -34,6 +59,14 @@ fn toggle_taskbar_alignment() -> io::Result<()> {
         1 => 0u32,
         _ => return Err(io::Error::other("TaskbarAl must be 0 or 1")),
     };
+    println!(
+        "Current TaskbarAl: {current} ({})",
+        if current == 1 { "center" } else { "left" }
+    );
+    if !yes && !confirm()? {
+        println!("Cancelled.");
+        return Ok(());
+    }
     key.set_value("TaskbarAl", &next)?;
     println!(
         "Taskbar alignment saved: {}",
@@ -55,7 +88,7 @@ fn toggle_taskbar_alignment() -> io::Result<()> {
 
 fn main() -> io::Result<()> {
     match Cli::parse().command {
-        Command::TaskbarAlignment => toggle_taskbar_alignment()?,
+        Command::TaskbarAlignment { yes } => toggle_taskbar_alignment(yes)?,
         Command::Sysinfo => {
             let mut system = System::new();
             let cur_ver = HKLM
