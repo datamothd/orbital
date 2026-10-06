@@ -4,7 +4,7 @@
 
 The idea comes from frustration with Windows configuration tools that require a proprietary parent app, don't let you change settings before the OS is installed, or leave out the options you actually want. All while making the process less clear than some power users would like.
 
-Orbital should eventually be an alternative, allowing users to configure Windows before and after its initial installation. This "software" is intended for people who frequently reset their computers, people who want to get the most out of their system while remaining stable, and people who want to enable their OCD.
+Orbital should eventually be an alternative, allowing users to configure Windows before and after its initial installation. This "software" is intended for people who frequently reset their computers, people who want to get the most out of their system while remaining stable, and people who want to enable their OCD (which was actually the main motivation for this project).
 
 Right now, we can tell basic system information and have a few tweaks for your system (currently only for devices with Windows already installed). Orbital is NOT that sophisticated yet.
 
@@ -50,15 +50,15 @@ Toggle taskbar alignment:
 cargo run -- taskbar-alignment
 ```
 
-This displays the current `TaskbarAl` value: `0` means left, `1` means centered. Press Enter or type `y` to toggle it, or type `n` to cancel. If the value is missing, Orbital assumes the centered default.
+This displays the current `TaskbarAl` value: `0` means left, `1` means centered. Press Enter or type `y` to toggle it, or type `n` to cancel. If the value is missing, the centered default is assumed.
 
-To skip y/n prompts:
+To skip confirmation prompts:
 
 ```powershell
 cargo run -- taskbar-alignment -y
 ```
 
-`--yes` works too.
+(`--yes` works too).
 
 To build an executable you can run directly:
 
