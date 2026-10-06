@@ -12,6 +12,7 @@ Right now, we can tell basic system information and have a few tweaks for your s
 
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
 - Toggle Windows 11 taskbar icons between left and centered.
+- Toggle File Explorer compact mode on or off.
 - Show the current taskbar setting and ask before changing it.
 - Skip the explanation and confirmation with `-y`.
 
@@ -59,6 +60,14 @@ cargo run -- taskbar-alignment -y
 ```
 
 (`--yes` works too).
+
+Toggle File Explorer compact mode:
+
+```powershell
+cargo run -- explorer-compact-mode
+```
+
+This displays the current `UseCompactMode` value: `0` means disabled, `1` means enabled. Press Enter or type `y` to toggle it, or type `n` to cancel. If the value is missing, the disabled default is assumed. Explorer restarts after the change. Use `-y` or `--yes` to skip confirmation.
 
 To build an executable you can run directly:
 
