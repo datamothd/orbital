@@ -1,0 +1,9 @@
+[package]
+name = "orbital"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+sysinfo = "0.39.6"
+winreg = "0.56.0"
