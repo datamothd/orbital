@@ -2,12 +2,6 @@
 
 const preferences = document.getElementById("explorer-preferences");
 
-preferences.addEventListener("click", (event) => {
-  if (event.target.closest("summary, button, a, input, select, textarea")) return;
-  preferences.open = !preferences.open;
-  if (!preferences.open) preferences.querySelector("summary").focus();
-});
-
 if (window.__TAURI__) {
   const appWindow = window.__TAURI__.window.getCurrentWindow();
   const { LogicalSize } = window.__TAURI__.dpi;

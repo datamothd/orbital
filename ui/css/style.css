@@ -92,11 +92,9 @@ details {
   margin-bottom: 16px;
 }
 
-details {
-  cursor: pointer;
-}
-
 summary {
+  margin: -20px;
+  padding: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -125,7 +123,13 @@ summary::after {
 }
 
 details[open] summary {
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.preferences-divider {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #333333;
 }
 
 details[open] summary::after {
@@ -190,6 +194,10 @@ button:disabled {
 
 .preference + .preference {
   border-top: 1px solid #333333;
+}
+
+#explorer-preferences > .preference:last-child {
+  padding-bottom: 0;
 }
 
 .preference p {
@@ -270,5 +278,14 @@ button.primary:hover {
   section,
   details {
     padding: 16px;
+  }
+
+  summary {
+    margin: -16px;
+    padding: 16px;
+  }
+
+  details[open] summary {
+    margin-bottom: 0;
   }
 }
