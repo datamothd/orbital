@@ -159,6 +159,20 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.tested-system-check,
+.older-system-dash {
+  display: inline-block;
+  margin-left: 6px;
+  color: #4ade80;
+  font-family: "Segoe UI Symbol", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.older-system-dash {
+  color: #facc15;
+}
+
 button {
   font: inherit;
   font-size: 12px;

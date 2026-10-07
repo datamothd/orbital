@@ -15,6 +15,7 @@ Right now, we can tell basic system information and have a few tweaks for your s
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
 - Toggle Windows 11 taskbar icons between left and centered.
 - Toggle File Explorer compact mode on or off.
+- Toggle the Windows 10-style classic context menu on Windows 11.
 - Tauri app for value editing.
 
 ISO configuration and the broader security and performance tweaks are planned. They aren't implemented yet.

@@ -14,19 +14,31 @@ function updateButtons() {
   byId("refresh").disabled = busy || !invoke;
   byId("taskbar").disabled = busy || !settings;
   byId("compact-toggle").disabled = busy || !settings;
+  byId("context-menu-toggle").disabled = busy || !settings?.classic_context_menu_supported;
 }
 
 async function loadSettings() {
   settings = null;
   byId("alignment").textContent = "Unavailable";
   byId("compact").textContent = "Unavailable";
+  byId("context-menu").textContent = "Unavailable";
   settings = await invoke("explorer_settings");
   byId("alignment").textContent = settings.taskbar_centered ? "Centered" : "Left";
   byId("compact").textContent = settings.compact_mode ? "Enabled" : "Disabled";
+  byId("context-menu").textContent = settings.classic_context_menu_supported
+    ? (settings.classic_context_menu ? "Enabled" : "Disabled")
+    : "Requires Windows 11";
 }
 
 async function loadSystem() {
   const info = await invoke("system_info");
+  const windowsVersion = info.windows_version.trim().toUpperCase();
+  const testedOs = /^Windows 11 (Pro|Home)$/i.test(info.os.trim());
+  const testedVersion = testedOs && windowsVersion === "25H2";
+  const release = /^(\d{2})H([12])$/.exec(windowsVersion);
+  const olderWindows11 = /^Windows 11(?: |$)/i.test(info.os.trim())
+    && release !== null
+    && (Number(release[1]) < 25 || (Number(release[1]) === 25 && Number(release[2]) < 2));
   const rows = [
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
     ["CPU", info.cpu], ["Threads", info.threads],
@@ -37,6 +49,21 @@ async function loadSystem() {
     const description = document.createElement("dd");
     term.textContent = label;
     description.textContent = value;
+    const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
+    const yellowDash = label === "Windows" && olderWindows11;
+    if (greenCheck || yellowDash) {
+      const check = document.createElement("span");
+      check.className = greenCheck ? "tested-system-check" : "older-system-dash";
+      check.textContent = greenCheck ? "✓" : "−";
+      check.title = label === "OS"
+        ? "Matches the tested OS edition: Windows 11 Pro"
+        : greenCheck
+          ? "Matches the tested Windows version: 25H2"
+          : "Older Windows 11 release! Features are tested on version 25H2";
+      check.setAttribute("role", "img");
+      check.setAttribute("aria-label", check.title);
+      description.append(check);
+    }
     return [term, description];
   }));
 }
@@ -103,11 +130,17 @@ byId("compact-toggle").addEventListener("click", (event) => toggle(
   event.shiftKey,
 ));
 
+byId("context-menu-toggle").addEventListener("click", (event) => toggle(
+  "toggle_classic_context_menu", `${settings?.classic_context_menu ? "Disable" : "Enable"} the Windows 10-style right-click menu?`,
+  event.shiftKey,
+));
+
 if (invoke) {
   refresh();
 } else {
   byId("system").textContent = "Open Orbital with npm run dev to read system information.";
   byId("alignment").textContent = "Unavailable";
   byId("compact").textContent = "Unavailable";
+  byId("context-menu").textContent = "Unavailable";
   status("The Rust backend is available inside the desktop app.", true);
 }

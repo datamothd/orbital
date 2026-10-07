@@ -4,7 +4,20 @@ use orbital::{explorer, sysinfo};
 
 #[tauri::command]
 async fn system_info() -> Result<sysinfo::SystemInfo, String> {
-    sysinfo::collect().map_err(|error| error.to_string())
+    let info = sysinfo::collect().map_err(|error| error.to_string())?;
+    // Preview system labels in development without changing the actual tweak checks.
+    #[cfg(debug_assertions)]
+    let info = {
+        let mut info = info;
+        if let Ok(os) = std::env::var("ORBITAL_DEV_OS") {
+            info.os = os;
+        }
+        if let Ok(version) = std::env::var("ORBITAL_DEV_WINDOWS_VERSION") {
+            info.windows_version = version;
+        }
+        info
+    };
+    Ok(info)
 }
 
 #[tauri::command]
@@ -22,6 +35,11 @@ async fn toggle_explorer_compact_mode() -> Result<(), String> {
     explorer::toggle_explorer_compact_mode(true).map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+async fn toggle_classic_context_menu() -> Result<(), String> {
+    explorer::toggle_classic_context_menu(true).map_err(|error| error.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -29,6 +47,7 @@ fn main() {
             explorer_settings,
             toggle_taskbar_alignment,
             toggle_explorer_compact_mode,
+            toggle_classic_context_menu,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");

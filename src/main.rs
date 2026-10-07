@@ -24,12 +24,17 @@ enum Command {
         #[arg(short = 'y', long)]
         yes: bool,
     },
+    ClassicContextMenu {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
 }
 
 fn main() -> io::Result<()> {
     match Cli::parse().command {
         Command::TaskbarAlignment { yes } => explorer::toggle_taskbar_alignment(yes)?,
         Command::ExplorerCompactMode { yes } => explorer::toggle_explorer_compact_mode(yes)?,
+        Command::ClassicContextMenu { yes } => explorer::toggle_classic_context_menu(yes)?,
         Command::Sysinfo => sysinfo::show()?,
     }
     Ok(())
