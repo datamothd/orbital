@@ -1,1 +1,9 @@
-/target
+/target/
+/src-tauri/target/
+/src-tauri/gen/
+
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

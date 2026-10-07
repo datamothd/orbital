@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbital</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/app.js" defer></script>
+  <script src="js/window.js" defer></script>
+</head>
+<body>
+  <main>
+    <section aria-labelledby="system-title">
+      <header class="section-header">
+        <h2 id="system-title">System Information</h2>
+        <button id="refresh" disabled>Refresh</button>
+      </header>
+      <dl id="system"><dt>System information</dt><dd>Loading…</dd></dl>
+    </section>
+    <details id="explorer-preferences" aria-labelledby="preferences-title">
+      <summary>
+        <h2 id="preferences-title">Explorer settings</h2>
+      </summary>
+      <div class="preference">
+        <div><h3>Taskbar alignment</h3><p id="alignment">Loading…</p></div>
+        <button id="taskbar" disabled>Toggle</button>
+      </div>
+      <div class="preference">
+        <div><h3>Compact mode</h3><p id="compact">Loading…</p></div>
+        <button id="compact-toggle" disabled>Toggle</button>
+      </div>
+      <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking Toggle to skip confirmation and apply the change immediately.</p>
+    </details>
+    <p id="status" role="status" aria-live="polite">Reading your system…</p>
+  </main>
+  <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
+    <h2 id="confirm-title">Change preference?</h2>
+    <p id="confirm-description"></p>
+    <p class="note">Windows Explorer will restart to apply this change.</p>
+    <form method="dialog">
+      <button value="cancel" autofocus>Cancel</button>
+      <button value="apply" class="primary">Apply &amp; restart</button>
+    </form>
+  </dialog>
+</body>
+</html>

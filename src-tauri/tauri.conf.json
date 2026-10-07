@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Orbital",
+  "version": "0.1.0",
+  "identifier": "dev.orbital.desktop",
+  "build": { "frontendDist": "../ui" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{
+      "label": "main",
+      "title": "Orbital",
+      "theme": "Dark",
+      "backgroundColor": "#000000",
+      "width": 640,
+      "height": 360,
+      "resizable": false,
+      "maximizable": false
+    }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.ico", "icons/icon.png"]
+  }
+}

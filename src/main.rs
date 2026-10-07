@@ -1,6 +1,4 @@
-mod sysinfo;
-#[path = "tweaks/tweaks.rs"]
-mod tweaks;
+use orbital::{explorer, sysinfo};
 
 use clap::{Parser, Subcommand};
 use std::io;
@@ -30,9 +28,9 @@ enum Command {
 
 fn main() -> io::Result<()> {
     match Cli::parse().command {
-        Command::TaskbarAlignment { yes } => tweaks::toggle_taskbar_alignment(yes)?,
-        Command::ExplorerCompactMode { yes } => tweaks::toggle_explorer_compact_mode(yes)?,
-        Command::Sysinfo => sysinfo::show(),
+        Command::TaskbarAlignment { yes } => explorer::toggle_taskbar_alignment(yes)?,
+        Command::ExplorerCompactMode { yes } => explorer::toggle_explorer_compact_mode(yes)?,
+        Command::Sysinfo => sysinfo::show()?,
     }
     Ok(())
 }

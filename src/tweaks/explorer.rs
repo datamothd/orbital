@@ -1,3 +1,4 @@
+use std::os::windows::process::CommandExt;
 use std::{
     io::{self, Write},
     process::Command as ProcessCommand,
@@ -6,6 +7,35 @@ use winreg::{
     HKCU,
     enums::{KEY_QUERY_VALUE, KEY_SET_VALUE},
 };
+
+#[derive(serde::Serialize)]
+pub struct ExplorerSettings {
+    pub taskbar_centered: bool,
+    pub compact_mode: bool,
+}
+
+pub fn settings() -> io::Result<ExplorerSettings> {
+    let key = HKCU.open_subkey_with_flags(
+        r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+        KEY_QUERY_VALUE,
+    )?;
+    let read = |name: &str, default: u32| -> io::Result<bool> {
+        let value: u32 = match key.get_value(name) {
+            Ok(value) => value,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => default,
+            Err(error) => return Err(error),
+        };
+        match value {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(io::Error::other(format!("{name} must be 0 or 1"))),
+        }
+    };
+    Ok(ExplorerSettings {
+        taskbar_centered: read("TaskbarAl", 1)?,
+        compact_mode: read("UseCompactMode", 0)?,
+    })
+}
 
 fn confirm(prompt: &str) -> io::Result<bool> {
     loop {
@@ -23,7 +53,7 @@ fn confirm(prompt: &str) -> io::Result<bool> {
     }
 }
 
-pub(crate) fn toggle_taskbar_alignment(yes: bool) -> io::Result<()> {
+pub fn toggle_taskbar_alignment(yes: bool) -> io::Result<()> {
     let key = HKCU.open_subkey_with_flags(
         r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
         KEY_QUERY_VALUE | KEY_SET_VALUE,
@@ -55,14 +85,15 @@ pub(crate) fn toggle_taskbar_alignment(yes: bool) -> io::Result<()> {
     }
     key.set_value("TaskbarAl", &next)?;
     println!(
-        "Taskbar alignment saved: {next} ({})",
+        "Taskbar alignment saved: {current} ({}) >> {next} ({})",
+        if current == 1 { "center" } else { "left" },
         if next == 1 { "center" } else { "left" }
     );
 
     restart_explorer("Alignment")
 }
 
-pub(crate) fn toggle_explorer_compact_mode(yes: bool) -> io::Result<()> {
+pub fn toggle_explorer_compact_mode(yes: bool) -> io::Result<()> {
     let key = HKCU.open_subkey_with_flags(
         r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
         KEY_QUERY_VALUE | KEY_SET_VALUE,
@@ -94,7 +125,8 @@ pub(crate) fn toggle_explorer_compact_mode(yes: bool) -> io::Result<()> {
     }
     key.set_value("UseCompactMode", &next)?;
     println!(
-        "Explorer compact mode saved: {next} ({})",
+        "Explorer compact mode saved: {current} ({}) >> {next} ({})",
+        if current == 1 { "enabled" } else { "disabled" },
         if next == 1 { "enabled" } else { "disabled" }
     );
     restart_explorer("Compact mode")
@@ -102,6 +134,7 @@ pub(crate) fn toggle_explorer_compact_mode(yes: bool) -> io::Result<()> {
 
 fn restart_explorer(setting: &str) -> io::Result<()> {
     let stopped = ProcessCommand::new("taskkill")
+        .creation_flags(0x08000000)
         .args(["/F", "/IM", "explorer.exe"])
         .output()?;
     if !stopped.status.success() {
@@ -110,6 +143,8 @@ fn restart_explorer(setting: &str) -> io::Result<()> {
             String::from_utf8_lossy(&stopped.stderr).trim()
         )));
     }
-    ProcessCommand::new("explorer.exe").spawn()?;
+    ProcessCommand::new("explorer.exe")
+        .creation_flags(0x08000000)
+        .spawn()?;
     Ok(())
 }

@@ -13,8 +13,7 @@ Right now, we can tell basic system information and have a few tweaks for your s
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
 - Toggle Windows 11 taskbar icons between left and centered.
 - Toggle File Explorer compact mode on or off.
-- Show the current taskbar setting and ask before changing it.
-- Skip the explanation and confirmation with `-y`.
+- Tauri app for value editing.
 
 ISO configuration and the broader security and performance tweaks are planned. They aren't implemented yet.
 
@@ -33,43 +32,33 @@ cargo build
 
 ## Running it
 
+### Desktop app
+
+Simple Tauri 2 app the calls to the Rust backend for the Windows customization and the entire program basically.
+
+With Rust, the Visual Studio C++ Build Tools, Node.js, and the Microsoft Edge WebView2 runtime installed, run:
+
+```powershell
+npm install
+npm run dev
+```
+
+Build the small standalone desktop executable (no installer):
+
+```powershell
+npm run build
+.\src-tauri\target\release\orbital-desktop.exe
+```
+
+### Command line
+
 Show the available commands:
 
 ```powershell
 cargo run -- --help
 ```
 
-Display system information:
-
-```powershell
-cargo run -- sysinfo
-```
-
-Toggle taskbar alignment:
-
-```powershell
-cargo run -- taskbar-alignment
-```
-
-This displays the current `TaskbarAl` value: `0` means left, `1` means centered. Press Enter or type `y` to toggle it, or type `n` to cancel. If the value is missing, the centered default is assumed.
-
-To skip confirmation prompts:
-
-```powershell
-cargo run -- taskbar-alignment -y
-```
-
-(`--yes` works too).
-
-Toggle File Explorer compact mode:
-
-```powershell
-cargo run -- explorer-compact-mode
-```
-
-This displays the current `UseCompactMode` value: `0` means disabled, `1` means enabled. Press Enter or type `y` to toggle it, or type `n` to cancel. If the value is missing, the disabled default is assumed. Explorer restarts after the change. Use `-y` or `--yes` to skip confirmation.
-
-To build an executable you can run directly:
+To build an executable:
 
 ```powershell
 cargo build --release
