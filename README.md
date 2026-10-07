@@ -1,3 +1,5 @@
+<img width="256" height="256" src="https://github.com/datamothd/orbital/blob/main/src-tauri/icons/icon.png" /> 
+
 # Orbital
 
 (Will be) A Windows optimization and `.iso` configuration tool that lets users change certain aspects of Windows, specifically security, performance, and speed.
