@@ -5,7 +5,7 @@ const byId = (id) => document.getElementById(id);
 let settings = null;
 let busy = false;
 
-function status(message, error = false) {
+function setStatus(message, error = false) {
   byId("status").textContent = message;
   byId("status").classList.toggle("error", error);
 }
@@ -17,17 +17,23 @@ function updateButtons() {
   byId("context-menu-toggle").disabled = busy || !settings?.classic_context_menu_supported;
 }
 
+function setPreferenceValue(id, value) {
+  const element = byId(id);
+  element.textContent = value;
+  element.dataset.state = value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
+}
+
 async function loadSettings() {
   settings = null;
-  byId("alignment").textContent = "Unavailable";
-  byId("compact").textContent = "Unavailable";
-  byId("context-menu").textContent = "Unavailable";
+  setPreferenceValue("alignment", "Unavailable");
+  setPreferenceValue("compact", "Unavailable");
+  setPreferenceValue("context-menu", "Unavailable");
   settings = await invoke("explorer_settings");
-  byId("alignment").textContent = settings.taskbar_centered ? "Centered" : "Left";
-  byId("compact").textContent = settings.compact_mode ? "Enabled" : "Disabled";
-  byId("context-menu").textContent = settings.classic_context_menu_supported
+  setPreferenceValue("alignment", settings.taskbar_centered ? "Centered" : "Left");
+  setPreferenceValue("compact", settings.compact_mode ? "Enabled" : "Disabled");
+  setPreferenceValue("context-menu", settings.classic_context_menu_supported
     ? (settings.classic_context_menu ? "Enabled" : "Disabled")
-    : "Requires Windows 11";
+    : "Requires Windows 11");
 }
 
 async function loadSystem() {
@@ -72,13 +78,13 @@ async function refresh() {
   if (busy) return;
   busy = true;
   updateButtons();
-  status("Reading your system…");
+  setStatus("Reading your system…");
   const results = await Promise.allSettled([loadSystem(), loadSettings()]);
   const errors = results.filter((result) => result.status === "rejected");
   if (results[0].status === "rejected") {
     byId("system").textContent = "System information unavailable.";
   }
-  status(errors.length ? errors.map((result) => String(result.reason)).join(" · ") : "Up to date.", errors.length > 0);
+  setStatus(errors.length ? errors.map((result) => String(result.reason)).join(" · ") : "Up to date.", errors.length > 0);
   busy = false;
   updateButtons();
 }
@@ -99,7 +105,7 @@ async function toggle(command, description, skipConfirmation = false) {
   updateButtons();
   try {
     if (!skipConfirmation && !await confirmChange(description)) return;
-    status("Applying preference and restarting Explorer…");
+    setStatus("Applying preference and restarting Explorer…");
     let error = null;
     try {
       await invoke(command);
@@ -111,9 +117,9 @@ async function toggle(command, description, skipConfirmation = false) {
     } catch (reason) {
       error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
     }
-    status(error || "Preference saved. Explorer restarted.", Boolean(error));
+    setStatus(error || "Preference saved. Explorer restarted.", Boolean(error));
   } catch (reason) {
-    status(String(reason), true);
+    setStatus(String(reason), true);
   } finally {
     busy = false;
     updateButtons();
@@ -139,8 +145,8 @@ if (invoke) {
   refresh();
 } else {
   byId("system").textContent = "Open Orbital with npm run dev to read system information.";
-  byId("alignment").textContent = "Unavailable";
-  byId("compact").textContent = "Unavailable";
-  byId("context-menu").textContent = "Unavailable";
-  status("The Rust backend is available inside the desktop app.", true);
+  setPreferenceValue("alignment", "Unavailable");
+  setPreferenceValue("compact", "Unavailable");
+  setPreferenceValue("context-menu", "Unavailable");
+  setStatus("The Rust backend is available inside the desktop app.", true);
 }
