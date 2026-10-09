@@ -23,20 +23,82 @@
       </summary>
       <hr class="preferences-divider" aria-hidden="true">
       <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking Toggle to skip confirmation and apply the change immediately.</p>
+      <h3 class="preference-group">Taskbar</h3>
       <div class="preference">
-        <div><h3>Taskbar alignment</h3><p id="alignment" class="preference-value">Loading…</p></div>
-        <button id="taskbar" disabled>Toggle</button>
+        <div>
+          <h3>Taskbar alignment</h3>
+          <p class="preference-description">Choose left or centered taskbar icons.</p>
+          <p id="taskbar-centering" class="preference-value">Loading…</p>
+        </div>
+        <button id="taskbar-centering-toggle" disabled>Toggle</button>
       </div>
+      <h3 class="preference-group">File Explorer</h3>
       <div class="preference">
-        <div><h3>Compact mode</h3><p id="compact" class="preference-value">Loading…</p></div>
-        <button id="compact-toggle" disabled>Toggle</button>
+        <div>
+          <h3>Disable extra spacing</h3>
+          <p class="preference-description">Uses compact spacing in File Explorer.</p>
+          <p id="explorer-spacing" class="preference-value">Loading…</p>
+        </div>
+        <button id="explorer-spacing-toggle" disabled>Toggle</button>
       </div>
       <div class="preference">
         <div>
-          <h3>Classic context menu</h3>
-          <p id="context-menu" class="preference-value">Loading…</p>
+          <h3>Disable Windows 11 context menu</h3>
+          <p class="preference-description">Uses the classic Windows 10-style right-click menu.</p>
+          <p id="modern-context-menu" class="preference-value">Loading…</p>
         </div>
-        <button id="context-menu-toggle" disabled>Toggle</button>
+        <button id="modern-context-menu-toggle" disabled>Toggle</button>
+      </div>
+      <h3 class="preference-group">Quick Access</h3>
+      <div class="preference">
+        <div>
+          <h3>Hide recently used files</h3>
+          <p class="preference-description">Hides recent files and recommendations in Quick Access.</p>
+          <p id="recent-files" class="preference-value">Loading…</p>
+        </div>
+        <button id="recent-files-toggle" disabled>Toggle</button>
+      </div>
+      <div class="preference">
+        <div>
+          <h3>Hide frequently used folders</h3>
+          <p class="preference-description">Hides your most accessed folders in Quick Access.</p>
+          <p id="frequent-folders" class="preference-value">Loading…</p>
+        </div>
+        <button id="frequent-folders-toggle" disabled>Toggle</button>
+      </div>
+      <div class="preference">
+        <div>
+          <h3>Hide files from Office.com</h3>
+          <p class="preference-description">Hides cloud files from your Office.com account.</p>
+          <p id="office-files" class="preference-value">Loading…</p>
+        </div>
+        <button id="office-files-toggle" disabled>Toggle</button>
+      </div>
+      <h3 class="preference-group">Navigation Pane</h3>
+      <div class="preference">
+        <div>
+          <h3>Hide Home folder</h3>
+          <p class="preference-description">Hides Home from the navigation pane. Requires administrator access.</p>
+          <p id="home-folder" class="preference-value">Loading…</p>
+        </div>
+        <button id="home-folder-toggle" disabled>Toggle</button>
+      </div>
+      <div class="preference">
+        <div>
+          <h3>Hide Gallery</h3>
+          <p class="preference-description">Hides Gallery from the navigation pane. Requires administrator access.</p>
+          <p id="gallery" class="preference-value">Loading…</p>
+        </div>
+        <button id="gallery-toggle" disabled>Toggle</button>
+      </div>
+      <h3 class="preference-group">Desktop</h3>
+      <div class="preference">
+        <div>
+          <h3>Hide shortcut arrow icon</h3>
+          <p class="preference-description">Hides the arrow overlay on desktop shortcuts. Requires administrator access.</p>
+          <p id="shortcut-arrow" class="preference-value">Loading…</p>
+        </div>
+        <button id="shortcut-arrow-toggle" disabled>Toggle</button>
       </div>
     </details>
     <p id="status" role="status" aria-live="polite">Reading your system…</p>

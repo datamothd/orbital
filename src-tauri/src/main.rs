@@ -26,18 +26,48 @@ async fn explorer_settings() -> Result<explorer::ExplorerSettings, String> {
 }
 
 #[tauri::command]
-async fn toggle_taskbar_alignment() -> Result<(), String> {
-    explorer::toggle_taskbar_alignment(true).map_err(|error| error.to_string())
+async fn toggle_disable_taskbar_centering() -> Result<(), String> {
+    explorer::toggle_disable_taskbar_centering(true).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn toggle_explorer_compact_mode() -> Result<(), String> {
-    explorer::toggle_explorer_compact_mode(true).map_err(|error| error.to_string())
+async fn toggle_disable_explorer_spacing() -> Result<(), String> {
+    explorer::toggle_disable_explorer_spacing(true).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn toggle_classic_context_menu() -> Result<(), String> {
-    explorer::toggle_classic_context_menu(true).map_err(|error| error.to_string())
+async fn toggle_disable_modern_context_menu() -> Result<(), String> {
+    explorer::toggle_disable_modern_context_menu(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_recent_files() -> Result<(), String> {
+    explorer::toggle_hide_recent_files(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_frequent_folders() -> Result<(), String> {
+    explorer::toggle_hide_frequent_folders(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_office_files() -> Result<(), String> {
+    explorer::toggle_hide_office_files(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_home_folder() -> Result<(), String> {
+    explorer::toggle_hide_home_folder(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_gallery() -> Result<(), String> {
+    explorer::toggle_hide_gallery(true).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn toggle_hide_shortcut_arrow() -> Result<(), String> {
+    explorer::toggle_hide_shortcut_arrow(true).map_err(|error| error.to_string())
 }
 
 fn main() {
@@ -45,9 +75,15 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
-            toggle_taskbar_alignment,
-            toggle_explorer_compact_mode,
-            toggle_classic_context_menu,
+            toggle_disable_taskbar_centering,
+            toggle_disable_explorer_spacing,
+            toggle_disable_modern_context_menu,
+            toggle_hide_recent_files,
+            toggle_hide_frequent_folders,
+            toggle_hide_office_files,
+            toggle_hide_home_folder,
+            toggle_hide_gallery,
+            toggle_hide_shortcut_arrow,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");

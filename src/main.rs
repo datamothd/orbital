@@ -6,7 +6,6 @@ use std::io;
 #[derive(Parser)]
 #[command(
     name = "orbital",
-    about = "Basic framework of a Windows optimization tool. Only displays system information and changes a few Windows preferences for the time being."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -16,15 +15,39 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Sysinfo,
-    TaskbarAlignment {
+    DisableTaskbarCentering {
         #[arg(short = 'y', long)]
         yes: bool,
     },
-    ExplorerCompactMode {
+    DisableExplorerSpacing {
         #[arg(short = 'y', long)]
         yes: bool,
     },
-    ClassicContextMenu {
+    DisableModernContextMenu {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideRecentFiles {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideFrequentFolders {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideOfficeFiles {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideHomeFolder {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideGallery {
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    HideShortcutArrow {
         #[arg(short = 'y', long)]
         yes: bool,
     },
@@ -32,9 +55,19 @@ enum Command {
 
 fn main() -> io::Result<()> {
     match Cli::parse().command {
-        Command::TaskbarAlignment { yes } => explorer::toggle_taskbar_alignment(yes)?,
-        Command::ExplorerCompactMode { yes } => explorer::toggle_explorer_compact_mode(yes)?,
-        Command::ClassicContextMenu { yes } => explorer::toggle_classic_context_menu(yes)?,
+        Command::DisableTaskbarCentering { yes } => {
+            explorer::toggle_disable_taskbar_centering(yes)?
+        }
+        Command::DisableExplorerSpacing { yes } => explorer::toggle_disable_explorer_spacing(yes)?,
+        Command::DisableModernContextMenu { yes } => {
+            explorer::toggle_disable_modern_context_menu(yes)?
+        }
+        Command::HideRecentFiles { yes } => explorer::toggle_hide_recent_files(yes)?,
+        Command::HideFrequentFolders { yes } => explorer::toggle_hide_frequent_folders(yes)?,
+        Command::HideOfficeFiles { yes } => explorer::toggle_hide_office_files(yes)?,
+        Command::HideHomeFolder { yes } => explorer::toggle_hide_home_folder(yes)?,
+        Command::HideGallery { yes } => explorer::toggle_hide_gallery(yes)?,
+        Command::HideShortcutArrow { yes } => explorer::toggle_hide_shortcut_arrow(yes)?,
         Command::Sysinfo => sysinfo::show()?,
     }
     Ok(())

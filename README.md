@@ -2,23 +2,25 @@
 
 # Orbital
 
-(Will be) A Windows optimization and `.iso` configuration tool that lets users change certain aspects of Windows, specifically security, performance, and speed.
+A Windows preference and configurator tool that lets users change certain aspects of Windows, specifically security, performance, and speed.
 
 The idea comes from frustration with Windows configuration tools that require a proprietary parent app, don't let you change settings before the OS is installed, or leave out the options you actually want. All while making the process less clear than some power users would like.
 
-Orbital should eventually be an alternative, allowing users to configure Windows before and after its initial installation. This "software" is intended for people who frequently reset their computers, people who want to get the most out of their system while remaining stable, and people who want to enable their OCD (which was actually the main motivation for this project).
+In the future, I would like to implement an actual ISO injector for autounattend.xml files and Windows PE customization to streamline the entire Windows setup process, but these features are not currently available in Orbital.
 
-Right now, we can tell basic system information and have a few tweaks for your system (currently only for devices with Windows already installed). Orbital is NOT that sophisticated yet.
+Intended for use on Windows 11 Pro on 25H2, possible 26H2 support in the future.
 
 ## Current features
 
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
-- Toggle Windows 11 taskbar icons between left and centered.
-- Toggle File Explorer compact mode on or off.
-- Toggle the Windows 10-style classic context menu on Windows 11.
+- Toggles for 9 different Windows preferences (only for Explorer related settings for now).
 - Tauri app for value editing.
 
-ISO configuration and the broader security and performance tweaks are planned. They aren't implemented yet.
+## Planned features
+- ISO configuration
+- Autounattend.xml configuration
+- More preferences, especially tailoring to security and performance
+- 26H2 support (as soon as I even get the update offered, thanks Windows).
 
 ## Basic setup
 
