@@ -201,6 +201,7 @@ fn shortcut_arrows_hidden_in(
 enum SettingValue {
     Dword(u32),
     String(String),
+    Raw(RegValue<'static>),
     Delete,
 }
 
@@ -268,6 +269,7 @@ fn apply_changes(changes: &[RegistryChange<'_>], prepared: &[RegistrySnapshot]) 
         let result = match &change.value {
             SettingValue::Dword(value) => key.set_value(&change.name, value),
             SettingValue::String(value) => key.set_value(&change.name, value),
+            SettingValue::Raw(value) => key.set_raw_value(&change.name, value),
             SettingValue::Delete => delete_value_if_present(key, &change.name),
         };
         if let Err(error) = result {
@@ -476,6 +478,124 @@ pub fn toggle_hide_home_folder(yes: bool) -> io::Result<()> {
 
 pub fn toggle_hide_gallery(yes: bool) -> io::Result<()> {
     toggle_namespace("Hide Gallery", GALLERY_CLSID, yes)
+}
+
+fn settings_changes<'a>(
+    user: &'a RegKey,
+    machine: &'a RegKey,
+    windows11: bool,
+) -> Vec<RegistryChange<'a>> {
+    let mut changes = Vec::new();
+    for preference in [
+        &DISABLE_TASKBAR_CENTERING,
+        &DISABLE_EXPLORER_SPACING,
+        &HIDE_RECENT_FILES,
+        &HIDE_FREQUENT_FOLDERS,
+    ] {
+        changes.extend(preference.changes_in(user, true));
+    }
+    if windows11 {
+        changes.extend(HIDE_OFFICE_FILES.changes_in(user, true));
+        changes.push(RegistryChange::new(
+            user,
+            CLASSIC_CONTEXT_MENU_KEY,
+            "",
+            SettingValue::String(String::new()),
+        ));
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            changes.extend(namespace_changes(user, machine, clsid, false));
+        }
+    }
+    changes.push(RegistryChange::new(
+        machine,
+        SHELL_ICONS_KEY,
+        "29",
+        SettingValue::Delete,
+    ));
+    changes
+}
+
+fn recommended_changes<'a>(
+    user: &'a RegKey,
+    machine: &'a RegKey,
+    windows11: bool,
+) -> Vec<RegistryChange<'a>> {
+    settings_changes(user, machine, windows11)
+        .into_iter()
+        .filter(|change| change.path != ADVANCED_KEY || change.name != "TaskbarAl")
+        .collect()
+}
+
+fn read_original(root: &RegKey, path: &str, name: &str) -> io::Result<Option<RegValue<'static>>> {
+    match root.open_subkey_with_flags(path, KEY_QUERY_VALUE) {
+        Ok(key) => match key.get_raw_value(name) {
+            Ok(value) => Ok(Some(value)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error),
+        },
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io::Result<RegKey> {
+    const BACKUP_KEY: &str = r"Software\Orbital\OriginalExplorerSettings";
+    if read_original(user, BACKUP_KEY, "Windows11")?.is_some() {
+        read_toggle(user, BACKUP_KEY, "Windows11", false)?;
+        return user.open_subkey(BACKUP_KEY);
+    }
+    let originals = settings_changes(user, machine, windows11)
+        .iter()
+        .map(|change| read_original(change.root, &change.path, &change.name))
+        .collect::<io::Result<Vec<_>>>()?;
+    let (key, _) = user.create_subkey(BACKUP_KEY)?;
+    for (index, value) in originals.iter().enumerate() {
+        let name = index.to_string();
+        match value {
+            Some(value) => key.set_raw_value(&name, value)?,
+            None => delete_value_if_present(&key, &name)?,
+        }
+    }
+    key.set_value("Windows11", &u32::from(windows11))?;
+    Ok(key)
+}
+
+pub fn save_original_settings() -> io::Result<()> {
+    original_settings_in(HKCU, HKLM, supports_windows11()?).map(|_| ())
+}
+
+pub fn apply_recommended_settings() -> io::Result<()> {
+    save_original_settings()?;
+    let mut changes = recommended_changes(HKCU, HKLM, supports_windows11()?);
+    let prepared = prepare_changes(&changes)?;
+    changes.last_mut().unwrap().value =
+        SettingValue::String(ensure_blank_icon()?.to_string_lossy().into_owned());
+    apply_changes(&changes, &prepared)?;
+    restart_explorer("Recommended settings")
+}
+
+fn original_changes<'a>(
+    user: &'a RegKey,
+    machine: &'a RegKey,
+    backup: &RegKey,
+) -> io::Result<Vec<RegistryChange<'a>>> {
+    let windows11 = read_toggle(backup, "", "Windows11", false)?;
+    let mut changes = settings_changes(user, machine, windows11);
+    for (index, change) in changes.iter_mut().enumerate() {
+        change.value = match read_original(backup, "", &index.to_string())? {
+            Some(value) => SettingValue::Raw(value),
+            None => SettingValue::Delete,
+        };
+    }
+    Ok(changes)
+}
+
+pub fn restore_original_settings() -> io::Result<()> {
+    let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
+    let changes = original_changes(HKCU, HKLM, &backup)?;
+    let prepared = prepare_changes(&changes)?;
+    apply_changes(&changes, &prepared)?;
+    restart_explorer("Original settings")
 }
 
 fn transparent_icon() -> Vec<u8> {
@@ -735,6 +855,83 @@ mod tests {
         let prepared = prepare_changes(&changes).unwrap();
         apply_changes(&changes, &prepared).unwrap();
         assert!(HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
+    }
+
+    #[test]
+    fn recommendations_preserve_taskbar_alignment_and_are_repeatable() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        for windows11 in [false, true] {
+            let mut changes = recommended_changes(&user.key, &machine.key, windows11);
+            changes.last_mut().unwrap().value = SettingValue::String("test-blank.ico".into());
+            assert_eq!(changes.len(), if windows11 { 13 } else { 5 });
+            let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
+            for alignment in [None, Some(0u32), Some(1u32)] {
+                match alignment {
+                    Some(value) => key.set_value("TaskbarAl", &value).unwrap(),
+                    None => delete_value_if_present(&key, "TaskbarAl").unwrap(),
+                }
+                let prepared = prepare_changes(&changes).unwrap();
+                apply_changes(&changes, &prepared).unwrap();
+                assert_eq!(key.get_value::<u32, _>("TaskbarAl").ok(), alignment);
+                let key = machine.key.open_subkey(SHELL_ICONS_KEY).unwrap();
+                assert_eq!(key.get_value::<String, _>("29").unwrap(), "test-blank.ico");
+                for preference in [
+                    &DISABLE_EXPLORER_SPACING,
+                    &HIDE_RECENT_FILES,
+                    &HIDE_FREQUENT_FOLDERS,
+                ] {
+                    assert!(preference.enabled_in(&user.key).unwrap());
+                }
+                if windows11 {
+                    assert!(HIDE_OFFICE_FILES.enabled_in(&user.key).unwrap());
+                    let key = user.key.open_subkey(CLASSIC_CONTEXT_MENU_KEY).unwrap();
+                    assert_eq!(key.get_value::<String, _>("").unwrap(), "");
+                    for clsid in [HOME_CLSID, GALLERY_CLSID] {
+                        assert!(!namespace_visible_in(&user.key, &machine.key, clsid).unwrap());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn first_load_snapshot_survives_reloads_and_restores_exact_original_values() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let (key, _) = user.key.create_subkey(EXPLORER_KEY).unwrap();
+        key.set_value("ShowRecent", &0u32).unwrap();
+        key.set_value("ShowRecommendations", &1u32).unwrap();
+        let (key, _) = machine.key.create_subkey(SHELL_ICONS_KEY).unwrap();
+        key.set_value("29", &r"C:\custom-overlay.ico").unwrap();
+        let changes = settings_changes(&user.key, &machine.key, true);
+        let originals: Vec<_> = changes
+            .iter()
+            .map(|change| read_original(change.root, &change.path, &change.name).unwrap())
+            .collect();
+        original_settings_in(&user.key, &machine.key, true).unwrap();
+        assert!(user.key.open_subkey(ADVANCED_KEY).is_err());
+        assert!(
+            machine
+                .key
+                .open_subkey(namespace_paths(HOME_CLSID).2)
+                .is_err()
+        );
+        let prepared = prepare_changes(&changes).unwrap();
+        apply_changes(&changes, &prepared).unwrap();
+        let backup = original_settings_in(&user.key, &machine.key, false).unwrap();
+        let restore = original_changes(&user.key, &machine.key, &backup).unwrap();
+        for _ in 0..2 {
+            let prepared = prepare_changes(&restore).unwrap();
+            apply_changes(&restore, &prepared).unwrap();
+            for (change, original) in changes.iter().zip(&originals) {
+                let restored = read_original(change.root, &change.path, &change.name).unwrap();
+                assert_eq!(
+                    restored.as_ref().map(|v| (&v.bytes, &v.vtype)),
+                    original.as_ref().map(|v| (&v.bytes, &v.vtype))
+                );
+            }
+        }
     }
 
     #[test]

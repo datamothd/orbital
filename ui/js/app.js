@@ -24,6 +24,8 @@ function setStatus(message, error = false) {
 
 function updateButtons() {
   byId("refresh").disabled = busy || !invoke;
+  byId("apply-recommended").disabled = busy || !settings;
+  byId("restore-original").disabled = busy || !settings;
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !settings
       || (preference.windows11 === true && !settings.windows11_supported);
@@ -113,13 +115,13 @@ function confirmChange(description) {
   });
 }
 
-async function toggle(command, description, skipConfirmation = false) {
+async function toggle(command, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   busy = true;
   updateButtons();
   try {
     if (!skipConfirmation && !await confirmChange(description)) return;
-    setStatus("Applying preference and restarting Explorer…");
+    setStatus("Saving preferences and restarting Explorer…");
     let error = null;
     try {
       await invoke(command);
@@ -131,7 +133,7 @@ async function toggle(command, description, skipConfirmation = false) {
     } catch (reason) {
       error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
     }
-    setStatus(error || "Preference saved. Explorer restarted.", Boolean(error));
+    setStatus(error || success, Boolean(error));
   } catch (reason) {
     setStatus(String(reason), true);
   } finally {
@@ -141,6 +143,12 @@ async function toggle(command, description, skipConfirmation = false) {
 }
 
 byId("refresh").addEventListener("click", refresh);
+byId("apply-recommended").addEventListener("click", () => toggle(
+  "apply_recommended_settings", "", true, "Recommended settings enabled. Explorer restarted.",
+));
+byId("restore-original").addEventListener("click", () => toggle(
+  "restore_original_settings", "", true, "Original settings restored. Explorer restarted.",
+));
 for (const preference of explorerPreferences) {
   byId(`${preference.id}-toggle`).addEventListener("click", (event) => toggle(
     `toggle_${preference.field}`,

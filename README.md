@@ -15,6 +15,7 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
 - Toggles for 9 different Windows preferences (only for Explorer related settings for now).
 - Tauri app interface for value editing.
+- Setting preference state in mass and change reverting.
 
 ## Planned features
 - ISO configuration
@@ -39,7 +40,7 @@ cargo build
 
 ### Desktop app
 
-Simple Tauri 2 app that calls to the Rust backend for the Windows customization and preferences.
+Simple Tauri 2.0 app that calls to the Rust backend for the Windows customization and preferences.
 
 With Rust, the Visual Studio C++ Build Tools, Node.js, and the Microsoft Edge WebView2 runtime installed, run:
 

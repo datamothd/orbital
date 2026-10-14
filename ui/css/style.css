@@ -185,6 +185,32 @@ button:disabled {
   cursor: default;
 }
 
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: -8px;
+  margin-bottom: 8px;
+}
+
+.settings-actions button {
+  flex: 1;
+  font-size: 14px;
+  background: #0a0a0a;
+  border: 1px solid #333333;
+}
+
+.settings-actions button:hover:not(:disabled) {
+  background: #161616;
+}
+
+#apply-recommended {
+  color: #4ade80;
+}
+
+#restore-original {
+  color: #facc15;
+}
+
 .preference {
   display: flex;
   align-items: center;

@@ -22,7 +22,18 @@ async fn system_info() -> Result<sysinfo::SystemInfo, String> {
 
 #[tauri::command]
 async fn explorer_settings() -> Result<explorer::ExplorerSettings, String> {
+    explorer::save_original_settings().map_err(|error| error.to_string())?;
     explorer::settings().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn apply_recommended_settings() -> Result<(), String> {
+    explorer::apply_recommended_settings().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn restore_original_settings() -> Result<(), String> {
+    explorer::restore_original_settings().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -75,6 +86,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
+            apply_recommended_settings,
+            restore_original_settings,
             toggle_disable_taskbar_centering,
             toggle_disable_explorer_spacing,
             toggle_disable_modern_context_menu,
