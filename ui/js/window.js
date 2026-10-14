@@ -6,6 +6,7 @@ if (window.__TAURI__) {
   const appWindow = window.__TAURI__.window.getCurrentWindow();
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
+  const maxHeight = 720;
   let resizing = false;
   let pending = false;
   let lastHeight = 0;
@@ -20,7 +21,7 @@ if (window.__TAURI__) {
     try {
       do {
         pending = false;
-        const height = Math.ceil(main.getBoundingClientRect().height);
+        const height = Math.min(maxHeight, Math.ceil(main.getBoundingClientRect().height));
         if (height !== lastHeight) {
           await appWindow.setSize(new LogicalSize(640, height));
           lastHeight = height;
