@@ -1,7 +1,5 @@
 "use strict";
 
-const preferences = document.getElementById("explorer-preferences");
-
 if (window.__TAURI__) {
   const appWindow = window.__TAURI__.window.getCurrentWindow();
   const { LogicalSize } = window.__TAURI__.dpi;
@@ -29,9 +27,7 @@ if (window.__TAURI__) {
       } while (pending);
     } catch (error) {
       observer.disconnect();
-      const status = document.getElementById("status");
-      status.textContent = `Could not fit window to content: ${error}`;
-      status.classList.add("error");
+      setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
       resizing = false;
     }
@@ -39,6 +35,5 @@ if (window.__TAURI__) {
 
   const observer = new ResizeObserver(() => requestAnimationFrame(fitWindow));
   observer.observe(main);
-  preferences.addEventListener("toggle", () => requestAnimationFrame(fitWindow));
   document.fonts.ready.then(fitWindow);
 }

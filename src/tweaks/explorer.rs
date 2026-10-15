@@ -2,12 +2,13 @@ use std::os::windows::process::CommandExt;
 use std::{
     fs::OpenOptions,
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command as ProcessCommand,
 };
 use winreg::{
     HKCU, HKLM, RegKey, RegValue,
     enums::{KEY_QUERY_VALUE, KEY_SET_VALUE},
+    types::ToRegValue,
 };
 
 const CLASSIC_CONTEXT_MENU_KEY: &str =
@@ -54,7 +55,6 @@ pub struct ExplorerSettings {
     pub hide_office_files: bool,
     pub hide_home_folder: bool,
     pub hide_gallery: bool,
-    // None means a custom overlay or a missing blank icon needs to be replaced.
     pub hide_shortcut_arrow: Option<bool>,
 }
 
@@ -156,8 +156,6 @@ fn namespace_visible(clsid: &str) -> io::Result<bool> {
 
 fn namespace_visible_in(user: &RegKey, machine: &RegKey, clsid: &str) -> io::Result<bool> {
     let (pinned, non_enum, hidden) = namespace_paths(clsid);
-    // Missing overrides leave the built-in Windows namespace visible. An explicit
-    // hide in any of the three locations takes precedence.
     let pinned = read_toggle(user, &pinned, "System.IsPinnedToNameSpaceTree", true)?;
     let excluded = read_toggle(machine, &non_enum, clsid, false)?;
     let hidden = read_toggle(machine, &hidden, "HiddenByDefault", false)?;
@@ -248,8 +246,6 @@ fn prepare_changes(changes: &[RegistryChange<'_>]) -> io::Result<Vec<RegistrySna
     changes
         .iter()
         .map(|change| {
-            // Check access to every key before changing any values, so an HKLM
-            // permission failure cannot leave only the HKCU part of a tweak applied.
             let (key, _) = change
                 .root
                 .create_subkey_with_flags(&change.path, KEY_QUERY_VALUE | KEY_SET_VALUE)?;
@@ -361,13 +357,11 @@ const HIDE_OFFICE_FILES: DwordPreference = DwordPreference {
 
 impl DwordPreference {
     fn enabled_in(&self, root: &RegKey) -> io::Result<bool> {
-        let states = self
-            .values
-            .iter()
-            .map(|value| read_toggle(root, self.path, value, self.default))
-            .collect::<io::Result<Vec<_>>>()?;
-        // Every related value must match the applied preference, including recommendations.
-        Ok(states.iter().all(|value| *value == self.enabled_value))
+        let mut enabled = true;
+        for value in self.values {
+            enabled &= read_toggle(root, self.path, value, self.default)? == self.enabled_value;
+        }
+        Ok(enabled)
     }
 
     fn changes_in<'a>(&self, root: &'a RegKey, enabled: bool) -> Vec<RegistryChange<'a>> {
@@ -432,7 +426,6 @@ fn toggle_namespace(name: &str, clsid: &str, yes: bool) -> io::Result<()> {
     if !confirm_toggle(name, current, yes)? {
         return Ok(());
     }
-    // Turning hiding off restores visibility in all three registry locations.
     let changes = namespace_changes(HKCU, HKLM, clsid, current);
     let prepared = prepare_changes(&changes)?;
     apply_changes(&changes, &prepared)?;
@@ -519,11 +512,29 @@ fn recommended_changes<'a>(
     user: &'a RegKey,
     machine: &'a RegKey,
     windows11: bool,
-) -> Vec<RegistryChange<'a>> {
-    settings_changes(user, machine, windows11)
-        .into_iter()
-        .filter(|change| change.path != ADVANCED_KEY || change.name != "TaskbarAl")
-        .collect()
+    icon: &Path,
+) -> io::Result<Vec<RegistryChange<'a>>> {
+    let mut changes = settings_changes(user, machine, windows11);
+    changes.retain(|change| {
+        !(change.path == ADVANCED_KEY && change.name == "TaskbarAl"
+            || change.path == SHELL_ICONS_KEY && change.name == "29")
+    });
+    if windows11 {
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            if !namespace_visible_in(user, machine, clsid)? {
+                changes.retain(|change| change.name != clsid && !change.path.ends_with(clsid));
+            }
+        }
+    }
+    if shortcut_arrows_hidden_in(machine, icon)? != Some(true) {
+        changes.push(RegistryChange::new(
+            machine,
+            SHELL_ICONS_KEY,
+            "29",
+            SettingValue::String(icon.to_string_lossy().into_owned()),
+        ));
+    }
+    Ok(changes)
 }
 
 fn read_original(root: &RegKey, path: &str, name: &str) -> io::Result<Option<RegValue<'static>>> {
@@ -564,14 +575,60 @@ pub fn save_original_settings() -> io::Result<()> {
     original_settings_in(HKCU, HKLM, supports_windows11()?).map(|_| ())
 }
 
-pub fn apply_recommended_settings() -> io::Result<()> {
-    save_original_settings()?;
-    let mut changes = recommended_changes(HKCU, HKLM, supports_windows11()?);
+pub fn apply_recommended_settings() -> io::Result<usize> {
+    let windows11 = supports_windows11()?;
+    original_settings_in(HKCU, HKLM, windows11)?;
+    let icon = blank_icon_path()?;
+    let changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
+    let missing_icon = !icon.is_file();
+    if changes.is_empty() && !missing_icon {
+        return Ok(0);
+    }
     let prepared = prepare_changes(&changes)?;
-    changes.last_mut().unwrap().value =
-        SettingValue::String(ensure_blank_icon()?.to_string_lossy().into_owned());
+    let count = changed_preferences(&changes, missing_icon);
+    if missing_icon {
+        ensure_blank_icon()?;
+    }
     apply_changes(&changes, &prepared)?;
-    restart_explorer("Recommended settings")
+    restart_explorer("Recommended settings")?;
+    Ok(count)
+}
+
+fn changed_preferences(changes: &[RegistryChange<'_>], missing_icon: bool) -> usize {
+    let mut preferences = std::collections::HashSet::new();
+    for change in changes {
+        let preference = if change.name == "ShowRecommendations" {
+            "ShowRecent"
+        } else if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) {
+            HOME_CLSID
+        } else if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) {
+            GALLERY_CLSID
+        } else {
+            &change.name
+        };
+        preferences.insert(preference);
+    }
+    if missing_icon {
+        preferences.insert("29");
+    }
+    preferences.len()
+}
+
+fn pending_changes(changes: Vec<RegistryChange<'_>>) -> io::Result<Vec<RegistryChange<'_>>> {
+    let mut pending = Vec::new();
+    for change in changes {
+        let current = read_original(change.root, &change.path, &change.name)?;
+        let changed = match &change.value {
+            SettingValue::Dword(value) => current.as_ref() != Some(&value.to_reg_value()),
+            SettingValue::String(value) => current.as_ref() != Some(&value.to_reg_value()),
+            SettingValue::Raw(value) => current.as_ref() != Some(value),
+            SettingValue::Delete => current.is_some(),
+        };
+        if changed {
+            pending.push(change);
+        }
+    }
+    Ok(pending)
 }
 
 fn original_changes<'a>(
@@ -590,17 +647,19 @@ fn original_changes<'a>(
     Ok(changes)
 }
 
-pub fn restore_original_settings() -> io::Result<()> {
+pub fn restore_original_settings() -> io::Result<bool> {
     let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
-    let changes = original_changes(HKCU, HKLM, &backup)?;
+    let changes = pending_changes(original_changes(HKCU, HKLM, &backup)?)?;
+    if changes.is_empty() {
+        return Ok(false);
+    }
     let prepared = prepare_changes(&changes)?;
     apply_changes(&changes, &prepared)?;
-    restart_explorer("Original settings")
+    restart_explorer("Original settings")?;
+    Ok(true)
 }
 
 fn transparent_icon() -> Vec<u8> {
-    // A 32x32, 32-bit ICO with transparent pixels and an all-transparent AND mask.
-    // Build it locally instead of invoking PowerShell or downloading an asset.
     let image_size = 40 + 32 * 32 * 4 + 32 * 4;
     let mut bytes = vec![0, 0, 1, 0, 1, 0, 32, 32, 0, 0, 1, 0, 32, 0];
     bytes.extend_from_slice(&(image_size as u32).to_le_bytes());
@@ -620,7 +679,6 @@ fn ensure_blank_icon() -> io::Result<PathBuf> {
         Ok(mut file) => {
             if let Err(error) = file.write_all(&transparent_icon()) {
                 drop(file);
-                // A failed creation must not leave a truncated icon for the next try.
                 let _ = std::fs::remove_file(&path);
                 return Err(setting_error(error));
             }
@@ -648,7 +706,6 @@ pub fn toggle_hide_shortcut_arrow(yes: bool) -> io::Result<()> {
         let path = ensure_blank_icon()?;
         changes[0].value = SettingValue::String(path.to_string_lossy().into_owned());
     }
-    // Keep blank.ico when restoring arrows: deleting it invalidates the icon cache.
     apply_changes(&changes, &prepared)?;
     println!(
         "{name} saved: {}",
@@ -658,6 +715,10 @@ pub fn toggle_hide_shortcut_arrow(yes: bool) -> io::Result<()> {
 }
 
 fn restart_explorer(setting: &str) -> io::Result<()> {
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn GetShellWindow() -> *mut std::ffi::c_void;
+    }
     let stopped = ProcessCommand::new("taskkill")
         .creation_flags(0x08000000)
         .args(["/F", "/IM", "explorer.exe"])
@@ -671,12 +732,22 @@ fn restart_explorer(setting: &str) -> io::Result<()> {
     ProcessCommand::new("explorer.exe")
         .creation_flags(0x08000000)
         .spawn()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while unsafe { GetShellWindow() }.is_null() {
+        if std::time::Instant::now() >= deadline {
+            return Err(io::Error::other(format!(
+                "{setting} saved, but Explorer did not finish restarting."
+            )));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct TestRegistry {
@@ -686,11 +757,16 @@ mod tests {
 
     impl TestRegistry {
         fn new() -> Self {
+            static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
             let unique = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let path = format!(r"Software\OrbitalTests\{}-{unique}", std::process::id());
+            let path = format!(
+                r"Software\OrbitalTests\{}-{unique}-{}",
+                std::process::id(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            );
             let (key, _) = HKCU.create_subkey(&path).unwrap();
             Self { key, path }
         }
@@ -781,7 +857,6 @@ mod tests {
             RegistryChange::new(&registry.key, "Values", "Failure", SettingValue::Dword(1)),
         ];
         let mut prepared = prepare_changes(&changes).unwrap();
-        // Simulate a write failure after two successful writes using a read-only handle.
         prepared[2].0 = registry
             .key
             .open_subkey_with_flags("Values", KEY_QUERY_VALUE)
@@ -862,8 +937,13 @@ mod tests {
         let user = TestRegistry::new();
         let machine = TestRegistry::new();
         for windows11 in [false, true] {
-            let mut changes = recommended_changes(&user.key, &machine.key, windows11);
-            changes.last_mut().unwrap().value = SettingValue::String("test-blank.ico".into());
+            let changes = recommended_changes(
+                &user.key,
+                &machine.key,
+                windows11,
+                Path::new("test-blank.ico"),
+            )
+            .unwrap();
             assert_eq!(changes.len(), if windows11 { 13 } else { 5 });
             let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
             for alignment in [None, Some(0u32), Some(1u32)] {
@@ -893,6 +973,79 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn completion_counts_preferences_instead_of_registry_values() {
+        let mut changes = settings_changes(HKCU, HKLM, true);
+        changes.retain(|change| change.name != "TaskbarAl");
+        assert_eq!(changed_preferences(&changes, false), 8);
+        assert_eq!(changed_preferences(&changes, true), 8);
+        let recent = HIDE_RECENT_FILES.changes_in(HKCU, true);
+        assert_eq!(changed_preferences(&recent, false), 1);
+        let home = namespace_changes(HKCU, HKLM, HOME_CLSID, false);
+        assert_eq!(changed_preferences(&home, false), 1);
+        assert_eq!(changed_preferences(&[], false), 0);
+        assert_eq!(changed_preferences(&[], true), 1);
+    }
+
+    #[test]
+    fn matching_settings_do_not_require_machine_write_access() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let changes =
+            recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
+                .unwrap();
+        let prepared = prepare_changes(&changes).unwrap();
+        apply_changes(&changes, &prepared).unwrap();
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            let (_, non_enum, hidden) = namespace_paths(clsid);
+            machine
+                .key
+                .open_subkey_with_flags(non_enum, KEY_SET_VALUE)
+                .unwrap()
+                .delete_value(clsid)
+                .unwrap();
+            machine
+                .key
+                .open_subkey_with_flags(hidden, KEY_SET_VALUE)
+                .unwrap()
+                .delete_value("HiddenByDefault")
+                .unwrap();
+        }
+        let machine_readonly = HKCU
+            .open_subkey_with_flags(&machine.path, KEY_QUERY_VALUE)
+            .unwrap();
+        let build_changes = || {
+            pending_changes(
+                recommended_changes(
+                    &user.key,
+                    &machine_readonly,
+                    true,
+                    Path::new("test-blank.ico"),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(build_changes().is_empty());
+        let key = user
+            .key
+            .open_subkey_with_flags(EXPLORER_KEY, KEY_SET_VALUE)
+            .unwrap();
+        key.set_value("ShowRecent", &1u32).unwrap();
+        let pending = build_changes();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].name, "ShowRecent");
+        let prepared = prepare_changes(&pending).unwrap();
+        apply_changes(&pending, &prepared).unwrap();
+        assert!(build_changes().is_empty());
+        let backup = original_settings_in(&user.key, &machine.key, true).unwrap();
+        assert!(
+            pending_changes(original_changes(&user.key, &machine_readonly, &backup).unwrap())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -967,6 +1120,12 @@ mod tests {
             shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
             Some(true)
         );
+        assert!(
+            recommended_changes(&registry.key, &registry.key, true, &icon.0)
+                .unwrap()
+                .iter()
+                .all(|change| change.path != SHELL_ICONS_KEY)
+        );
         delete_value_if_present(&key, "29").unwrap();
         assert!(icon.0.is_file());
         assert_eq!(
@@ -979,6 +1138,12 @@ mod tests {
         assert_eq!(
             shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
             None
+        );
+        assert!(
+            recommended_changes(&registry.key, &registry.key, true, &icon.0)
+                .unwrap()
+                .iter()
+                .any(|change| change.path == SHELL_ICONS_KEY && change.name == "29")
         );
     }
     #[test]

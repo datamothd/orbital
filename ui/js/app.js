@@ -18,8 +18,14 @@ const explorerPreferences = [
 ];
 
 function setStatus(message, error = false) {
-  byId("status").textContent = message;
-  byId("status").classList.toggle("error", error);
+  const administrator = error && message.includes("requires administrator access");
+  const notice = byId("administrator-status");
+  const status = byId("status");
+  notice.hidden = !administrator;
+  notice.textContent = administrator ? message : "";
+  status.textContent = administrator ? "" : message;
+  status.hidden = administrator || !message;
+  status.classList.toggle("error", error && !administrator);
 }
 
 function updateButtons() {
@@ -28,7 +34,7 @@ function updateButtons() {
   byId("restore-original").disabled = busy || !settings;
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !settings
-      || (preference.windows11 === true && !settings.windows11_supported);
+      || (preference.windows11 && !settings.windows11_supported);
   }
 }
 
@@ -100,7 +106,7 @@ async function refresh() {
   if (results[0].status === "rejected") {
     byId("system").textContent = "System information unavailable.";
   }
-  setStatus(errors.length ? errors.map((result) => String(result.reason)).join(" · ") : "Up to date.", errors.length > 0);
+  setStatus(errors.map((result) => String(result.reason)).join(" · "), errors.length > 0);
   busy = false;
   updateButtons();
 }
@@ -115,6 +121,19 @@ function confirmChange(description) {
   });
 }
 
+function showApplyResult(count, error) {
+  const completed = typeof count === "number";
+  const errorNotice = byId("apply-result-error");
+  byId("apply-result-title").textContent = completed
+    ? "Recommended settings applied" : "Could not complete recommendations";
+  byId("apply-result-description").textContent = completed
+    ? `${count} ${count === 1 ? "change" : "changes"} made.${count ? " Explorer restarted." : " All recommended settings are already enabled."}`
+    : "The number of changes could not be confirmed.";
+  errorNotice.hidden = !error;
+  errorNotice.textContent = error || "";
+  byId("apply-result").showModal();
+}
+
 async function toggle(command, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   busy = true;
@@ -123,8 +142,9 @@ async function toggle(command, description, skipConfirmation = false, success = 
     if (!skipConfirmation && !await confirmChange(description)) return;
     setStatus("Saving preferences and restarting Explorer…");
     let error = null;
+    let changed;
     try {
-      await invoke(command);
+      changed = await invoke(command);
     } catch (reason) {
       error = String(reason);
     }
@@ -133,7 +153,8 @@ async function toggle(command, description, skipConfirmation = false, success = 
     } catch (reason) {
       error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
     }
-    setStatus(error || success, Boolean(error));
+    setStatus(error || (changed === false || changed === 0 ? "" : success), Boolean(error));
+    if (command === "apply_recommended_settings") showApplyResult(changed, error);
   } catch (reason) {
     setStatus(String(reason), true);
   } finally {

@@ -21,6 +21,7 @@
       <button id="apply-recommended" disabled title="Enable supported recommendations except taskbar alignment and restart Explorer">Enable recommended settings</button>
       <button id="restore-original" disabled title="Restore settings saved on first load and restart Explorer">Revert changes</button>
     </div>
+    <p id="administrator-status" role="alert" hidden></p>
     <details id="explorer-preferences" aria-labelledby="preferences-title">
       <summary>
         <h2 id="preferences-title">Explorer Settings</h2>
@@ -82,7 +83,7 @@
       <div class="preference">
         <div>
           <h3>Hide Home folder</h3>
-          <p class="preference-description">Hides Home from the navigation pane. Requires administrator access.</p>
+          <p class="preference-description">Hides Home from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
           <p id="home-folder" class="preference-value">Loading…</p>
         </div>
         <button id="home-folder-toggle" disabled>Toggle</button>
@@ -90,7 +91,7 @@
       <div class="preference">
         <div>
           <h3>Hide Gallery</h3>
-          <p class="preference-description">Hides Gallery from the navigation pane. Requires administrator access.</p>
+          <p class="preference-description">Hides Gallery from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
           <p id="gallery" class="preference-value">Loading…</p>
         </div>
         <button id="gallery-toggle" disabled>Toggle</button>
@@ -99,7 +100,7 @@
       <div class="preference">
         <div>
           <h3>Hide shortcut arrow icon</h3>
-          <p class="preference-description">Hides the arrow overlay on desktop shortcuts. Requires administrator access.</p>
+          <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
           <p id="shortcut-arrow" class="preference-value">Loading…</p>
         </div>
         <button id="shortcut-arrow-toggle" disabled>Toggle</button>
@@ -114,6 +115,14 @@
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
       <button value="apply" class="primary">Apply &amp; restart</button>
+    </form>
+  </dialog>
+  <dialog id="apply-result" aria-labelledby="apply-result-title" aria-describedby="apply-result-description">
+    <h2 id="apply-result-title">Recommended settings applied</h2>
+    <p id="apply-result-description"></p>
+    <p id="apply-result-error" class="note" hidden></p>
+    <form method="dialog">
+      <button class="primary" autofocus>OK</button>
     </form>
   </dialog>
 </body>

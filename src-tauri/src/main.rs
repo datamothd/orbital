@@ -5,7 +5,6 @@ use orbital::{explorer, sysinfo};
 #[tauri::command]
 async fn system_info() -> Result<sysinfo::SystemInfo, String> {
     let info = sysinfo::collect().map_err(|error| error.to_string())?;
-    // Preview system labels in development without changing the actual tweak checks.
     #[cfg(debug_assertions)]
     let info = {
         let mut info = info;
@@ -27,12 +26,12 @@ async fn explorer_settings() -> Result<explorer::ExplorerSettings, String> {
 }
 
 #[tauri::command]
-async fn apply_recommended_settings() -> Result<(), String> {
+async fn apply_recommended_settings() -> Result<usize, String> {
     explorer::apply_recommended_settings().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn restore_original_settings() -> Result<(), String> {
+async fn restore_original_settings() -> Result<bool, String> {
     explorer::restore_original_settings().map_err(|error| error.to_string())
 }
 
