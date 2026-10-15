@@ -154,7 +154,8 @@ dd {
 }
 
 .tested-system-check,
-.older-system-dash {
+.older-system-dash,
+.unsupported-system-cross {
   display: inline-block;
   margin-left: 6px;
   color: #4ade80;
@@ -165,6 +166,10 @@ dd {
 
 .older-system-dash {
   color: #facc15;
+}
+
+.unsupported-system-cross {
+  color: #f87171;
 }
 
 button {

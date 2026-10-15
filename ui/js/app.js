@@ -73,12 +73,14 @@ async function loadSettings() {
 async function loadSystem() {
   const info = await invoke("system_info");
   const windowsVersion = info.windows_version.trim().toUpperCase();
-  const testedOs = /^Windows 11 (Pro|Home)$/i.test(info.os.trim());
-  const testedVersion = testedOs && windowsVersion === "25H2";
+  const windows11 = /^Windows 11(?: |$)/i.test(info.os.trim());
+  const testedOs = /^Windows 11 Pro$/i.test(info.os.trim());
+  const testedVersion = windows11 && windowsVersion === "25H2";
   const release = /^(\d{2})H([12])$/.exec(windowsVersion);
-  const olderWindows11 = /^Windows 11(?: |$)/i.test(info.os.trim())
+  const olderWindows11 = windows11
     && release !== null
     && (Number(release[1]) < 25 || (Number(release[1]) === 25 && Number(release[2]) < 2));
+  const newerWindows11 = windows11 && release !== null && Number(release[1]) > 25;
   const rows = [
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
     ["CPU", info.cpu], ["Threads", info.threads],
@@ -90,16 +92,24 @@ async function loadSystem() {
     term.textContent = label;
     description.textContent = value;
     const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
-    const yellowDash = label === "Windows" && olderWindows11;
-    if (greenCheck || yellowDash) {
+    const yellowDash = (label === "OS" && windows11 && !testedOs)
+      || (label === "Windows" && (olderWindows11 || newerWindows11));
+    const redCross = label === "OS" && !windows11;
+    if (greenCheck || yellowDash || redCross) {
       const check = document.createElement("span");
-      check.className = greenCheck ? "tested-system-check" : "older-system-dash";
-      check.textContent = greenCheck ? "✓" : "−";
+      check.className = greenCheck ? "tested-system-check" : yellowDash ? "older-system-dash" : "unsupported-system-cross";
+      check.textContent = greenCheck ? "✓" : yellowDash ? "−" : "✕";
       check.title = label === "OS"
-        ? "Matches the tested OS edition: Windows 11 Pro"
+        ? testedOs
+          ? "Matches the tested OS edition: Windows 11 Pro"
+          : windows11
+            ? "Different Windows 11 edition! Features are tested on Windows 11 Pro"
+            : "Different Windows operating system! Features are tested on Windows 11 Pro"
         : greenCheck
           ? "Matches the tested Windows version: 25H2"
-          : "Older Windows 11 release! Features are tested on version 25H2";
+          : newerWindows11
+            ? "Windows version is newer than recommended. Features are tested on version 25H2"
+            : "Windows version is older than recommended. Features are tested on version 25H2";
       check.setAttribute("role", "img");
       check.setAttribute("aria-label", check.title);
       description.append(check);
