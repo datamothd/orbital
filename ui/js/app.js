@@ -12,9 +12,9 @@ const explorerPreferences = [
   { id: "recent-files", field: "hide_recent_files", apply: "Hide recent files and recommendations in Quick Access?", restore: "Show recent files and recommendations in Quick Access?" },
   { id: "frequent-folders", field: "hide_frequent_folders", apply: "Hide frequently used folders in Quick Access?", restore: "Show frequently used folders in Quick Access?" },
   { id: "office-files", field: "hide_office_files", apply: "Hide Office.com cloud files in Quick Access?", restore: "Show Office.com cloud files in Quick Access?", windows11: true },
-  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", windows11: true },
-  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", windows11: true },
-  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?" },
+  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", windows11: true, requiresAdmin: true },
+  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", windows11: true, requiresAdmin: true },
+  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true },
 ];
 
 function setStatus(message, error = false) {
@@ -26,12 +26,14 @@ function setStatus(message, error = false) {
   status.textContent = administrator ? "" : message;
   status.hidden = administrator || !message;
   status.classList.toggle("error", error && !administrator);
+  if (administrator) window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function updateButtons() {
   byId("refresh").disabled = busy || !invoke;
   byId("apply-recommended").disabled = busy || !settings;
   byId("restore-original").disabled = busy || !settings;
+  folderSorting.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !settings
       || (preference.windows11 && !settings.windows11_supported);
@@ -46,10 +48,12 @@ function setPreferenceValue(id, value) {
 
 async function loadSettings() {
   settings = null;
+  folderSorting.load(null, false);
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, "Unavailable");
   }
   settings = await invoke("explorer_settings");
+  folderSorting.load(settings.folder_sort);
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, preference.windows11 && !settings.windows11_supported
       ? "Requires Windows 11"
@@ -134,8 +138,13 @@ function showApplyResult(count, error) {
   byId("apply-result").showModal();
 }
 
-async function toggle(command, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
+async function toggle(command, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.", args = {}) {
   if (busy || !settings) return;
+  const preference = explorerPreferences.find(preference => `toggle_${preference.field}` === command);
+  if (preference?.requiresAdmin && !settings.is_administrator) {
+    setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
+    return;
+  }
   busy = true;
   updateButtons();
   try {
@@ -144,7 +153,7 @@ async function toggle(command, description, skipConfirmation = false, success = 
     let error = null;
     let changed;
     try {
-      changed = await invoke(command);
+      changed = await invoke(command, args);
     } catch (reason) {
       error = String(reason);
     }
@@ -170,6 +179,16 @@ byId("apply-recommended").addEventListener("click", () => toggle(
 byId("restore-original").addEventListener("click", () => toggle(
   "restore_original_settings", "", true, "Original settings restored. Explorer restarted.",
 ));
+byId("folder-sort-apply").addEventListener("click", (event) => {
+  const sort = folderSorting.selected;
+  if (sort) toggle(
+    "set_folder_sort",
+    `Use ${folderSorting.label.toLowerCase()} across all folder types? Saved folder views will be reset.`,
+    event.shiftKey,
+    "Default folder sorting saved. Explorer restarted.",
+    { sort },
+  );
+});
 for (const preference of explorerPreferences) {
   byId(`${preference.id}-toggle`).addEventListener("click", (event) => toggle(
     `toggle_${preference.field}`,
@@ -181,6 +200,7 @@ for (const preference of explorerPreferences) {
 if (invoke) {
   refresh();
 } else {
+  folderSorting.load(null, false);
   byId("system").textContent = "Open Orbital with npm run dev to read system information.";
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, "Unavailable");

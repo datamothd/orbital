@@ -265,6 +265,68 @@ button:disabled {
   color: #f87171;
 }
 
+.folder-sort-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 216px;
+}
+
+#folder-sort-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  color: #facc15;
+}
+
+.picker-arrow {
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  margin-bottom: 3px;
+}
+
+#folder-sort-picker[aria-expanded="true"] .picker-arrow {
+  transform: rotate(225deg);
+  margin-bottom: -3px;
+}
+
+#folder-sort-options {
+  position: fixed;
+  z-index: 10;
+  overflow-y: auto;
+  padding: 4px;
+  background: #171717;
+  border: 1px solid #555555;
+  border-radius: 7px;
+  box-shadow: 0 8px 24px #0009;
+  font-size: 12px;
+  outline: none;
+}
+
+#folder-sort-options [role="option"] {
+  padding: 9px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#folder-sort-options [role="option"]:hover,
+#folder-sort-options .active {
+  background: #292929;
+}
+
+#folder-sort-options [aria-selected="true"] {
+  color: #facc15;
+}
+
 .note {
   color: #b3b3b3;
   font-size: 12px;
@@ -335,5 +397,16 @@ button.primary:hover {
 @media (max-width: 440px) {
   :root {
     --panel-padding: 16px;
+  }
+
+  .folder-sort-preference {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .folder-sort-controls {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
   }
 }

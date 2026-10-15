@@ -1,3 +1,8 @@
+#[path = "explorer/folder_sort.rs"]
+mod folder_sort;
+
+pub use folder_sort::{FolderSort, SortColumn};
+
 use std::os::windows::process::CommandExt;
 use std::{
     fs::OpenOptions,
@@ -18,6 +23,42 @@ const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\
 const SHELL_ICONS_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons";
 const HOME_CLSID: &str = "{f874310e-b6b7-47dc-bc84-b9e6b38f5903}";
 const GALLERY_CLSID: &str = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}";
+
+fn is_administrator() -> io::Result<bool> {
+    use std::ffi::c_void;
+
+    #[repr(C)]
+    struct AdministratorSid {
+        revision: u8,
+        subauthority_count: u8,
+        authority: [u8; 6],
+        subauthorities: [u32; 2],
+    }
+
+    #[link(name = "advapi32")]
+    unsafe extern "system" {
+        fn CheckTokenMembership(token: *mut c_void, sid: *const c_void, member: *mut i32) -> i32;
+    }
+
+    let sid = AdministratorSid {
+        revision: 1,
+        subauthority_count: 2,
+        authority: [0, 0, 0, 0, 0, 5],
+        subauthorities: [32, 544],
+    };
+    let mut member = 0;
+    if unsafe {
+        CheckTokenMembership(
+            std::ptr::null_mut(),
+            std::ptr::from_ref(&sid).cast(),
+            &mut member,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(member != 0)
+}
 
 fn supports_windows11() -> io::Result<bool> {
     let key = HKLM.open_subkey_with_flags(
@@ -46,6 +87,8 @@ fn classic_context_menu_enabled() -> io::Result<bool> {
 
 #[derive(serde::Serialize)]
 pub struct ExplorerSettings {
+    pub is_administrator: bool,
+    pub folder_sort: Option<FolderSort>,
     pub disable_taskbar_centering: bool,
     pub disable_explorer_spacing: bool,
     pub disable_modern_context_menu: bool,
@@ -61,6 +104,8 @@ pub struct ExplorerSettings {
 pub fn settings() -> io::Result<ExplorerSettings> {
     let windows11_supported = supports_windows11()?;
     Ok(ExplorerSettings {
+        is_administrator: is_administrator()?,
+        folder_sort: folder_sort::current()?,
         disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
         disable_explorer_spacing: DISABLE_EXPLORER_SPACING.enabled_in(HKCU)?,
         disable_modern_context_menu: windows11_supported && classic_context_menu_enabled()?,
@@ -650,13 +695,19 @@ fn original_changes<'a>(
 pub fn restore_original_settings() -> io::Result<bool> {
     let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
     let changes = pending_changes(original_changes(HKCU, HKLM, &backup)?)?;
-    if changes.is_empty() {
+    let prepared = prepare_changes(&changes)?;
+    let sorting_restored = folder_sort::restore()?;
+    if changes.is_empty() && !sorting_restored {
         return Ok(false);
     }
-    let prepared = prepare_changes(&changes)?;
     apply_changes(&changes, &prepared)?;
     restart_explorer("Original settings")?;
     Ok(true)
+}
+
+pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
+    folder_sort::apply(sort)?;
+    restart_explorer("Folder sorting")
 }
 
 fn transparent_icon() -> Vec<u8> {
@@ -749,6 +800,15 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn administrator_check_matches_windows() {
+        #[link(name = "shell32")]
+        unsafe extern "system" {
+            fn IsUserAnAdmin() -> i32;
+        }
+        assert_eq!(is_administrator().unwrap(), unsafe { IsUserAnAdmin() } != 0);
+    }
 
     struct TestRegistry {
         key: RegKey,
