@@ -13,8 +13,7 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 ## Current features
 
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
-- Toggles for 9 different Windows preferences (only for Explorer related settings for now).
-- Default column sorting across Explorer folder types, with ascending and descending order.
+- Toggles for 11 different Windows preferences (only for Explorer related settings for now).
 - Tauri app interface for value editing.
 - Setting preference state in mass and change reverting.
 

@@ -49,7 +49,8 @@ main:has(> #status[hidden]) > details:last-of-type {
 
 .section-header,
 summary,
-.preference {
+.preference,
+.folder-view-picker {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -141,7 +142,9 @@ dl {
   font-size: 13px;
 }
 
-dt {
+dt,
+.preference .preference-description,
+.note {
   color: #b3b3b3;
 }
 
@@ -192,8 +195,7 @@ button:disabled {
 .settings-actions {
   display: flex;
   gap: 10px;
-  margin-top: -8px;
-  margin-bottom: 8px;
+  margin: -8px 0 8px;
 }
 
 .settings-actions button {
@@ -231,7 +233,6 @@ button:disabled {
 }
 
 .preference .preference-description {
-  color: #b3b3b3;
   line-height: 1.4;
   margin: 0 0 6px;
 }
@@ -265,7 +266,7 @@ button:disabled {
   color: #f87171;
 }
 
-.folder-sort-controls {
+.folder-view-controls {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -274,10 +275,7 @@ button:disabled {
   width: 216px;
 }
 
-#folder-sort-picker {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.folder-view-picker {
   gap: 10px;
   width: 100%;
   text-align: left;
@@ -294,12 +292,12 @@ button:disabled {
   margin-bottom: 3px;
 }
 
-#folder-sort-picker[aria-expanded="true"] .picker-arrow {
+.folder-view-picker[aria-expanded="true"] .picker-arrow {
   transform: rotate(225deg);
   margin-bottom: -3px;
 }
 
-#folder-sort-options {
+.folder-view-options {
   position: fixed;
   z-index: 10;
   overflow-y: auto;
@@ -312,23 +310,22 @@ button:disabled {
   outline: none;
 }
 
-#folder-sort-options [role="option"] {
+.folder-view-options [role="option"] {
   padding: 9px 10px;
   border-radius: 4px;
   cursor: pointer;
 }
 
-#folder-sort-options [role="option"]:hover,
-#folder-sort-options .active {
+.folder-view-options [role="option"]:hover,
+.folder-view-options .active {
   background: #292929;
 }
 
-#folder-sort-options [aria-selected="true"] {
+.folder-view-options [aria-selected="true"] {
   color: #facc15;
 }
 
 .note {
-  color: #b3b3b3;
   font-size: 12px;
   line-height: 1.6;
   margin: 14px 0 0;
@@ -399,12 +396,12 @@ button.primary:hover {
     --panel-padding: 16px;
   }
 
-  .folder-sort-preference {
+  .folder-view-preference {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .folder-sort-controls {
+  .folder-view-controls {
     flex-direction: row;
     align-items: center;
     width: 100%;

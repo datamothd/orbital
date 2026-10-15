@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Orbital</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/folder-sort.js" defer></script>
+  <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
   <script src="js/window.js" defer></script>
 </head>
@@ -19,7 +19,7 @@
       <dl id="system"><dt>System information</dt><dd>Loading…</dd></dl>
     </section>
     <div class="settings-actions" role="group" aria-label="Settings actions">
-      <button id="apply-recommended" disabled title="Enable supported recommendations except personal preferences and restart Explorer">Enable recommended settings</button>
+      <button id="apply-recommended" disabled title="Enable supported recommendations, sort folders by Type, set Group by to None, and restart Explorer. Hold Shift to skip confirmation.">Enable recommended settings</button>
       <button id="restore-original" disabled title="Restore settings saved on first load and restart Explorer">Revert changes</button>
     </div>
     <p id="administrator-status" role="alert" hidden></p>
@@ -38,18 +38,32 @@
         </div>
         <button id="taskbar-centering-toggle" disabled>Toggle</button>
       </div>
-      <div class="preference folder-sort-preference">
+      <div class="preference folder-view-preference">
         <div>
           <h3 id="folder-sort-label">Default folder sorting</h3>
           <p class="preference-description">Sets sorting across all folder types. Resets saved folder views.</p>
           <p id="folder-sort-value" class="preference-value">Loading…</p>
         </div>
-        <div class="folder-sort-controls">
-          <button id="folder-sort-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
+        <div class="folder-view-controls">
+          <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
             <span id="folder-sort-selection">Choose sorting</span>
             <span class="picker-arrow" aria-hidden="true"></span>
           </button>
           <button id="folder-sort-apply" disabled>Apply</button>
+        </div>
+      </div>
+      <div class="preference folder-view-preference">
+        <div>
+          <h3 id="folder-grouping-label">Default folder grouping</h3>
+          <p class="preference-description">Sets grouping across all folder types. Resets saved folder views.</p>
+          <p id="folder-grouping-value" class="preference-value">Loading…</p>
+        </div>
+        <div class="folder-view-controls">
+          <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
+            <span id="folder-grouping-selection">Choose grouping</span>
+            <span class="picker-arrow" aria-hidden="true"></span>
+          </button>
+          <button id="folder-grouping-apply" disabled>Apply</button>
         </div>
       </div>
       <h3 class="preference-group">File Explorer</h3>
@@ -123,7 +137,8 @@
     </details>
     <p id="status" role="status" aria-live="polite">Reading your system…</p>
   </main>
-  <div id="folder-sort-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
+  <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
+  <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
   <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
     <h2 id="confirm-title">Change preference?</h2>
     <p id="confirm-description"></p>

@@ -1,29 +1,17 @@
 "use strict";
 
-const folderSorting = (() => {
-  const picker = document.getElementById("folder-sort-picker");
-  const menu = document.getElementById("folder-sort-options");
-  const selection = document.getElementById("folder-sort-selection");
-  const apply = document.getElementById("folder-sort-apply");
-  const value = document.getElementById("folder-sort-value");
-  const choices = [
-    ["name", false, "Name · A to Z"],
-    ["name", true, "Name · Z to A"],
-    ["date_modified", true, "Modified · newest first"],
-    ["date_modified", false, "Modified · oldest first"],
-    ["date_created", true, "Created · newest first"],
-    ["date_created", false, "Created · oldest first"],
-    ["type", false, "Type · A to Z"],
-    ["type", true, "Type · Z to A"],
-    ["size", true, "Size · largest first"],
-    ["size", false, "Size · smallest first"],
-  ].map(([column, descending, label]) => ({ column, descending, label }));
+function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
+  const picker = document.getElementById(`${id}-picker`);
+  const menu = document.getElementById(`${id}-options`);
+  const selection = document.getElementById(`${id}-selection`);
+  const apply = document.getElementById(`${id}-apply`);
+  const value = document.getElementById(`${id}-value`);
   let selected = -1;
   let active = 0;
 
   const options = choices.map((choice, index) => {
     const option = document.createElement("div");
-    option.id = `folder-sort-option-${index}`;
+    option.id = `${id}-option-${index}`;
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", "false");
     option.textContent = choice.label;
@@ -107,10 +95,10 @@ const folderSorting = (() => {
   }, true);
 
   return {
-    load(sort, available = true) {
-      selected = choices.findIndex(choice => choice.column === sort?.column && choice.descending === sort?.descending);
-      selection.textContent = selected < 0 ? "Choose sorting" : choices[selected].label;
-      value.textContent = !available ? "Unavailable" : selected < 0 ? "Windows defaults or mixed sorting" : choices[selected].label;
+    load(current, available = true) {
+      selected = choices.findIndex(choice => matches(choice.value, current));
+      selection.textContent = selected < 0 ? placeholder : choices[selected].label;
+      value.textContent = !available ? "Unavailable" : selected < 0 ? fallback : choices[selected].label;
       options.forEach((option, index) => option.setAttribute("aria-selected", String(index === selected)));
       close();
     },
@@ -120,12 +108,35 @@ const folderSorting = (() => {
       if (disabled) close();
     },
     get selected() {
-      if (selected < 0) return null;
-      const { column, descending } = choices[selected];
-      return { column, descending };
+      return choices[selected]?.value ?? null;
     },
     get label() {
       return choices[selected]?.label;
     },
   };
-})();
+}
+
+const folderSorting = createFolderPicker("folder-sort", [
+  ["name", false, "Name · A to Z"],
+  ["name", true, "Name · Z to A"],
+  ["date_modified", true, "Modified · newest first"],
+  ["date_modified", false, "Modified · oldest first"],
+  ["date_created", true, "Created · newest first"],
+  ["date_created", false, "Created · oldest first"],
+  ["type", false, "Type · A to Z"],
+  ["type", true, "Type · Z to A"],
+  ["size", true, "Size · largest first"],
+  ["size", false, "Size · smallest first"],
+].map(([column, descending, label]) => ({ value: { column, descending }, label })),
+"Choose sorting", "Windows defaults or mixed sorting",
+(a, b) => a.column === b?.column && a.descending === b?.descending);
+
+const folderGrouping = createFolderPicker("folder-grouping", [
+  ["none", "None"],
+  ["name", "Name"],
+  ["date_modified", "Date modified"],
+  ["date_created", "Date created"],
+  ["type", "Type"],
+  ["size", "Size"],
+].map(([value, label]) => ({ value, label })),
+"Choose grouping", "Windows defaults or mixed grouping");

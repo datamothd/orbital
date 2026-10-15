@@ -1,7 +1,7 @@
-#[path = "explorer/folder_sort.rs"]
-mod folder_sort;
+#[path = "explorer/folder_views.rs"]
+mod folder_views;
 
-pub use folder_sort::{FolderSort, SortColumn};
+pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
 
 use std::os::windows::process::CommandExt;
 use std::{
@@ -73,22 +73,19 @@ fn supports_windows11() -> io::Result<bool> {
 }
 
 fn classic_context_menu_enabled() -> io::Result<bool> {
-    let key = match HKCU.open_subkey_with_flags(CLASSIC_CONTEXT_MENU_KEY, KEY_QUERY_VALUE) {
-        Ok(key) => key,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(error),
+    let Some(key) =
+        optional(HKCU.open_subkey_with_flags(CLASSIC_CONTEXT_MENU_KEY, KEY_QUERY_VALUE))?
+    else {
+        return Ok(false);
     };
-    match key.get_value::<String, _>("") {
-        Ok(value) => Ok(value.is_empty()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error),
-    }
+    Ok(optional(key.get_value::<String, _>(""))?.is_some_and(|value| value.is_empty()))
 }
 
 #[derive(serde::Serialize)]
 pub struct ExplorerSettings {
     pub is_administrator: bool,
     pub folder_sort: Option<FolderSort>,
+    pub folder_grouping: Option<FolderGrouping>,
     pub disable_taskbar_centering: bool,
     pub disable_explorer_spacing: bool,
     pub disable_modern_context_menu: bool,
@@ -105,7 +102,8 @@ pub fn settings() -> io::Result<ExplorerSettings> {
     let windows11_supported = supports_windows11()?;
     Ok(ExplorerSettings {
         is_administrator: is_administrator()?,
-        folder_sort: folder_sort::current()?,
+        folder_sort: folder_views::current()?,
+        folder_grouping: folder_views::current_grouping()?,
         disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
         disable_explorer_spacing: DISABLE_EXPLORER_SPACING.enabled_in(HKCU)?,
         disable_modern_context_menu: windows11_supported && classic_context_menu_enabled()?,
@@ -135,52 +133,59 @@ fn confirm(prompt: &str) -> io::Result<bool> {
     }
 }
 
-pub fn toggle_disable_taskbar_centering(yes: bool) -> io::Result<()> {
-    DISABLE_TASKBAR_CENTERING.toggle(yes)
+#[derive(Clone, Copy, clap::Subcommand, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Preference {
+    DisableTaskbarCentering,
+    DisableExplorerSpacing,
+    DisableModernContextMenu,
+    HideRecentFiles,
+    HideFrequentFolders,
+    HideOfficeFiles,
+    HideHomeFolder,
+    HideGallery,
+    HideShortcutArrow,
 }
 
-pub fn toggle_disable_explorer_spacing(yes: bool) -> io::Result<()> {
-    DISABLE_EXPLORER_SPACING.toggle(yes)
+pub fn toggle_preference(preference: Preference, yes: bool) -> io::Result<()> {
+    match preference {
+        Preference::DisableTaskbarCentering => DISABLE_TASKBAR_CENTERING.toggle(yes),
+        Preference::DisableExplorerSpacing => DISABLE_EXPLORER_SPACING.toggle(yes),
+        Preference::DisableModernContextMenu => toggle_modern_context_menu(yes),
+        Preference::HideRecentFiles => HIDE_RECENT_FILES.toggle(yes),
+        Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.toggle(yes),
+        Preference::HideOfficeFiles => {
+            require_windows11(HIDE_OFFICE_FILES.name)?;
+            HIDE_OFFICE_FILES.toggle(yes)
+        }
+        Preference::HideHomeFolder => toggle_namespace("Hide Home folder", HOME_CLSID, yes),
+        Preference::HideGallery => toggle_namespace("Hide Gallery", GALLERY_CLSID, yes),
+        Preference::HideShortcutArrow => toggle_shortcut_arrow(yes),
+    }
 }
 
-pub fn toggle_disable_modern_context_menu(yes: bool) -> io::Result<()> {
+fn toggle_modern_context_menu(yes: bool) -> io::Result<()> {
     let name = "Disable Windows 11 context menu";
     require_windows11(name)?;
     let current = classic_context_menu_enabled()?;
-    if !confirm_toggle(name, current, yes)? {
-        return Ok(());
-    }
     let changes = [RegistryChange::new(
         HKCU,
         CLASSIC_CONTEXT_MENU_KEY,
         "",
         if current {
-            SettingValue::Delete
+            None
         } else {
-            SettingValue::String(String::new())
+            Some("".to_reg_value())
         },
     )];
-    let prepared = prepare_changes(&changes)?;
-    apply_changes(&changes, &prepared)?;
-    println!(
-        "{name} saved: {}",
-        if current { "disabled" } else { "enabled" }
-    );
-    restart_explorer(name)
+    apply_toggle(name, current, yes, &changes)
 }
 
 fn read_toggle(root: &RegKey, path: &str, name: &str, default: bool) -> io::Result<bool> {
-    let key = match root.open_subkey_with_flags(path, KEY_QUERY_VALUE) {
-        Ok(key) => key,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(default),
-        Err(error) => return Err(error),
+    let Some(key) = optional(root.open_subkey_with_flags(path, KEY_QUERY_VALUE))? else {
+        return Ok(default);
     };
-    let value: u32 = match key.get_value(name) {
-        Ok(value) => value,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(default),
-        Err(error) => return Err(error),
-    };
-    match value {
+    match optional(key.get_value::<u32, _>(name))?.unwrap_or(u32::from(default)) {
         0 => Ok(false),
         1 => Ok(true),
         _ => Err(io::Error::other(format!("{name} must be 0 or 1"))),
@@ -221,19 +226,12 @@ fn shortcut_arrows_hidden() -> io::Result<Option<bool>> {
     shortcut_arrows_hidden_in(HKLM, &blank_icon_path()?)
 }
 
-fn shortcut_arrows_hidden_in(
-    root: &RegKey,
-    blank_path: &std::path::Path,
-) -> io::Result<Option<bool>> {
-    let key = match root.open_subkey_with_flags(SHELL_ICONS_KEY, KEY_QUERY_VALUE) {
-        Ok(key) => key,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Some(false)),
-        Err(error) => return Err(error),
+fn shortcut_arrows_hidden_in(root: &RegKey, blank_path: &Path) -> io::Result<Option<bool>> {
+    let Some(key) = optional(root.open_subkey_with_flags(SHELL_ICONS_KEY, KEY_QUERY_VALUE))? else {
+        return Ok(Some(false));
     };
-    let overlay: String = match key.get_value("29") {
-        Ok(value) => value,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Some(false)),
-        Err(error) => return Err(error),
+    let Some(overlay) = optional(key.get_value::<String, _>("29"))? else {
+        return Ok(Some(false));
     };
     if overlay.eq_ignore_ascii_case(&blank_path.to_string_lossy()) && blank_path.is_file() {
         return Ok(Some(true));
@@ -241,36 +239,43 @@ fn shortcut_arrows_hidden_in(
     Ok(None)
 }
 
-enum SettingValue {
-    Dword(u32),
-    String(String),
-    Raw(RegValue<'static>),
-    Delete,
-}
-
 struct RegistryChange<'a> {
     root: &'a RegKey,
     path: String,
     name: String,
-    value: SettingValue,
+    value: Option<RegValue<'static>>,
 }
 
 impl<'a> RegistryChange<'a> {
-    fn new(root: &'a RegKey, path: &str, name: &str, value: SettingValue) -> Self {
+    fn new(root: &'a RegKey, path: &str, name: &str, value: Option<RegValue<'_>>) -> Self {
         Self {
             root,
             path: path.into(),
             name: name.into(),
-            value,
+            value: value.map(|value| RegValue {
+                bytes: value.bytes.into_owned().into(),
+                vtype: value.vtype,
+            }),
         }
     }
 }
 
 fn delete_value_if_present(key: &RegKey, name: &str) -> io::Result<()> {
-    match key.delete_value(name) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+    optional(key.delete_value(name)).map(|_| ())
+}
+
+fn optional<T>(result: io::Result<T>) -> io::Result<Option<T>> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
+    }
+}
+
+fn write_value(key: &RegKey, name: &str, value: Option<&RegValue<'_>>) -> io::Result<()> {
+    match value {
+        Some(value) => key.set_raw_value(name, value),
+        None => delete_value_if_present(key, name),
     }
 }
 
@@ -294,11 +299,7 @@ fn prepare_changes(changes: &[RegistryChange<'_>]) -> io::Result<Vec<RegistrySna
             let (key, _) = change
                 .root
                 .create_subkey_with_flags(&change.path, KEY_QUERY_VALUE | KEY_SET_VALUE)?;
-            let previous = match key.get_raw_value(&change.name) {
-                Ok(value) => Some(value),
-                Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-                Err(error) => return Err(error),
-            };
+            let previous = optional(key.get_raw_value(&change.name))?;
             Ok((key, previous))
         })
         .collect::<io::Result<_>>()
@@ -307,20 +308,10 @@ fn prepare_changes(changes: &[RegistryChange<'_>]) -> io::Result<Vec<RegistrySna
 
 fn apply_changes(changes: &[RegistryChange<'_>], prepared: &[RegistrySnapshot]) -> io::Result<()> {
     for (index, (change, (key, _))) in changes.iter().zip(prepared).enumerate() {
-        let result = match &change.value {
-            SettingValue::Dword(value) => key.set_value(&change.name, value),
-            SettingValue::String(value) => key.set_value(&change.name, value),
-            SettingValue::Raw(value) => key.set_raw_value(&change.name, value),
-            SettingValue::Delete => delete_value_if_present(key, &change.name),
-        };
-        if let Err(error) = result {
+        if let Err(error) = write_value(key, &change.name, change.value.as_ref()) {
             let mut failures = Vec::new();
             for (change, (key, previous)) in changes[..index].iter().zip(&prepared[..index]).rev() {
-                let restored = match previous {
-                    Some(value) => key.set_raw_value(&change.name, value),
-                    None => delete_value_if_present(key, &change.name),
-                };
-                if let Err(error) = restored {
+                if let Err(error) = write_value(key, &change.name, previous.as_ref()) {
                     failures.push(format!("{}: {error}", change.name));
                 }
             }
@@ -350,11 +341,28 @@ fn confirm_toggle(name: &str, current: bool, yes: bool) -> io::Result<bool> {
     Ok(true)
 }
 
+fn apply_toggle(
+    name: &str,
+    current: bool,
+    yes: bool,
+    changes: &[RegistryChange<'_>],
+) -> io::Result<()> {
+    if !confirm_toggle(name, current, yes)? {
+        return Ok(());
+    }
+    let prepared = prepare_changes(changes)?;
+    apply_changes(changes, &prepared)?;
+    println!(
+        "{name} saved: {}",
+        if current { "disabled" } else { "enabled" }
+    );
+    restart_explorer(name)
+}
+
 struct DwordPreference {
     name: &'static str,
     path: &'static str,
     values: &'static [&'static str],
-    default: bool,
     enabled_value: bool,
     delete_when_disabled: bool,
 }
@@ -363,7 +371,6 @@ const DISABLE_TASKBAR_CENTERING: DwordPreference = DwordPreference {
     name: "Disable centered taskbar icons",
     path: ADVANCED_KEY,
     values: &["TaskbarAl"],
-    default: true,
     enabled_value: false,
     delete_when_disabled: false,
 };
@@ -371,7 +378,6 @@ const DISABLE_EXPLORER_SPACING: DwordPreference = DwordPreference {
     name: "Disable extra spacing",
     path: ADVANCED_KEY,
     values: &["UseCompactMode"],
-    default: false,
     enabled_value: true,
     delete_when_disabled: false,
 };
@@ -379,7 +385,6 @@ const HIDE_RECENT_FILES: DwordPreference = DwordPreference {
     name: "Hide recently used files",
     path: EXPLORER_KEY,
     values: &["ShowRecent", "ShowRecommendations"],
-    default: true,
     enabled_value: false,
     delete_when_disabled: false,
 };
@@ -387,7 +392,6 @@ const HIDE_FREQUENT_FOLDERS: DwordPreference = DwordPreference {
     name: "Hide frequently used folders",
     path: EXPLORER_KEY,
     values: &["ShowFrequent"],
-    default: true,
     enabled_value: false,
     delete_when_disabled: false,
 };
@@ -395,7 +399,6 @@ const HIDE_OFFICE_FILES: DwordPreference = DwordPreference {
     name: "Hide files from Office.com",
     path: EXPLORER_KEY,
     values: &["ShowCloudFilesInQuickAccess"],
-    default: true,
     enabled_value: false,
     delete_when_disabled: true,
 };
@@ -404,23 +407,21 @@ impl DwordPreference {
     fn enabled_in(&self, root: &RegKey) -> io::Result<bool> {
         let mut enabled = true;
         for value in self.values {
-            enabled &= read_toggle(root, self.path, value, self.default)? == self.enabled_value;
+            enabled &=
+                read_toggle(root, self.path, value, !self.enabled_value)? == self.enabled_value;
         }
         Ok(enabled)
     }
 
     fn changes_in<'a>(&self, root: &'a RegKey, enabled: bool) -> Vec<RegistryChange<'a>> {
+        let next_value = u32::from(enabled == self.enabled_value);
         self.values
             .iter()
             .map(|value| {
                 let next = if !enabled && self.delete_when_disabled {
-                    SettingValue::Delete
+                    None
                 } else {
-                    SettingValue::Dword(u32::from(if enabled {
-                        self.enabled_value
-                    } else {
-                        !self.enabled_value
-                    }))
+                    Some(next_value.to_reg_value())
                 };
                 RegistryChange::new(root, self.path, value, next)
             })
@@ -429,27 +430,8 @@ impl DwordPreference {
 
     fn toggle(&self, yes: bool) -> io::Result<()> {
         let current = self.enabled_in(HKCU)?;
-        if !confirm_toggle(self.name, current, yes)? {
-            return Ok(());
-        }
-        let changes = self.changes_in(HKCU, !current);
-        let prepared = prepare_changes(&changes)?;
-        apply_changes(&changes, &prepared)?;
-        println!(
-            "{} saved: {}",
-            self.name,
-            if current { "disabled" } else { "enabled" }
-        );
-        restart_explorer(self.name)
+        apply_toggle(self.name, current, yes, &self.changes_in(HKCU, !current))
     }
-}
-
-pub fn toggle_hide_recent_files(yes: bool) -> io::Result<()> {
-    HIDE_RECENT_FILES.toggle(yes)
-}
-
-pub fn toggle_hide_frequent_folders(yes: bool) -> io::Result<()> {
-    HIDE_FREQUENT_FOLDERS.toggle(yes)
 }
 
 fn require_windows11(name: &str) -> io::Result<()> {
@@ -460,25 +442,11 @@ fn require_windows11(name: &str) -> io::Result<()> {
     }
 }
 
-pub fn toggle_hide_office_files(yes: bool) -> io::Result<()> {
-    require_windows11(HIDE_OFFICE_FILES.name)?;
-    HIDE_OFFICE_FILES.toggle(yes)
-}
-
 fn toggle_namespace(name: &str, clsid: &str, yes: bool) -> io::Result<()> {
     require_windows11(name)?;
     let current = !namespace_visible(clsid)?;
-    if !confirm_toggle(name, current, yes)? {
-        return Ok(());
-    }
     let changes = namespace_changes(HKCU, HKLM, clsid, current);
-    let prepared = prepare_changes(&changes)?;
-    apply_changes(&changes, &prepared)?;
-    println!(
-        "{name} saved: {}",
-        if current { "disabled" } else { "enabled" }
-    );
-    restart_explorer(name)
+    apply_toggle(name, current, yes, &changes)
 }
 
 fn namespace_changes<'a>(
@@ -493,29 +461,21 @@ fn namespace_changes<'a>(
             user,
             &pinned,
             "System.IsPinnedToNameSpaceTree",
-            SettingValue::Dword(u32::from(visible)),
+            Some(u32::from(visible).to_reg_value()),
         ),
         RegistryChange::new(
             machine,
             &non_enum,
             clsid,
-            SettingValue::Dword(u32::from(!visible)),
+            Some(u32::from(!visible).to_reg_value()),
         ),
         RegistryChange::new(
             machine,
             &hidden,
             "HiddenByDefault",
-            SettingValue::Dword(u32::from(!visible)),
+            Some(u32::from(!visible).to_reg_value()),
         ),
     ]
-}
-
-pub fn toggle_hide_home_folder(yes: bool) -> io::Result<()> {
-    toggle_namespace("Hide Home folder", HOME_CLSID, yes)
-}
-
-pub fn toggle_hide_gallery(yes: bool) -> io::Result<()> {
-    toggle_namespace("Hide Gallery", GALLERY_CLSID, yes)
 }
 
 fn settings_changes<'a>(
@@ -538,18 +498,13 @@ fn settings_changes<'a>(
             user,
             CLASSIC_CONTEXT_MENU_KEY,
             "",
-            SettingValue::String(String::new()),
+            Some("".to_reg_value()),
         ));
         for clsid in [HOME_CLSID, GALLERY_CLSID] {
             changes.extend(namespace_changes(user, machine, clsid, false));
         }
     }
-    changes.push(RegistryChange::new(
-        machine,
-        SHELL_ICONS_KEY,
-        "29",
-        SettingValue::Delete,
-    ));
+    changes.push(RegistryChange::new(machine, SHELL_ICONS_KEY, "29", None));
     changes
 }
 
@@ -576,22 +531,17 @@ fn recommended_changes<'a>(
             machine,
             SHELL_ICONS_KEY,
             "29",
-            SettingValue::String(icon.to_string_lossy().into_owned()),
+            Some(icon.as_os_str().to_reg_value()),
         ));
     }
     Ok(changes)
 }
 
 fn read_original(root: &RegKey, path: &str, name: &str) -> io::Result<Option<RegValue<'static>>> {
-    match root.open_subkey_with_flags(path, KEY_QUERY_VALUE) {
-        Ok(key) => match key.get_raw_value(name) {
-            Ok(value) => Ok(Some(value)),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(error),
-        },
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error),
-    }
+    let Some(key) = optional(root.open_subkey_with_flags(path, KEY_QUERY_VALUE))? else {
+        return Ok(None);
+    };
+    optional(key.get_raw_value(name))
 }
 
 fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io::Result<RegKey> {
@@ -607,10 +557,7 @@ fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io:
     let (key, _) = user.create_subkey(BACKUP_KEY)?;
     for (index, value) in originals.iter().enumerate() {
         let name = index.to_string();
-        match value {
-            Some(value) => key.set_raw_value(&name, value)?,
-            None => delete_value_if_present(&key, &name)?,
-        }
+        write_value(&key, &name, value.as_ref())?;
     }
     key.set_value("Windows11", &u32::from(windows11))?;
     Ok(key)
@@ -620,21 +567,22 @@ pub fn save_original_settings() -> io::Result<()> {
     original_settings_in(HKCU, HKLM, supports_windows11()?).map(|_| ())
 }
 
-pub fn apply_recommended_settings() -> io::Result<usize> {
+pub fn apply_recommended_settings(preview: bool) -> io::Result<usize> {
     let windows11 = supports_windows11()?;
-    original_settings_in(HKCU, HKLM, windows11)?;
     let icon = blank_icon_path()?;
     let changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
+    let view_changes = folder_views::recommended_changes()?;
     let missing_icon = !icon.is_file();
-    if changes.is_empty() && !missing_icon {
-        return Ok(0);
+    let count = changed_preferences(&changes, missing_icon) + view_changes.len();
+    if preview || count == 0 {
+        return Ok(count);
     }
+    original_settings_in(HKCU, HKLM, windows11)?;
     let prepared = prepare_changes(&changes)?;
-    let count = changed_preferences(&changes, missing_icon);
     if missing_icon {
         ensure_blank_icon()?;
     }
-    apply_changes(&changes, &prepared)?;
+    folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
     restart_explorer("Recommended settings")?;
     Ok(count)
 }
@@ -663,13 +611,7 @@ fn pending_changes(changes: Vec<RegistryChange<'_>>) -> io::Result<Vec<RegistryC
     let mut pending = Vec::new();
     for change in changes {
         let current = read_original(change.root, &change.path, &change.name)?;
-        let changed = match &change.value {
-            SettingValue::Dword(value) => current.as_ref() != Some(&value.to_reg_value()),
-            SettingValue::String(value) => current.as_ref() != Some(&value.to_reg_value()),
-            SettingValue::Raw(value) => current.as_ref() != Some(value),
-            SettingValue::Delete => current.is_some(),
-        };
-        if changed {
+        if current != change.value {
             pending.push(change);
         }
     }
@@ -684,10 +626,7 @@ fn original_changes<'a>(
     let windows11 = read_toggle(backup, "", "Windows11", false)?;
     let mut changes = settings_changes(user, machine, windows11);
     for (index, change) in changes.iter_mut().enumerate() {
-        change.value = match read_original(backup, "", &index.to_string())? {
-            Some(value) => SettingValue::Raw(value),
-            None => SettingValue::Delete,
-        };
+        change.value = read_original(backup, "", &index.to_string())?;
     }
     Ok(changes)
 }
@@ -696,8 +635,8 @@ pub fn restore_original_settings() -> io::Result<bool> {
     let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
     let changes = pending_changes(original_changes(HKCU, HKLM, &backup)?)?;
     let prepared = prepare_changes(&changes)?;
-    let sorting_restored = folder_sort::restore()?;
-    if changes.is_empty() && !sorting_restored {
+    let views_restored = folder_views::restore()?;
+    if changes.is_empty() && !views_restored {
         return Ok(false);
     }
     apply_changes(&changes, &prepared)?;
@@ -706,8 +645,13 @@ pub fn restore_original_settings() -> io::Result<bool> {
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
-    folder_sort::apply(sort)?;
+    folder_views::apply(sort)?;
     restart_explorer("Folder sorting")
+}
+
+pub fn set_folder_grouping(grouping: FolderGrouping) -> io::Result<()> {
+    folder_views::apply_grouping(grouping)?;
+    restart_explorer("Folder grouping")
 }
 
 fn transparent_icon() -> Vec<u8> {
@@ -740,22 +684,22 @@ fn ensure_blank_icon() -> io::Result<PathBuf> {
     Ok(path)
 }
 
-pub fn toggle_hide_shortcut_arrow(yes: bool) -> io::Result<()> {
+fn toggle_shortcut_arrow(yes: bool) -> io::Result<()> {
     let name = "Hide shortcut arrow icon";
     let current = shortcut_arrows_hidden()?.unwrap_or(false);
     if !confirm_toggle(name, current, yes)? {
         return Ok(());
     }
-    let mut changes = [RegistryChange::new(
-        HKLM,
-        SHELL_ICONS_KEY,
-        "29",
-        SettingValue::Delete,
-    )];
+    let mut changes = [RegistryChange::new(HKLM, SHELL_ICONS_KEY, "29", None)];
     let prepared = prepare_changes(&changes)?;
     if !current {
         let path = ensure_blank_icon()?;
-        changes[0].value = SettingValue::String(path.to_string_lossy().into_owned());
+        changes[0] = RegistryChange::new(
+            HKLM,
+            SHELL_ICONS_KEY,
+            "29",
+            Some(path.as_os_str().to_reg_value()),
+        );
     }
     apply_changes(&changes, &prepared)?;
     println!(
@@ -912,9 +856,24 @@ mod tests {
         key.set_value("Existing", &"custom original value").unwrap();
         let original = key.get_raw_value("Existing").unwrap();
         let changes = [
-            RegistryChange::new(&registry.key, "Values", "Existing", SettingValue::Dword(0)),
-            RegistryChange::new(&registry.key, "Values", "Missing", SettingValue::Dword(1)),
-            RegistryChange::new(&registry.key, "Values", "Failure", SettingValue::Dword(1)),
+            RegistryChange::new(
+                &registry.key,
+                "Values",
+                "Existing",
+                Some(0u32.to_reg_value()),
+            ),
+            RegistryChange::new(
+                &registry.key,
+                "Values",
+                "Missing",
+                Some(1u32.to_reg_value()),
+            ),
+            RegistryChange::new(
+                &registry.key,
+                "Values",
+                "Failure",
+                Some(1u32.to_reg_value()),
+            ),
         ];
         let mut prepared = prepare_changes(&changes).unwrap();
         prepared[2].0 = registry

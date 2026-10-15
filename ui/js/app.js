@@ -17,6 +17,11 @@ const explorerPreferences = [
   { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true },
 ];
 
+const folderViews = [
+  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting" },
+  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping" },
+];
+
 function setStatus(message, error = false) {
   const administrator = error && message.includes("requires administrator access");
   const notice = byId("administrator-status");
@@ -29,11 +34,12 @@ function setStatus(message, error = false) {
   if (administrator) window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-function updateButtons() {
+function setBusy(value) {
+  busy = value;
   byId("refresh").disabled = busy || !invoke;
   byId("apply-recommended").disabled = busy || !settings;
   byId("restore-original").disabled = busy || !settings;
-  folderSorting.setDisabled(busy || !settings);
+  for (const view of folderViews) view.picker.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !settings
       || (preference.windows11 && !settings.windows11_supported);
@@ -46,20 +52,22 @@ function setPreferenceValue(id, value) {
   element.dataset.state = value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
 }
 
-async function loadSettings() {
-  settings = null;
-  folderSorting.load(null, false);
+function renderSettings() {
+  for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
   for (const preference of explorerPreferences) {
-    setPreferenceValue(preference.id, "Unavailable");
-  }
-  settings = await invoke("explorer_settings");
-  folderSorting.load(settings.folder_sort);
-  for (const preference of explorerPreferences) {
-    setPreferenceValue(preference.id, preference.windows11 && !settings.windows11_supported
+    setPreferenceValue(preference.id, !settings ? "Unavailable"
+      : preference.windows11 && !settings.windows11_supported
       ? "Requires Windows 11"
       : settings[preference.field] === null ? "Custom or missing overlay icon"
       : settings[preference.field] ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"));
   }
+}
+
+async function loadSettings() {
+  settings = null;
+  renderSettings();
+  settings = await invoke("explorer_settings");
+  renderSettings();
 }
 
 async function loadSystem() {
@@ -102,8 +110,7 @@ async function loadSystem() {
 
 async function refresh() {
   if (busy) return;
-  busy = true;
-  updateButtons();
+  setBusy(true);
   setStatus("Reading your system…");
   const results = await Promise.allSettled([loadSystem(), loadSettings()]);
   const errors = results.filter((result) => result.status === "rejected");
@@ -111,12 +118,12 @@ async function refresh() {
     byId("system").textContent = "System information unavailable.";
   }
   setStatus(errors.map((result) => String(result.reason)).join(" · "), errors.length > 0);
-  busy = false;
-  updateButtons();
+  setBusy(false);
 }
 
-function confirmChange(description) {
+function confirmChange(description, title = "Change preference?") {
   const dialog = byId("confirmation");
+  byId("confirm-title").textContent = title;
   byId("confirm-description").textContent = description;
   dialog.returnValue = "cancel";
   return new Promise((resolve) => {
@@ -138,17 +145,27 @@ function showApplyResult(count, error) {
   byId("apply-result").showModal();
 }
 
-async function toggle(command, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.", args = {}) {
+async function applyChange(command, args, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
-  const preference = explorerPreferences.find(preference => `toggle_${preference.field}` === command);
+  const recommended = command === "apply_recommended_settings";
+  const preference = explorerPreferences.find(preference => preference.field === args.preference);
   if (preference?.requiresAdmin && !settings.is_administrator) {
     setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
     return;
   }
-  busy = true;
-  updateButtons();
+  setBusy(true);
   try {
-    if (!skipConfirmation && !await confirmChange(description)) return;
+    if (recommended) {
+      setStatus("Checking recommended settings…");
+      const count = await invoke(command, { preview: true });
+      setStatus("");
+      if (count === 0) {
+        showApplyResult(0);
+        return;
+      }
+      description = `Apply ${count} recommended ${count === 1 ? "change" : "changes"}?`;
+    }
+    if (!skipConfirmation && !await confirmChange(description, recommended ? "Apply recommended settings?" : undefined)) return;
     setStatus("Saving preferences and restarting Explorer…");
     let error = null;
     let changed;
@@ -163,35 +180,37 @@ async function toggle(command, description, skipConfirmation = false, success = 
       error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
     }
     setStatus(error || (changed === false || changed === 0 ? "" : success), Boolean(error));
-    if (command === "apply_recommended_settings") showApplyResult(changed, error);
+    if (recommended) showApplyResult(changed, error);
   } catch (reason) {
     setStatus(String(reason), true);
   } finally {
-    busy = false;
-    updateButtons();
+    setBusy(false);
   }
 }
 
 byId("refresh").addEventListener("click", refresh);
-byId("apply-recommended").addEventListener("click", () => toggle(
-  "apply_recommended_settings", "", true, "Recommended settings enabled. Explorer restarted.",
+byId("apply-recommended").addEventListener("click", (event) => applyChange(
+  "apply_recommended_settings", {}, "", event.shiftKey, "Recommended settings enabled. Explorer restarted.",
 ));
-byId("restore-original").addEventListener("click", () => toggle(
-  "restore_original_settings", "", true, "Original settings restored. Explorer restarted.",
+byId("restore-original").addEventListener("click", () => applyChange(
+  "restore_original_settings", {}, "", true, "Original settings restored. Explorer restarted.",
 ));
-byId("folder-sort-apply").addEventListener("click", (event) => {
-  const sort = folderSorting.selected;
-  if (sort) toggle(
-    "set_folder_sort",
-    `Use ${folderSorting.label.toLowerCase()} across all folder types? Saved folder views will be reset.`,
-    event.shiftKey,
-    "Default folder sorting saved. Explorer restarted.",
-    { sort },
-  );
-});
+for (const view of folderViews) {
+  byId(`${view.id}-apply`).addEventListener("click", (event) => {
+    const selected = view.picker.selected;
+    if (selected !== null) applyChange(
+      view.command,
+      { [view.argument]: selected },
+      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset.`,
+      event.shiftKey,
+      `Default folder ${view.label} saved. Explorer restarted.`,
+    );
+  });
+}
 for (const preference of explorerPreferences) {
-  byId(`${preference.id}-toggle`).addEventListener("click", (event) => toggle(
-    `toggle_${preference.field}`,
+  byId(`${preference.id}-toggle`).addEventListener("click", (event) => applyChange(
+    "toggle_preference",
+    { preference: preference.field },
     settings?.[preference.field] ? preference.restore : preference.apply,
     event.shiftKey,
   ));
@@ -200,10 +219,7 @@ for (const preference of explorerPreferences) {
 if (invoke) {
   refresh();
 } else {
-  folderSorting.load(null, false);
+  renderSettings();
   byId("system").textContent = "Open Orbital with npm run dev to read system information.";
-  for (const preference of explorerPreferences) {
-    setPreferenceValue(preference.id, "Unavailable");
-  }
   setStatus("The Rust backend is available inside the desktop app.", true);
 }
