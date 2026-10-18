@@ -24,14 +24,17 @@ const folderViews = [
 
 function setStatus(message, error = false) {
   const administrator = error && message.includes("requires administrator access");
-  const notice = byId("administrator-status");
+  const notice = byId("administrator-notice");
+  if (administrator) {
+    byId("administrator-description").textContent = message;
+    if (!notice.open) notice.showModal();
+    return;
+  }
+  if (notice.open) notice.close();
   const status = byId("status");
-  notice.hidden = !administrator;
-  notice.textContent = administrator ? message : "";
-  status.textContent = administrator ? "" : message;
-  status.hidden = administrator || !message;
-  status.classList.toggle("error", error && !administrator);
-  if (administrator) window.scrollTo({ top: 0, behavior: "instant" });
+  status.textContent = message;
+  status.hidden = !message;
+  status.classList.toggle("error", error);
 }
 
 function setBusy(value) {

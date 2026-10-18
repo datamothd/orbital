@@ -43,8 +43,28 @@ main {
   margin: auto;
 }
 
-main:has(> #status[hidden]) > details:last-of-type {
+#tweaks-panel:has(> #status[hidden]) > details:last-of-type,
+#settings-panel > section:last-child {
   margin-bottom: 0;
+}
+
+.navigation-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.navigation-tabs button {
+  padding: 6px 12px;
+  color: #b3b3b3;
+  background: #0a0a0a;
+  border-color: #333333;
+}
+
+.navigation-tabs button[aria-selected="true"] {
+  color: #ffffff;
+  background: #171717;
+  border-color: #777777;
 }
 
 .section-header,
@@ -226,6 +246,18 @@ button:disabled {
   padding: 12px 0;
 }
 
+#settings-title {
+  margin-bottom: 12px;
+}
+
+#settings-panel > section > h2 + .preference {
+  padding-top: 0;
+}
+
+#settings-panel > section > .preference:last-child {
+  padding-bottom: 0;
+}
+
 .preference-group {
   margin: 0;
   padding-top: 14px;
@@ -340,8 +372,7 @@ button:disabled {
   margin: 10px 0;
 }
 
-#status,
-#administrator-status {
+#status {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
@@ -349,16 +380,10 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-#status.error,
-#administrator-status {
+#status.error {
   border-left: 2px solid currentColor;
   padding-left: 10px;
   font-weight: 700;
-}
-
-#administrator-status {
-  margin-bottom: 8px;
-  color: #f87171;
 }
 
 dialog {

@@ -2,6 +2,32 @@
 
 let scrollFrame = 0;
 let scrollTarget = 0;
+let smoothScrolling = true;
+try {
+  smoothScrolling = localStorage.getItem("orbital.smoothScrolling") !== "false";
+} catch {
+}
+
+const smoothScrollToggle = document.getElementById("smooth-scroll-toggle");
+const smoothScrollValue = document.getElementById("smooth-scroll-value");
+
+function renderSmoothScrolling() {
+  smoothScrollToggle.setAttribute("aria-checked", String(smoothScrolling));
+  smoothScrollValue.textContent = smoothScrolling ? "Enabled" : "Disabled";
+  smoothScrollValue.dataset.state = smoothScrolling ? "enabled" : "disabled";
+}
+
+smoothScrollToggle.addEventListener("click", () => {
+  smoothScrolling = !smoothScrolling;
+  stopScrolling();
+  renderSmoothScrolling();
+  try {
+    localStorage.setItem("orbital.smoothScrolling", String(smoothScrolling));
+  } catch {
+  }
+});
+renderSmoothScrolling();
+
 function stopScrolling() {
   cancelAnimationFrame(scrollFrame);
   scrollFrame = 0;
@@ -9,7 +35,7 @@ function stopScrolling() {
 window.addEventListener("pointerdown", stopScrolling);
 window.addEventListener("keydown", stopScrolling);
 window.addEventListener("wheel", (event) => {
-  if (event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
+  if (!smoothScrolling || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
     || event.target.closest(".folder-view-options, dialog")) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
