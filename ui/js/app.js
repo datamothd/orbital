@@ -4,6 +4,26 @@ const invoke = window.__TAURI__?.core.invoke;
 const byId = (id) => document.getElementById(id);
 let settings = null;
 let busy = false;
+let skipPrompts = false;
+try {
+  skipPrompts = localStorage.getItem("orbital.skipPrompts") === "true";
+} catch {
+}
+
+function renderSkipPrompts() {
+  byId("skip-prompts-toggle").setAttribute("aria-checked", String(skipPrompts));
+  setPreferenceValue("skip-prompts-value", skipPrompts ? "Enabled" : "Disabled");
+}
+
+byId("skip-prompts-toggle").addEventListener("click", () => {
+  skipPrompts = !skipPrompts;
+  renderSkipPrompts();
+  try {
+    localStorage.setItem("orbital.skipPrompts", String(skipPrompts));
+  } catch {
+  }
+});
+renderSkipPrompts();
 
 const explorerPreferences = [
   { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?" },
@@ -178,7 +198,7 @@ async function applyChange(command, args, description, skipConfirmation = false,
       }
       description = `Apply ${count} recommended ${count === 1 ? "change" : "changes"}?`;
     }
-    if (!skipConfirmation && !await confirmChange(description, recommended ? "Apply recommended settings?" : undefined)) return;
+    if (!skipPrompts && !skipConfirmation && !await confirmChange(description, recommended ? "Apply recommended settings?" : undefined)) return;
     setStatus("Saving preferences and restarting Explorer…");
     let error = null;
     let changed;

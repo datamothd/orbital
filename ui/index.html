@@ -33,7 +33,7 @@
         <h2 id="preferences-title">Explorer Settings</h2>
       </summary>
       <hr class="preferences-divider" aria-hidden="true">
-      <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking Toggle to skip confirmation and apply the change immediately.</p>
+      <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.</p>
       <h3 class="preference-group">Personal preferences</h3>
       <div class="preference">
         <div>
@@ -145,6 +145,14 @@
     <div id="settings-panel" role="tabpanel" aria-labelledby="settings-tab" hidden>
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">Settings</h2>
+        <div class="preference">
+          <div>
+            <h3 id="skip-prompts-label">Skip confirmation prompts</h3>
+            <p id="skip-prompts-description" class="preference-description">Apply changes immediately without holding Shift. Windows Explorer will still restart.</p>
+            <p id="skip-prompts-value" class="preference-value" data-state="disabled">Disabled</p>
+          </div>
+          <button id="skip-prompts-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="skip-prompts-label" aria-describedby="skip-prompts-description">Toggle</button>
+        </div>
         <div class="preference">
           <div>
             <h3 id="smooth-scroll-label">Smooth scrolling</h3>
