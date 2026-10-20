@@ -189,9 +189,8 @@ async function applyChange(command, args, description, skipConfirmation = false,
   setBusy(true);
   try {
     if (recommended) {
-      setStatus("Checking recommended settings…");
-      const count = await invoke(command, { preview: true });
       setStatus("");
+      const count = await invoke(command, { preview: true });
       if (count === 0) {
         showApplyResult(0);
         return;
