@@ -7,15 +7,28 @@
   <link rel="stylesheet" href="css/style.css">
   <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
+  <script src="js/profiles.js" defer></script>
   <script src="js/window.js" defer></script>
   <script src="js/navigation.js" defer></script>
 </head>
 <body>
   <main>
-    <nav class="navigation-tabs" role="tablist" aria-label="App navigation">
-      <button id="tweaks-tab" type="button" role="tab" aria-selected="true" aria-controls="tweaks-panel">tweaks</button>
-      <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel" tabindex="-1">settings</button>
-    </nav>
+    <div class="top-bar">
+      <nav class="navigation-tabs" role="tablist" aria-label="App navigation">
+        <button id="tweaks-tab" type="button" role="tab" aria-selected="true" aria-controls="tweaks-panel">tweaks</button>
+        <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel" tabindex="-1">settings</button>
+      </nav>
+      <div class="profile-actions" role="group" aria-label="Import and export tweaks">
+        <button id="import-tweaks" type="button" disabled title="Import tweaks from a JSON file">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" shape-rendering="crispEdges"><path d="M7 1h2v6h2V5h2v2h-2v2H9v2H7V9H5V7H3V5h2v2h2zM1 10h2v3h10v-3h2v5H1z"/></svg>
+          <span>import</span>
+        </button>
+        <button id="export-tweaks" type="button" disabled title="Export current tweak values as JSON">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" shape-rendering="crispEdges"><path d="M7 1h2v2h2v2h2v2h-2V5H9v6H7V5H5v2H3V5h2V3h2zM1 10h2v3h10v-3h2v5H1z"/></svg>
+          <span>export</span>
+        </button>
+      </div>
+    </div>
     <div id="tweaks-panel" role="tabpanel" aria-labelledby="tweaks-tab">
       <section aria-labelledby="system-title">
         <header class="section-header">
@@ -176,19 +189,22 @@
   <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
     <h2 id="confirm-title">Change preference?</h2>
     <p id="confirm-description"></p>
-    <details id="recommended-options" hidden open>
+    <details id="recommended-options" class="changes-options" hidden open>
       <summary>List of changes</summary>
-      <div id="recommendation-scroll">
+      <div id="recommendation-scroll" class="changes-scroll">
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
-        <div id="recommendation-list" role="group" aria-label="Recommended changes"></div>
+        <div id="recommendation-list" class="changes-list" role="group" aria-label="Recommended changes"></div>
         <p class="note">Changing folder sorting or grouping resets saved folder views.</p>
       </div>
     </details>
     <p class="note">Windows Explorer will restart to apply this change.</p>
-    <form method="dialog">
-      <button value="cancel" autofocus>Cancel</button>
-      <button id="confirm-apply" value="apply" class="primary">Apply &amp; restart</button>
+    <form method="dialog" class="confirmation-footer">
+      <p id="confirm-admin-note" class="note" role="status" aria-live="polite" hidden></p>
+      <span class="confirmation-buttons">
+        <button value="cancel" autofocus>Cancel</button>
+        <button id="confirm-apply" value="apply" class="primary" aria-describedby="confirm-admin-note">Apply &amp; restart</button>
+      </span>
     </form>
   </dialog>
   <dialog id="apply-result" aria-labelledby="apply-result-title" aria-describedby="apply-result-description">
@@ -197,6 +213,20 @@
     <p id="apply-result-error" class="note" hidden></p>
     <form method="dialog">
       <button class="primary" autofocus>OK</button>
+    </form>
+  </dialog>
+  <dialog id="import-preview" class="changes-dialog" aria-labelledby="import-title" aria-describedby="import-description">
+    <h2 id="import-title">Import tweaks</h2>
+    <p id="import-description"></p>
+    <details id="import-options" class="changes-options" open>
+      <summary>List of changes</summary>
+      <div id="import-list" class="changes-scroll changes-list" role="group" aria-label="Imported tweaks compared with current settings"></div>
+    </details>
+    <p id="import-summary" class="note" role="status" aria-live="polite"></p>
+    <p class="note">Only selected changes will be applied. Other tweaks stay as they are. Windows Explorer will restart; changing folder sorting or grouping resets saved folder views.</p>
+    <form method="dialog">
+      <button value="cancel" autofocus>Cancel</button>
+      <button id="import-apply" value="apply" class="primary" disabled>Apply &amp; restart</button>
     </form>
   </dialog>
 </body>

@@ -58,8 +58,9 @@ function setStatus(message, error = false) {
 function setBusy(value) {
   busy = value;
   byId("refresh").disabled = busy || !invoke;
-  byId("apply-recommended").disabled = busy || !settings;
-  byId("restore-original").disabled = busy || !settings;
+  for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
+    byId(id).disabled = busy || !settings;
+  }
   for (const view of folderViews) view.picker.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !settings
@@ -165,8 +166,31 @@ function adminWarning(warning = document.createElement("span")) {
   return warning;
 }
 
+function missingAdminCount(ids) {
+  if (settings?.is_administrator) return 0;
+  return ids.filter(id => explorerPreferences.some(preference => preference.field === id && preference.requiresAdmin)).length;
+}
+
+function updateRecommendedSelection() {
+  const selected = [...byId("recommendation-list").querySelectorAll("input:checked")].map(input => input.value);
+  const count = missingAdminCount(selected);
+  const note = byId("confirm-admin-note");
+  note.hidden = count === 0;
+  note.textContent = count ? `Admin access is required for ${count} ${count === 1 ? "change" : "changes"}.` : "";
+  byId("confirm-apply").disabled = !selected.length || count > 0;
+}
+
+function confirmDialog(dialog) {
+  dialog.returnValue = "cancel";
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "apply"), { once: true });
+    dialog.showModal();
+  });
+}
+
 function confirmChange(description, title = "Change preference?", recommendations = []) {
   const dialog = byId("confirmation");
+  dialog.classList.toggle("changes-dialog", recommendations.length > 0);
   byId("confirm-title").textContent = title;
   byId("confirm-description").textContent = description;
   byId("recommended-options").hidden = !recommendations.length;
@@ -190,32 +214,52 @@ function confirmChange(description, title = "Change preference?", recommendation
     label.append(checkbox, text);
     return label;
   }).sort((a, b) => Number(b.classList.contains("visual-preference")) - Number(a.classList.contains("visual-preference"))));
-  byId("confirm-apply").disabled = false;
-  dialog.returnValue = "cancel";
-  return new Promise((resolve) => {
-    dialog.addEventListener("close", () => resolve(dialog.returnValue === "apply"), { once: true });
-    dialog.showModal();
-  });
+  if (recommendations.length) {
+    updateRecommendedSelection();
+  } else {
+    byId("confirm-admin-note").hidden = true;
+    byId("confirm-admin-note").textContent = "";
+    byId("confirm-apply").disabled = false;
+  }
+  return confirmDialog(dialog);
+}
+
+function showResult(title, description, error = "") {
+  const errorNotice = byId("apply-result-error");
+  byId("apply-result-title").textContent = title;
+  byId("apply-result-description").textContent = description;
+  errorNotice.hidden = !error;
+  errorNotice.textContent = error;
+  byId("apply-result").showModal();
 }
 
 function showApplyResult(count, error) {
   const completed = typeof count === "number";
-  const errorNotice = byId("apply-result-error");
-  byId("apply-result-title").textContent = completed
-    ? "Recommended settings applied" : "Could not complete recommendations";
-  byId("apply-result-description").textContent = completed
+  showResult(completed ? "Recommended settings applied" : "Could not complete recommendations", completed
     ? count === 0 ? "0 changes are made. All recommended settings are already enabled."
       : `${count} ${count === 1 ? "change" : "changes"} made. Explorer restarted.`
-    : "The number of changes could not be confirmed.";
-  errorNotice.hidden = !error;
-  errorNotice.textContent = error || "";
-  byId("apply-result").showModal();
+    : "The number of changes could not be confirmed.", error || "");
+}
+
+async function savePreferences(command, args) {
+  let changed, error;
+  try {
+    changed = await invoke(command, args);
+  } catch (reason) {
+    error = String(reason);
+  }
+  try {
+    await loadSettings();
+  } catch (reason) {
+    error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
+  }
+  return { changed, error };
 }
 
 async function applyChange(command, args, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   const recommended = command === "apply_recommended_settings";
-  const skip = skipPrompts || skipConfirmation;
+  let skip = skipPrompts || skipConfirmation;
   const preference = explorerPreferences.find(preference => preference.field === args.preference);
   if (preference?.requiresAdmin && !settings.is_administrator) {
     setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
@@ -234,24 +278,17 @@ async function applyChange(command, args, description, skipConfirmation = false,
         return;
       }
       description = "Uncheck any settings you want to keep.";
+      if (missingAdminCount(recommendations)) skip = false;
     }
     if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : undefined, recommendations)) return;
     if (recommended) {
       args.selected = skip ? recommendations
         : [...byId("recommendation-list").querySelectorAll("input:checked")].map(input => input.value);
+      if (!args.selected.length || missingAdminCount(args.selected)) return;
     }
     setStatus("Saving preferences and restarting Explorer…");
-    try {
-      changed = await invoke(command, args);
-      if (recommended) changed = changed.length;
-    } catch (reason) {
-      error = String(reason);
-    }
-    try {
-      await loadSettings();
-    } catch (reason) {
-      error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
-    }
+    ({ changed, error } = await savePreferences(command, args));
+    if (recommended && changed) changed = changed.length;
   } catch (reason) {
     error = String(reason);
   } finally {
@@ -265,9 +302,7 @@ async function applyChange(command, args, description, skipConfirmation = false,
   }
 }
 
-byId("recommendation-list").addEventListener("change", (event) => {
-  byId("confirm-apply").disabled = !event.currentTarget.querySelector("input:checked");
-});
+byId("recommendation-list").addEventListener("change", updateRecommendedSelection);
 byId("refresh").addEventListener("click", refresh);
 byId("apply-recommended").addEventListener("click", (event) => applyChange(
   "apply_recommended_settings", {}, "", event.shiftKey,

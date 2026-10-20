@@ -1,7 +1,10 @@
 #[path = "explorer/folder_views.rs"]
 mod folder_views;
+#[path = "explorer/profiles.rs"]
+mod profiles;
 
 pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
+pub use profiles::{TweakProfile, apply_imported_tweaks, export_tweaks};
 
 use std::os::windows::process::CommandExt;
 use std::{
@@ -133,7 +136,9 @@ fn confirm(prompt: &str) -> io::Result<bool> {
     }
 }
 
-#[derive(Clone, Copy, clap::Subcommand, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, clap::Subcommand, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Preference {
     DisableTaskbarCentering,
@@ -789,13 +794,13 @@ mod tests {
         assert_eq!(is_administrator().unwrap(), unsafe { IsUserAnAdmin() } != 0);
     }
 
-    struct TestRegistry {
-        key: RegKey,
+    pub(super) struct TestRegistry {
+        pub(super) key: RegKey,
         path: String,
     }
 
     impl TestRegistry {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
             let unique = SystemTime::now()
                 .duration_since(UNIX_EPOCH)

@@ -16,6 +16,7 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 - Toggles for 11 different Windows preferences (only for Explorer related settings for now).
 - Tauri app interface for value editing.
 - Setting preference state in mass and change reverting.
+- Import and export enabled and disabled tweak values as JSON, with a selectable comparison preview before importing.
 
 ## Planned features
 - ISO configuration

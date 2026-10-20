@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use orbital::{explorer, sysinfo};
+mod profiles;
 
 #[tauri::command]
 async fn system_info() -> Result<sysinfo::SystemInfo, String> {
@@ -64,6 +65,9 @@ fn main() {
             apply_recommended_settings,
             restore_original_settings,
             toggle_preference,
+            profiles::export_tweaks,
+            profiles::import_tweaks,
+            profiles::apply_imported_tweaks,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");

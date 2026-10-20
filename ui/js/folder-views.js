@@ -95,6 +95,10 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
   }, true);
 
   return {
+    matches,
+    labelFor(value) {
+      return choices.find(choice => matches(choice.value, value))?.label || fallback;
+    },
     load(current, available = true) {
       selected = choices.findIndex(choice => matches(choice.value, current));
       selection.textContent = selected < 0 ? placeholder : choices[selected].label;
