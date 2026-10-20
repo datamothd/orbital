@@ -23,6 +23,8 @@ const CLASSIC_CONTEXT_MENU_KEY: &str =
     r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+const TASKBAR_DEVELOPER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
+const WIDGETS_KEY: &str = r"SOFTWARE\Policies\Microsoft\Dsh";
 const SHELL_ICONS_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons";
 const HOME_CLSID: &str = "{f874310e-b6b7-47dc-bc84-b9e6b38f5903}";
 const GALLERY_CLSID: &str = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}";
@@ -63,16 +65,33 @@ fn is_administrator() -> io::Result<bool> {
     Ok(member != 0)
 }
 
-fn supports_windows11() -> io::Result<bool> {
+fn windows_build() -> io::Result<u32> {
     let key = HKLM.open_subkey_with_flags(
         r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
         KEY_QUERY_VALUE,
     )?;
     let build: String = key.get_value("CurrentBuildNumber")?;
-    let build: u32 = build
+    build
         .parse()
-        .map_err(|_| io::Error::other("Invalid Windows build number"))?;
-    Ok(build >= 22000)
+        .map_err(|_| io::Error::other("Invalid Windows build number"))
+}
+
+fn supports_windows11() -> io::Result<bool> {
+    Ok(windows_build()? >= 22000)
+}
+
+fn supports_taskbar_end_task(build: u32) -> io::Result<bool> {
+    if build >= 22631 {
+        return Ok(true);
+    }
+    if build != 22621 {
+        return Ok(false);
+    }
+    let key = HKLM.open_subkey_with_flags(
+        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+        KEY_QUERY_VALUE,
+    )?;
+    Ok(optional(key.get_value::<u32, _>("UBR"))?.is_some_and(|revision| revision >= 3958))
 }
 
 fn classic_context_menu_enabled() -> io::Result<bool> {
@@ -84,38 +103,58 @@ fn classic_context_menu_enabled() -> io::Result<bool> {
     Ok(optional(key.get_value::<String, _>(""))?.is_some_and(|value| value.is_empty()))
 }
 
-#[derive(serde::Serialize)]
+#[derive(Default, serde::Serialize)]
 pub struct ExplorerSettings {
     pub is_administrator: bool,
     pub folder_sort: Option<FolderSort>,
     pub folder_grouping: Option<FolderGrouping>,
     pub disable_taskbar_centering: bool,
+    pub hide_task_view: bool,
+    pub disable_widgets: bool,
+    pub enable_taskbar_end_task: bool,
+    pub taskbar_end_task_supported: bool,
     pub disable_explorer_spacing: bool,
     pub disable_modern_context_menu: bool,
     pub windows11_supported: bool,
     pub hide_recent_files: bool,
+    pub hide_recommendations: bool,
     pub hide_frequent_folders: bool,
     pub hide_office_files: bool,
     pub hide_home_folder: bool,
+    pub home_supported: bool,
     pub hide_gallery: bool,
+    pub gallery_supported: bool,
     pub hide_shortcut_arrow: Option<bool>,
 }
 
 pub fn settings() -> io::Result<ExplorerSettings> {
-    let windows11_supported = supports_windows11()?;
+    let build = windows_build()?;
+    let windows11_supported = build >= 22000;
+    let home_supported = windows11_supported && namespace_supported_in(HKLM, HOME_CLSID)?;
+    let gallery_supported = windows11_supported && namespace_supported_in(HKLM, GALLERY_CLSID)?;
+    let taskbar_end_task_supported = supports_taskbar_end_task(build)?;
     Ok(ExplorerSettings {
         is_administrator: is_administrator()?,
         folder_sort: folder_views::current()?,
         folder_grouping: folder_views::current_grouping()?,
         disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
-        disable_explorer_spacing: DISABLE_EXPLORER_SPACING.enabled_in(HKCU)?,
+        hide_task_view: HIDE_TASK_VIEW.enabled_in(HKCU)?,
+        disable_widgets: windows11_supported && DISABLE_WIDGETS.enabled_in(HKLM)?,
+        enable_taskbar_end_task: taskbar_end_task_supported
+            && ENABLE_TASKBAR_END_TASK.enabled_in(HKCU)?,
+        taskbar_end_task_supported,
+        disable_explorer_spacing: windows11_supported
+            && DISABLE_EXPLORER_SPACING.enabled_in(HKCU)?,
         disable_modern_context_menu: windows11_supported && classic_context_menu_enabled()?,
         windows11_supported,
         hide_recent_files: HIDE_RECENT_FILES.enabled_in(HKCU)?,
+        hide_recommendations: windows11_supported && HIDE_RECOMMENDATIONS.enabled_in(HKCU)?,
         hide_frequent_folders: HIDE_FREQUENT_FOLDERS.enabled_in(HKCU)?,
         hide_office_files: windows11_supported && HIDE_OFFICE_FILES.enabled_in(HKCU)?,
-        hide_home_folder: windows11_supported && !namespace_visible(HOME_CLSID)?,
-        hide_gallery: windows11_supported && !namespace_visible(GALLERY_CLSID)?,
+        hide_home_folder: home_supported && !namespace_visible(HOME_CLSID)?,
+        home_supported,
+        hide_gallery: gallery_supported && !namespace_visible(GALLERY_CLSID)?,
+        gallery_supported,
         hide_shortcut_arrow: shortcut_arrows_hidden()?,
     })
 }
@@ -142,9 +181,13 @@ fn confirm(prompt: &str) -> io::Result<bool> {
 #[serde(rename_all = "snake_case")]
 pub enum Preference {
     DisableTaskbarCentering,
+    HideTaskView,
+    DisableWidgets,
+    EnableTaskbarEndTask,
     DisableExplorerSpacing,
     DisableModernContextMenu,
     HideRecentFiles,
+    HideRecommendations,
     HideFrequentFolders,
     HideOfficeFiles,
     HideHomeFolder,
@@ -154,14 +197,37 @@ pub enum Preference {
 
 pub fn toggle_preference(preference: Preference, yes: bool) -> io::Result<()> {
     match preference {
-        Preference::DisableTaskbarCentering => DISABLE_TASKBAR_CENTERING.toggle(yes),
-        Preference::DisableExplorerSpacing => DISABLE_EXPLORER_SPACING.toggle(yes),
+        Preference::DisableTaskbarCentering => {
+            require_windows11(DISABLE_TASKBAR_CENTERING.name)?;
+            DISABLE_TASKBAR_CENTERING.toggle(HKCU, yes)
+        }
+        Preference::HideTaskView => HIDE_TASK_VIEW.toggle(HKCU, yes),
+        Preference::DisableWidgets => {
+            require_windows11(DISABLE_WIDGETS.name)?;
+            DISABLE_WIDGETS.toggle(HKLM, yes)
+        }
+        Preference::EnableTaskbarEndTask => {
+            if !supports_taskbar_end_task(windows_build()?)? {
+                return Err(io::Error::other(
+                    "Taskbar End task is unavailable on this system",
+                ));
+            }
+            ENABLE_TASKBAR_END_TASK.toggle(HKCU, yes)
+        }
+        Preference::DisableExplorerSpacing => {
+            require_windows11(DISABLE_EXPLORER_SPACING.name)?;
+            DISABLE_EXPLORER_SPACING.toggle(HKCU, yes)
+        }
         Preference::DisableModernContextMenu => toggle_modern_context_menu(yes),
-        Preference::HideRecentFiles => HIDE_RECENT_FILES.toggle(yes),
-        Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.toggle(yes),
+        Preference::HideRecentFiles => HIDE_RECENT_FILES.toggle(HKCU, yes),
+        Preference::HideRecommendations => {
+            require_windows11(HIDE_RECOMMENDATIONS.name)?;
+            HIDE_RECOMMENDATIONS.toggle(HKCU, yes)
+        }
+        Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.toggle(HKCU, yes),
         Preference::HideOfficeFiles => {
             require_windows11(HIDE_OFFICE_FILES.name)?;
-            HIDE_OFFICE_FILES.toggle(yes)
+            HIDE_OFFICE_FILES.toggle(HKCU, yes)
         }
         Preference::HideHomeFolder => toggle_namespace("Hide Home folder", HOME_CLSID, yes),
         Preference::HideGallery => toggle_namespace("Hide Gallery", GALLERY_CLSID, yes),
@@ -209,6 +275,13 @@ fn namespace_visible(clsid: &str) -> io::Result<bool> {
     namespace_visible_in(HKCU, HKLM, clsid)
 }
 
+fn namespace_supported_in(machine: &RegKey, clsid: &str) -> io::Result<bool> {
+    Ok(optional(
+        machine.open_subkey_with_flags(format!(r"Software\Classes\CLSID\{clsid}"), KEY_QUERY_VALUE),
+    )?
+    .is_some())
+}
+
 fn namespace_visible_in(user: &RegKey, machine: &RegKey, clsid: &str) -> io::Result<bool> {
     let (pinned, non_enum, hidden) = namespace_paths(clsid);
     let pinned = read_toggle(user, &pinned, "System.IsPinnedToNameSpaceTree", true)?;
@@ -238,7 +311,8 @@ fn shortcut_arrows_hidden_in(root: &RegKey, blank_path: &Path) -> io::Result<Opt
     let Some(overlay) = optional(key.get_value::<String, _>("29"))? else {
         return Ok(Some(false));
     };
-    if overlay.eq_ignore_ascii_case(&blank_path.to_string_lossy()) && blank_path.is_file() {
+    if overlay.eq_ignore_ascii_case(&blank_path.to_string_lossy()) && blank_icon_valid(blank_path)?
+    {
         return Ok(Some(true));
     }
     Ok(None)
@@ -355,6 +429,7 @@ fn apply_toggle(
     if !confirm_toggle(name, current, yes)? {
         return Ok(());
     }
+    save_original_settings()?;
     let prepared = prepare_changes(changes)?;
     apply_changes(changes, &prepared)?;
     println!(
@@ -367,7 +442,7 @@ fn apply_toggle(
 struct DwordPreference {
     name: &'static str,
     path: &'static str,
-    values: &'static [&'static str],
+    value: &'static str,
     enabled_value: bool,
     delete_when_disabled: bool,
 }
@@ -375,67 +450,85 @@ struct DwordPreference {
 const DISABLE_TASKBAR_CENTERING: DwordPreference = DwordPreference {
     name: "Disable centered taskbar icons",
     path: ADVANCED_KEY,
-    values: &["TaskbarAl"],
+    value: "TaskbarAl",
     enabled_value: false,
+    delete_when_disabled: false,
+};
+const HIDE_TASK_VIEW: DwordPreference = DwordPreference {
+    name: "Hide Task View button",
+    path: ADVANCED_KEY,
+    value: "ShowTaskViewButton",
+    enabled_value: false,
+    delete_when_disabled: false,
+};
+const DISABLE_WIDGETS: DwordPreference = DwordPreference {
+    name: "Disable Widgets",
+    path: WIDGETS_KEY,
+    value: "AllowNewsAndInterests",
+    enabled_value: false,
+    delete_when_disabled: true,
+};
+const ENABLE_TASKBAR_END_TASK: DwordPreference = DwordPreference {
+    name: "Enable taskbar End task",
+    path: TASKBAR_DEVELOPER_KEY,
+    value: "TaskbarEndTask",
+    enabled_value: true,
     delete_when_disabled: false,
 };
 const DISABLE_EXPLORER_SPACING: DwordPreference = DwordPreference {
     name: "Disable extra spacing",
     path: ADVANCED_KEY,
-    values: &["UseCompactMode"],
+    value: "UseCompactMode",
     enabled_value: true,
     delete_when_disabled: false,
 };
 const HIDE_RECENT_FILES: DwordPreference = DwordPreference {
     name: "Hide recently used files",
     path: EXPLORER_KEY,
-    values: &["ShowRecent", "ShowRecommendations"],
+    value: "ShowRecent",
+    enabled_value: false,
+    delete_when_disabled: false,
+};
+const HIDE_RECOMMENDATIONS: DwordPreference = DwordPreference {
+    name: "Hide recommendations",
+    path: EXPLORER_KEY,
+    value: "ShowRecommendations",
     enabled_value: false,
     delete_when_disabled: false,
 };
 const HIDE_FREQUENT_FOLDERS: DwordPreference = DwordPreference {
     name: "Hide frequently used folders",
     path: EXPLORER_KEY,
-    values: &["ShowFrequent"],
+    value: "ShowFrequent",
     enabled_value: false,
     delete_when_disabled: false,
 };
 const HIDE_OFFICE_FILES: DwordPreference = DwordPreference {
     name: "Hide files from Office.com",
     path: EXPLORER_KEY,
-    values: &["ShowCloudFilesInQuickAccess"],
+    value: "ShowCloudFilesInQuickAccess",
     enabled_value: false,
     delete_when_disabled: true,
 };
 
 impl DwordPreference {
     fn enabled_in(&self, root: &RegKey) -> io::Result<bool> {
-        let mut enabled = true;
-        for value in self.values {
-            enabled &=
-                read_toggle(root, self.path, value, !self.enabled_value)? == self.enabled_value;
-        }
-        Ok(enabled)
+        Ok(read_toggle(root, self.path, self.value, !self.enabled_value)? == self.enabled_value)
     }
 
-    fn changes_in<'a>(&self, root: &'a RegKey, enabled: bool) -> Vec<RegistryChange<'a>> {
+    fn change_in<'a>(&self, root: &'a RegKey, enabled: bool) -> RegistryChange<'a> {
         let next_value = u32::from(enabled == self.enabled_value);
-        self.values
-            .iter()
-            .map(|value| {
-                let next = if !enabled && self.delete_when_disabled {
-                    None
-                } else {
-                    Some(next_value.to_reg_value())
-                };
-                RegistryChange::new(root, self.path, value, next)
-            })
-            .collect()
+        let value = if !enabled && self.delete_when_disabled {
+            None
+        } else {
+            Some(next_value.to_reg_value())
+        };
+        RegistryChange::new(root, self.path, self.value, value)
     }
 
-    fn toggle(&self, yes: bool) -> io::Result<()> {
-        let current = self.enabled_in(HKCU)?;
-        apply_toggle(self.name, current, yes, &self.changes_in(HKCU, !current))
+    fn toggle(&self, root: &RegKey, yes: bool) -> io::Result<()> {
+        let current = self.enabled_in(root)?;
+        apply_toggle(self.name, current, yes, &[self.change_in(root, !current)])
     }
 }
 
@@ -443,12 +536,19 @@ fn require_windows11(name: &str) -> io::Result<()> {
     if supports_windows11()? {
         Ok(())
     } else {
-        Err(io::Error::other(format!("{name} requires Windows 11")))
+        Err(io::Error::other(format!(
+            "{name} is unavailable on this system"
+        )))
     }
 }
 
 fn toggle_namespace(name: &str, clsid: &str, yes: bool) -> io::Result<()> {
     require_windows11(name)?;
+    if !namespace_supported_in(HKLM, clsid)? {
+        return Err(io::Error::other(format!(
+            "{name} is unavailable on this system"
+        )));
+    }
     let current = !namespace_visible(clsid)?;
     let changes = namespace_changes(HKCU, HKLM, clsid, current);
     apply_toggle(name, current, yes, &changes)
@@ -493,12 +593,13 @@ fn settings_changes<'a>(
         &DISABLE_TASKBAR_CENTERING,
         &DISABLE_EXPLORER_SPACING,
         &HIDE_RECENT_FILES,
+        &HIDE_RECOMMENDATIONS,
         &HIDE_FREQUENT_FOLDERS,
     ] {
-        changes.extend(preference.changes_in(user, true));
+        changes.push(preference.change_in(user, true));
     }
     if windows11 {
-        changes.extend(HIDE_OFFICE_FILES.changes_in(user, true));
+        changes.push(HIDE_OFFICE_FILES.change_in(user, true));
         changes.push(RegistryChange::new(
             user,
             CLASSIC_CONTEXT_MENU_KEY,
@@ -510,6 +611,11 @@ fn settings_changes<'a>(
         }
     }
     changes.push(RegistryChange::new(machine, SHELL_ICONS_KEY, "29", None));
+    changes.push(HIDE_TASK_VIEW.change_in(user, true));
+    if windows11 {
+        changes.push(DISABLE_WIDGETS.change_in(machine, true));
+        changes.push(ENABLE_TASKBAR_END_TASK.change_in(user, true));
+    }
     changes
 }
 
@@ -526,10 +632,20 @@ fn recommended_changes<'a>(
     });
     if windows11 {
         for clsid in [HOME_CLSID, GALLERY_CLSID] {
-            if !namespace_visible_in(user, machine, clsid)? {
+            if !namespace_supported_in(machine, clsid)?
+                || !namespace_visible_in(user, machine, clsid)?
+            {
                 changes.retain(|change| change.name != clsid && !change.path.ends_with(clsid));
             }
         }
+    }
+    if !windows11 {
+        changes.retain(|change| {
+            !matches!(
+                change.name.as_str(),
+                "UseCompactMode" | "ShowRecommendations"
+            )
+        });
     }
     if shortcut_arrows_hidden_in(machine, icon)? != Some(true) {
         changes.push(RegistryChange::new(
@@ -551,20 +667,39 @@ fn read_original(root: &RegKey, path: &str, name: &str) -> io::Result<Option<Reg
 
 fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io::Result<RegKey> {
     const BACKUP_KEY: &str = r"Software\Orbital\OriginalExplorerSettings";
-    if read_original(user, BACKUP_KEY, "Windows11")?.is_some() {
-        read_toggle(user, BACKUP_KEY, "Windows11", false)?;
+    let (windows11, saved_count) = if read_original(user, BACKUP_KEY, "Windows11")?.is_some() {
+        let key = user.open_subkey(BACKUP_KEY)?;
+        let windows11 = read_toggle(&key, "", "Windows11", false)?;
+        let count = optional(key.get_value::<u32, _>("ValueCount"))?.unwrap_or(if windows11 {
+            14
+        } else {
+            6
+        });
+        (windows11, count as usize)
+    } else {
+        (windows11, 0)
+    };
+    let changes = settings_changes(user, machine, windows11);
+    if saved_count > changes.len() {
+        return Err(io::Error::other(
+            "Original settings backup has an unsupported version",
+        ));
+    }
+    if saved_count == changes.len() {
         return user.open_subkey(BACKUP_KEY);
     }
-    let originals = settings_changes(user, machine, windows11)
+    let originals = changes
         .iter()
+        .skip(saved_count)
         .map(|change| read_original(change.root, &change.path, &change.name))
         .collect::<io::Result<Vec<_>>>()?;
     let (key, _) = user.create_subkey(BACKUP_KEY)?;
     for (index, value) in originals.iter().enumerate() {
-        let name = index.to_string();
+        let name = (saved_count + index).to_string();
         write_value(&key, &name, value.as_ref())?;
     }
     key.set_value("Windows11", &u32::from(windows11))?;
+    key.set_value("ValueCount", &(changes.len() as u32))?;
     Ok(key)
 }
 
@@ -575,9 +710,13 @@ pub fn save_original_settings() -> io::Result<()> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Recommendation {
+    HideTaskView,
+    DisableWidgets,
+    EnableTaskbarEndTask,
     DisableExplorerSpacing,
     DisableModernContextMenu,
     HideRecentFiles,
+    HideRecommendations,
     HideFrequentFolders,
     HideOfficeFiles,
     HideHomeFolder,
@@ -591,10 +730,14 @@ pub fn apply_recommended_settings(
     preview: bool,
     selected: Option<&[Recommendation]>,
 ) -> io::Result<Vec<Recommendation>> {
-    let windows11 = supports_windows11()?;
+    let build = windows_build()?;
+    let windows11 = build >= 22000;
     let icon = blank_icon_path()?;
     let selected = |preference| selected.is_none_or(|items| items.contains(&preference));
     let mut changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
+    if !supports_taskbar_end_task(build)? {
+        changes.retain(|change| change.name != "TaskbarEndTask");
+    }
     changes.retain(|change| recommendation(change).is_some_and(selected));
     let mut view_changes = folder_views::recommended_changes()?;
     let view_id = |change: &folder_views::ViewChange| match change {
@@ -602,7 +745,7 @@ pub fn apply_recommended_settings(
         folder_views::ViewChange::Grouping(_) => Recommendation::FolderGrouping,
     };
     view_changes.retain(|change| selected(view_id(change)));
-    let missing_icon = selected(Recommendation::HideShortcutArrow) && !icon.is_file();
+    let missing_icon = selected(Recommendation::HideShortcutArrow) && !blank_icon_valid(&icon)?;
     let mut preferences = changed_preferences(&changes, missing_icon);
     preferences.extend(view_changes.iter().map(view_id));
     if preview || preferences.is_empty() {
@@ -621,8 +764,12 @@ pub fn apply_recommended_settings(
 fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {
     use Recommendation::*;
     Some(match change.name.as_str() {
+        "ShowTaskViewButton" => HideTaskView,
+        "AllowNewsAndInterests" => DisableWidgets,
+        "TaskbarEndTask" => EnableTaskbarEndTask,
         "UseCompactMode" => DisableExplorerSpacing,
-        "ShowRecent" | "ShowRecommendations" => HideRecentFiles,
+        "ShowRecent" => HideRecentFiles,
+        "ShowRecommendations" => HideRecommendations,
         "ShowFrequent" => HideFrequentFolders,
         "ShowCloudFilesInQuickAccess" => HideOfficeFiles,
         "" if change.path == CLASSIC_CONTEXT_MENU_KEY => DisableModernContextMenu,
@@ -708,6 +855,17 @@ fn transparent_icon() -> Vec<u8> {
     bytes
 }
 
+fn blank_icon_valid(path: &Path) -> io::Result<bool> {
+    let Some(metadata) = optional(std::fs::metadata(path))? else {
+        return Ok(false);
+    };
+    let expected = transparent_icon();
+    if !metadata.is_file() || metadata.len() != expected.len() as u64 {
+        return Ok(false);
+    }
+    Ok(optional(std::fs::read(path))?.is_some_and(|bytes| bytes == expected))
+}
+
 fn ensure_blank_icon() -> io::Result<PathBuf> {
     let path = blank_icon_path()?;
     match OpenOptions::new().write(true).create_new(true).open(&path) {
@@ -718,7 +876,14 @@ fn ensure_blank_icon() -> io::Result<PathBuf> {
                 return Err(setting_error(error));
             }
         }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists && path.is_file() => {}
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            if !blank_icon_valid(&path)? {
+                return Err(io::Error::other(format!(
+                    "{} already exists and is not Orbital's transparent icon. Move or rename it before hiding shortcut arrows.",
+                    path.display()
+                )));
+            }
+        }
         Err(error) => return Err(setting_error(error)),
     }
     Ok(path)
@@ -730,6 +895,7 @@ fn toggle_shortcut_arrow(yes: bool) -> io::Result<()> {
     if !confirm_toggle(name, current, yes)? {
         return Ok(());
     }
+    save_original_settings()?;
     let mut changes = [RegistryChange::new(HKLM, SHELL_ICONS_KEY, "29", None)];
     let prepared = prepare_changes(&changes)?;
     if !current {
@@ -823,6 +989,65 @@ mod tests {
     }
 
     #[test]
+    fn existing_backups_add_taskbar_values_without_replacing_saved_originals() {
+        for windows11 in [false, true] {
+            let user = TestRegistry::new();
+            let machine = TestRegistry::new();
+            let (advanced, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
+            advanced.set_value("TaskbarAl", &1u32).unwrap();
+            advanced.set_value("ShowTaskViewButton", &1u32).unwrap();
+            user.key
+                .create_subkey(TASKBAR_DEVELOPER_KEY)
+                .unwrap()
+                .0
+                .set_value("TaskbarEndTask", &0u32)
+                .unwrap();
+            machine
+                .key
+                .create_subkey(WIDGETS_KEY)
+                .unwrap()
+                .0
+                .set_value("AllowNewsAndInterests", &1u32)
+                .unwrap();
+            let changes = settings_changes(&user.key, &machine.key, windows11);
+            let originals: Vec<_> = changes
+                .iter()
+                .map(|change| read_original(change.root, &change.path, &change.name).unwrap())
+                .collect();
+            let backup = user
+                .key
+                .create_subkey(r"Software\Orbital\OriginalExplorerSettings")
+                .unwrap()
+                .0;
+            let legacy_count = if windows11 { 14 } else { 6 };
+            for (index, original) in originals[..legacy_count].iter().enumerate() {
+                write_value(&backup, &index.to_string(), original.as_ref()).unwrap();
+            }
+            backup
+                .set_value("Windows11", &u32::from(windows11))
+                .unwrap();
+            advanced.set_value("TaskbarAl", &0u32).unwrap();
+            let backup = original_settings_in(&user.key, &machine.key, windows11).unwrap();
+            assert_eq!(
+                backup.get_value::<u32, _>("ValueCount").unwrap() as usize,
+                changes.len()
+            );
+            let prepared = prepare_changes(&changes).unwrap();
+            apply_changes(&changes, &prepared).unwrap();
+            original_settings_in(&user.key, &machine.key, windows11).unwrap();
+            let restore = original_changes(&user.key, &machine.key, &backup).unwrap();
+            let prepared = prepare_changes(&restore).unwrap();
+            apply_changes(&restore, &prepared).unwrap();
+            for (change, original) in changes.iter().zip(originals) {
+                assert_eq!(
+                    read_original(change.root, &change.path, &change.name).unwrap(),
+                    original
+                );
+            }
+        }
+    }
+
+    #[test]
     fn missing_toggles_use_defaults_and_invalid_values_fail() {
         let registry = TestRegistry::new();
         assert!(read_toggle(&registry.key, "Missing", "ShowRecent", true).unwrap());
@@ -890,6 +1115,27 @@ mod tests {
     }
 
     #[test]
+    fn missing_namespaces_are_not_recommended_or_created() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let changes =
+            recommended_changes(&user.key, &machine.key, true, Path::new("unused.ico")).unwrap();
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            assert!(!namespace_supported_in(&machine.key, clsid).unwrap());
+            assert!(
+                changes
+                    .iter()
+                    .all(|change| change.name != clsid && !change.path.ends_with(clsid))
+            );
+            machine
+                .key
+                .create_subkey(format!(r"Software\Classes\CLSID\{clsid}"))
+                .unwrap();
+            assert!(namespace_supported_in(&machine.key, clsid).unwrap());
+        }
+    }
+
+    #[test]
     fn failed_grouped_write_restores_raw_values_and_missing_values() {
         let registry = TestRegistry::new();
         let (key, _) = registry.key.create_subkey("Values").unwrap();
@@ -935,8 +1181,12 @@ mod tests {
         let registry = TestRegistry::new();
         for preference in [
             &DISABLE_TASKBAR_CENTERING,
+            &HIDE_TASK_VIEW,
+            &DISABLE_WIDGETS,
+            &ENABLE_TASKBAR_END_TASK,
             &DISABLE_EXPLORER_SPACING,
             &HIDE_RECENT_FILES,
+            &HIDE_RECOMMENDATIONS,
             &HIDE_FREQUENT_FOLDERS,
             &HIDE_OFFICE_FILES,
         ] {
@@ -946,7 +1196,7 @@ mod tests {
                 preference.name
             );
             for enabled in [true, false] {
-                let changes = preference.changes_in(&registry.key, enabled);
+                let changes = [preference.change_in(&registry.key, enabled)];
                 let prepared = prepare_changes(&changes).unwrap();
                 apply_changes(&changes, &prepared).unwrap();
                 assert_eq!(
@@ -956,45 +1206,44 @@ mod tests {
                     preference.name
                 );
                 let key = registry.key.open_subkey(preference.path).unwrap();
-                for value in preference.values {
-                    if !enabled && preference.delete_when_disabled {
-                        assert_eq!(
-                            key.get_raw_value(value).unwrap_err().kind(),
-                            io::ErrorKind::NotFound
-                        );
-                    } else {
-                        let actual: u32 = key.get_value(value).unwrap();
-                        assert_eq!(
-                            actual,
-                            u32::from(if enabled {
-                                preference.enabled_value
-                            } else {
-                                !preference.enabled_value
-                            })
-                        );
-                    }
+                if !enabled && preference.delete_when_disabled {
+                    assert_eq!(
+                        key.get_raw_value(preference.value).unwrap_err().kind(),
+                        io::ErrorKind::NotFound
+                    );
+                } else {
+                    let actual: u32 = key.get_value(preference.value).unwrap();
+                    assert_eq!(actual, u32::from(enabled == preference.enabled_value));
                 }
             }
         }
     }
 
     #[test]
-    fn partial_recent_file_hiding_is_not_reported_as_enabled() {
+    fn recent_files_and_recommendations_change_independently() {
         let registry = TestRegistry::new();
         let (key, _) = registry.key.create_subkey(EXPLORER_KEY).unwrap();
         key.set_value("ShowRecent", &0u32).unwrap();
         key.set_value("ShowRecommendations", &1u32).unwrap();
-        assert!(!HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
-        let changes = HIDE_RECENT_FILES.changes_in(&registry.key, true);
+        assert!(HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
+        assert!(!HIDE_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
+        let changes = [HIDE_RECOMMENDATIONS.change_in(&registry.key, true)];
         let prepared = prepare_changes(&changes).unwrap();
         apply_changes(&changes, &prepared).unwrap();
         assert!(HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
+        assert!(HIDE_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
     }
 
     #[test]
     fn recommendations_preserve_taskbar_alignment_and_are_repeatable() {
         let user = TestRegistry::new();
         let machine = TestRegistry::new();
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            machine
+                .key
+                .create_subkey(format!(r"Software\Classes\CLSID\{clsid}"))
+                .unwrap();
+        }
         for windows11 in [false, true] {
             let changes = recommended_changes(
                 &user.key,
@@ -1003,7 +1252,7 @@ mod tests {
                 Path::new("test-blank.ico"),
             )
             .unwrap();
-            assert_eq!(changes.len(), if windows11 { 13 } else { 5 });
+            assert_eq!(changes.len(), if windows11 { 16 } else { 4 });
             let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
             for alignment in [None, Some(0u32), Some(1u32)] {
                 match alignment {
@@ -1015,14 +1264,12 @@ mod tests {
                 assert_eq!(key.get_value::<u32, _>("TaskbarAl").ok(), alignment);
                 let key = machine.key.open_subkey(SHELL_ICONS_KEY).unwrap();
                 assert_eq!(key.get_value::<String, _>("29").unwrap(), "test-blank.ico");
-                for preference in [
-                    &DISABLE_EXPLORER_SPACING,
-                    &HIDE_RECENT_FILES,
-                    &HIDE_FREQUENT_FOLDERS,
-                ] {
+                for preference in [&HIDE_RECENT_FILES, &HIDE_FREQUENT_FOLDERS] {
                     assert!(preference.enabled_in(&user.key).unwrap());
                 }
                 if windows11 {
+                    assert!(DISABLE_EXPLORER_SPACING.enabled_in(&user.key).unwrap());
+                    assert!(HIDE_RECOMMENDATIONS.enabled_in(&user.key).unwrap());
                     assert!(HIDE_OFFICE_FILES.enabled_in(&user.key).unwrap());
                     let key = user.key.open_subkey(CLASSIC_CONTEXT_MENU_KEY).unwrap();
                     assert_eq!(key.get_value::<String, _>("").unwrap(), "");
@@ -1038,9 +1285,9 @@ mod tests {
     fn completion_counts_preferences_instead_of_registry_values() {
         let mut changes = settings_changes(HKCU, HKLM, true);
         changes.retain(|change| change.name != "TaskbarAl");
-        assert_eq!(changed_preferences(&changes, false).len(), 8);
-        assert_eq!(changed_preferences(&changes, true).len(), 8);
-        let recent = HIDE_RECENT_FILES.changes_in(HKCU, true);
+        assert_eq!(changed_preferences(&changes, false).len(), 12);
+        assert_eq!(changed_preferences(&changes, true).len(), 12);
+        let recent = [HIDE_RECENT_FILES.change_in(HKCU, true)];
         assert_eq!(
             changed_preferences(&recent, false),
             [Recommendation::HideRecentFiles]
@@ -1058,9 +1305,43 @@ mod tests {
     }
 
     #[test]
+    fn splitting_recommendations_preserves_original_backup_indices() {
+        let names: Vec<_> = settings_changes(HKCU, HKLM, true)
+            .into_iter()
+            .map(|change| change.name)
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "TaskbarAl",
+                "UseCompactMode",
+                "ShowRecent",
+                "ShowRecommendations",
+                "ShowFrequent",
+                "ShowCloudFilesInQuickAccess",
+                "",
+                "System.IsPinnedToNameSpaceTree",
+                HOME_CLSID,
+                "HiddenByDefault",
+                "System.IsPinnedToNameSpaceTree",
+                GALLERY_CLSID,
+                "HiddenByDefault",
+                "29",
+                "ShowTaskViewButton",
+                "AllowNewsAndInterests",
+                "TaskbarEndTask"
+            ]
+        );
+    }
+
+    #[test]
     fn selected_recommendations_preserve_unchecked_settings() {
         let user = TestRegistry::new();
         let machine = TestRegistry::new();
+        machine
+            .key
+            .create_subkey(format!(r"Software\Classes\CLSID\{HOME_CLSID}"))
+            .unwrap();
         let changes =
             recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
                 .unwrap();
@@ -1096,6 +1377,12 @@ mod tests {
     fn matching_settings_do_not_require_machine_write_access() {
         let user = TestRegistry::new();
         let machine = TestRegistry::new();
+        for clsid in [HOME_CLSID, GALLERY_CLSID] {
+            machine
+                .key
+                .create_subkey(format!(r"Software\Classes\CLSID\{clsid}"))
+                .unwrap();
+        }
         let changes =
             recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
                 .unwrap();
@@ -1223,6 +1510,12 @@ mod tests {
             shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
             Some(true)
         );
+        std::fs::write(&icon.0, b"not an icon").unwrap();
+        assert_eq!(
+            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            None
+        );
+        std::fs::write(&icon.0, transparent_icon()).unwrap();
         assert!(
             recommended_changes(&registry.key, &registry.key, true, &icon.0)
                 .unwrap()
@@ -1261,5 +1554,27 @@ mod tests {
         assert_eq!(dword(30), 64);
         assert!(icon[62..62 + 4096].iter().all(|byte| *byte == 0));
         assert!(icon[62 + 4096..].iter().all(|byte| *byte == 0xff));
+    }
+
+    #[test]
+    fn blank_icon_validation_rejects_existing_invalid_files() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "orbital-icon-validation-{}-{unique}.ico",
+            std::process::id()
+        ));
+        assert!(!blank_icon_valid(&path).unwrap());
+        std::fs::write(&path, b"not an icon").unwrap();
+        assert!(!blank_icon_valid(&path).unwrap());
+        let mut bytes = transparent_icon();
+        bytes[100] = 1;
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(!blank_icon_valid(&path).unwrap());
+        std::fs::write(&path, transparent_icon()).unwrap();
+        assert!(blank_icon_valid(&path).unwrap());
+        std::fs::remove_file(path).unwrap();
     }
 }

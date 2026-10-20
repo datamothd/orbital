@@ -14,9 +14,9 @@ pub struct TweakProfile {
 
 impl TweakProfile {
     pub fn validate(&self) -> io::Result<()> {
-        if self.format != "orbital-tweaks" || !matches!(self.version, 1 | 2) {
+        if self.format != "orbital-tweaks" || !matches!(self.version, 1..=3) {
             return Err(io::Error::other(
-                "Choose an Orbital tweaks JSON file (version 1 or 2).",
+                "Choose an Orbital tweaks JSON file (version 1, 2 or 3).",
             ));
         }
         let all: Vec<_> = self.tweaks.iter().chain(&self.disabled_tweaks).collect();
@@ -31,15 +31,38 @@ impl TweakProfile {
         }
         Ok(())
     }
+
+    pub fn normalize(&mut self) -> io::Result<()> {
+        self.validate()?;
+        if self.version < 3 {
+            if !self.tweaks.contains(&Preference::HideRecommendations)
+                && !self
+                    .disabled_tweaks
+                    .contains(&Preference::HideRecommendations)
+            {
+                for tweaks in [&mut self.tweaks, &mut self.disabled_tweaks] {
+                    if tweaks.contains(&Preference::HideRecentFiles) {
+                        tweaks.push(Preference::HideRecommendations);
+                    }
+                }
+            }
+            self.version = 3;
+        }
+        Ok(())
+    }
 }
 
 impl Preference {
     fn state(self, current: &ExplorerSettings) -> Option<bool> {
         Some(match self {
             Self::DisableTaskbarCentering => current.disable_taskbar_centering,
+            Self::HideTaskView => current.hide_task_view,
+            Self::DisableWidgets => current.disable_widgets,
+            Self::EnableTaskbarEndTask => current.enable_taskbar_end_task,
             Self::DisableExplorerSpacing => current.disable_explorer_spacing,
             Self::DisableModernContextMenu => current.disable_modern_context_menu,
             Self::HideRecentFiles => current.hide_recent_files,
+            Self::HideRecommendations => current.hide_recommendations,
             Self::HideFrequentFolders => current.hide_frequent_folders,
             Self::HideOfficeFiles => current.hide_office_files,
             Self::HideHomeFolder => current.hide_home_folder,
@@ -48,20 +71,28 @@ impl Preference {
         })
     }
 
-    fn requires_windows11(self) -> bool {
-        matches!(
-            self,
-            Self::DisableModernContextMenu
-                | Self::HideOfficeFiles
-                | Self::HideHomeFolder
-                | Self::HideGallery
-        )
+    fn supported(self, current: &ExplorerSettings) -> bool {
+        match self {
+            Self::EnableTaskbarEndTask => current.taskbar_end_task_supported,
+            Self::HideHomeFolder => current.home_supported,
+            Self::HideGallery => current.gallery_supported,
+            Self::DisableWidgets
+            | Self::DisableTaskbarCentering
+            | Self::DisableExplorerSpacing
+            | Self::HideRecommendations
+            | Self::DisableModernContextMenu
+            | Self::HideOfficeFiles => current.windows11_supported,
+            _ => true,
+        }
     }
 
     fn requires_administrator(self) -> bool {
         matches!(
             self,
-            Self::HideHomeFolder | Self::HideGallery | Self::HideShortcutArrow
+            Self::DisableWidgets
+                | Self::HideHomeFolder
+                | Self::HideGallery
+                | Self::HideShortcutArrow
         )
     }
 }
@@ -74,9 +105,13 @@ pub fn export_tweaks() -> io::Result<TweakProfile> {
 fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
     let (tweaks, disabled_tweaks) = [
         Preference::DisableTaskbarCentering,
+        Preference::HideTaskView,
+        Preference::DisableWidgets,
+        Preference::EnableTaskbarEndTask,
         Preference::DisableExplorerSpacing,
         Preference::DisableModernContextMenu,
         Preference::HideRecentFiles,
+        Preference::HideRecommendations,
         Preference::HideFrequentFolders,
         Preference::HideOfficeFiles,
         Preference::HideHomeFolder,
@@ -84,14 +119,11 @@ fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
         Preference::HideShortcutArrow,
     ]
     .into_iter()
-    .filter(|preference| {
-        (!preference.requires_windows11() || current.windows11_supported)
-            && preference.state(current).is_some()
-    })
+    .filter(|preference| preference.supported(current) && preference.state(current).is_some())
     .partition(|preference| preference.state(current) == Some(true));
     TweakProfile {
         format: "orbital-tweaks".into(),
-        version: 2,
+        version: 3,
         tweaks,
         disabled_tweaks,
         folder_sort: current.folder_sort,
@@ -113,41 +145,46 @@ fn imported_changes<'a>(
         .map(|tweak| (tweak, true))
         .chain(disabled_tweaks.iter().map(|tweak| (tweak, false)))
     {
-        changes.extend(match tweak {
+        let change = match tweak {
             Preference::DisableTaskbarCentering => {
-                DISABLE_TASKBAR_CENTERING.changes_in(user, enabled)
+                DISABLE_TASKBAR_CENTERING.change_in(user, enabled)
             }
-            Preference::DisableExplorerSpacing => {
-                DISABLE_EXPLORER_SPACING.changes_in(user, enabled)
-            }
-            Preference::HideRecentFiles => HIDE_RECENT_FILES.changes_in(user, enabled),
-            Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.changes_in(user, enabled),
-            Preference::HideOfficeFiles => HIDE_OFFICE_FILES.changes_in(user, enabled),
-            Preference::DisableModernContextMenu => vec![RegistryChange::new(
+            Preference::HideTaskView => HIDE_TASK_VIEW.change_in(user, enabled),
+            Preference::DisableWidgets => DISABLE_WIDGETS.change_in(machine, enabled),
+            Preference::EnableTaskbarEndTask => ENABLE_TASKBAR_END_TASK.change_in(user, enabled),
+            Preference::DisableExplorerSpacing => DISABLE_EXPLORER_SPACING.change_in(user, enabled),
+            Preference::HideRecentFiles => HIDE_RECENT_FILES.change_in(user, enabled),
+            Preference::HideRecommendations => HIDE_RECOMMENDATIONS.change_in(user, enabled),
+            Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.change_in(user, enabled),
+            Preference::HideOfficeFiles => HIDE_OFFICE_FILES.change_in(user, enabled),
+            Preference::DisableModernContextMenu => RegistryChange::new(
                 user,
                 CLASSIC_CONTEXT_MENU_KEY,
                 "",
                 enabled.then(|| "".to_reg_value()),
-            )],
+            ),
             Preference::HideHomeFolder => {
-                namespace_changes(user, machine, HOME_CLSID, !enabled).into()
+                changes.extend(namespace_changes(user, machine, HOME_CLSID, !enabled));
+                continue;
             }
             Preference::HideGallery => {
-                namespace_changes(user, machine, GALLERY_CLSID, !enabled).into()
+                changes.extend(namespace_changes(user, machine, GALLERY_CLSID, !enabled));
+                continue;
             }
-            Preference::HideShortcutArrow => vec![RegistryChange::new(
+            Preference::HideShortcutArrow => RegistryChange::new(
                 machine,
                 SHELL_ICONS_KEY,
                 "29",
                 enabled.then(|| icon_value.to_reg_value()),
-            )],
-        });
+            ),
+        };
+        changes.push(change);
     }
     changes
 }
 
 pub fn apply_imported_tweaks(mut profile: TweakProfile) -> io::Result<usize> {
-    profile.validate()?;
+    profile.normalize()?;
     let current = settings()?;
     profile
         .tweaks
@@ -156,8 +193,10 @@ pub fn apply_imported_tweaks(mut profile: TweakProfile) -> io::Result<usize> {
         .disabled_tweaks
         .retain(|tweak| tweak.state(&current) != Some(false));
     let selected = || profile.tweaks.iter().chain(&profile.disabled_tweaks);
-    if selected().any(|tweak| tweak.requires_windows11() && !current.windows11_supported) {
-        return Err(io::Error::other("Some imported tweaks require Windows 11."));
+    if selected().any(|tweak| !tweak.supported(&current)) {
+        return Err(io::Error::other(
+            "Some imported tweaks are unavailable on this system.",
+        ));
     }
     if selected().any(|tweak| tweak.requires_administrator() && !current.is_administrator) {
         return Err(io::Error::other(
@@ -204,6 +243,81 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mixed_recent_and_recommendation_states_survive_export() {
+        for recent in [false, true] {
+            for recommendations in [false, true] {
+                let current = ExplorerSettings {
+                    windows11_supported: true,
+                    hide_recent_files: recent,
+                    hide_recommendations: recommendations,
+                    ..Default::default()
+                };
+                let profile = profile_from_settings(&current);
+                for (preference, enabled) in [
+                    (Preference::HideRecentFiles, recent),
+                    (Preference::HideRecommendations, recommendations),
+                ] {
+                    assert_eq!(profile.tweaks.contains(&preference), enabled);
+                    assert_eq!(profile.disabled_tweaks.contains(&preference), !enabled);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_profiles_expand_combined_preferences_once() {
+        for version in [1, 2, 3] {
+            for enabled in [false, true] {
+                let mut profile = TweakProfile {
+                    format: "orbital-tweaks".into(),
+                    version,
+                    tweaks: if enabled {
+                        vec![Preference::HideRecentFiles]
+                    } else {
+                        vec![]
+                    },
+                    disabled_tweaks: if enabled {
+                        vec![]
+                    } else {
+                        vec![Preference::HideRecentFiles]
+                    },
+                    folder_sort: None,
+                    folder_grouping: None,
+                };
+                profile.normalize().unwrap();
+                profile.normalize().unwrap();
+                profile.validate().unwrap();
+                let selected = if enabled {
+                    &profile.tweaks
+                } else {
+                    &profile.disabled_tweaks
+                };
+                assert_eq!(
+                    selected.contains(&Preference::HideRecommendations),
+                    version < 3
+                );
+                assert_eq!(profile.version, 3);
+            }
+        }
+    }
+
+    #[test]
+    fn unavailable_features_are_omitted_from_exports() {
+        let current = ExplorerSettings::default();
+        let profile = profile_from_settings(&current);
+        for preference in [
+            Preference::HideHomeFolder,
+            Preference::HideGallery,
+            Preference::DisableExplorerSpacing,
+            Preference::DisableTaskbarCentering,
+            Preference::HideRecommendations,
+        ] {
+            assert!(!profile.disabled_tweaks.contains(&preference));
+            assert!(!profile.tweaks.contains(&preference));
+        }
+    }
+
+    #[test]
     fn export_preserves_enabled_and_disabled_supported_tweaks_and_known_folder_values() {
         let mut current = ExplorerSettings {
             is_administrator: false,
@@ -214,13 +328,20 @@ mod tests {
             }),
             folder_grouping: Some(FolderGrouping::None),
             disable_taskbar_centering: true,
+            hide_task_view: false,
+            disable_widgets: false,
+            enable_taskbar_end_task: false,
+            taskbar_end_task_supported: true,
             disable_explorer_spacing: false,
             disable_modern_context_menu: true,
             hide_recent_files: true,
+            hide_recommendations: false,
             hide_frequent_folders: false,
             hide_office_files: false,
             hide_home_folder: false,
+            home_supported: true,
             hide_gallery: false,
+            gallery_supported: true,
             hide_shortcut_arrow: None,
         };
         let profile = profile_from_settings(&current);
@@ -233,13 +354,26 @@ mod tests {
             ]
         );
         assert_eq!(profile.folder_sort, current.folder_sort);
-        assert_eq!(profile.version, 2);
+        assert_eq!(profile.version, 3);
         assert!(
             profile
                 .disabled_tweaks
                 .contains(&Preference::DisableExplorerSpacing)
         );
         assert!(profile.disabled_tweaks.contains(&Preference::HideGallery));
+        for preference in [
+            Preference::HideTaskView,
+            Preference::DisableWidgets,
+            Preference::EnableTaskbarEndTask,
+        ] {
+            assert!(profile.disabled_tweaks.contains(&preference));
+        }
+        current.taskbar_end_task_supported = false;
+        assert!(
+            !profile_from_settings(&current)
+                .disabled_tweaks
+                .contains(&Preference::EnableTaskbarEndTask)
+        );
         assert!(
             !profile
                 .disabled_tweaks
@@ -256,6 +390,11 @@ mod tests {
         assert_eq!(Preference::HideShortcutArrow.state(&current), None);
         assert_eq!(profile.folder_grouping, Some(FolderGrouping::None));
         current.windows11_supported = false;
+        assert!(
+            !profile_from_settings(&current)
+                .disabled_tweaks
+                .contains(&Preference::DisableWidgets)
+        );
         assert!(
             !profile_from_settings(&current)
                 .tweaks
@@ -280,7 +419,7 @@ mod tests {
                 .iter()
                 .map(|change| change.name.as_str())
                 .collect::<Vec<_>>(),
-            ["TaskbarAl", "ShowRecent", "ShowRecommendations"]
+            ["TaskbarAl", "ShowRecent"]
         );
         assert!(imported_changes(HKCU, HKLM, &[], &[], Path::new("unused.ico")).is_empty());
     }
@@ -292,9 +431,13 @@ mod tests {
         let machine = registry.key.create_subkey("Machine").unwrap().0;
         let tweaks = [
             Preference::DisableTaskbarCentering,
+            Preference::HideTaskView,
+            Preference::DisableWidgets,
+            Preference::EnableTaskbarEndTask,
             Preference::DisableExplorerSpacing,
             Preference::DisableModernContextMenu,
             Preference::HideRecentFiles,
+            Preference::HideRecommendations,
             Preference::HideFrequentFolders,
             Preference::HideOfficeFiles,
             Preference::HideHomeFolder,
@@ -312,13 +455,17 @@ mod tests {
             apply_changes(&changes, &prepared).unwrap();
             for preference in [
                 &DISABLE_TASKBAR_CENTERING,
+                &HIDE_TASK_VIEW,
+                &ENABLE_TASKBAR_END_TASK,
                 &DISABLE_EXPLORER_SPACING,
                 &HIDE_RECENT_FILES,
+                &HIDE_RECOMMENDATIONS,
                 &HIDE_FREQUENT_FOLDERS,
                 &HIDE_OFFICE_FILES,
             ] {
                 assert_eq!(preference.enabled_in(&user).unwrap(), enabled);
             }
+            assert_eq!(DISABLE_WIDGETS.enabled_in(&machine).unwrap(), enabled);
             for clsid in [HOME_CLSID, GALLERY_CLSID] {
                 assert_eq!(
                     namespace_visible_in(&user, &machine, clsid).unwrap(),
@@ -351,7 +498,7 @@ mod tests {
             folder_grouping: None,
         };
         assert!(profile.validate().is_ok());
-        profile.version = 3;
+        profile.version = 4;
         assert!(profile.validate().is_err());
         profile.version = 1;
         profile.format = "other-app".into();

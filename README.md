@@ -13,7 +13,7 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 ## Current features
 
 - Display basic system information: host, OS, Windows version, CPU, thread count, and memory usage.
-- Toggles for 11 different Windows preferences (only for Explorer related settings for now).
+- Toggles for Explorer, taskbar and desktop preferences, including Widgets, Task View and taskbar End task.
 - Tauri app interface for value editing.
 - Setting preference state in mass and change reverting.
 - Import and export enabled and disabled tweak values as JSON, with a selectable comparison preview before importing.

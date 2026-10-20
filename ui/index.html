@@ -39,7 +39,7 @@
       </section>
       <div class="settings-actions" role="group" aria-label="Settings actions">
         <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Enable recommended settings</button>
-        <button id="restore-original" disabled title="Restore settings saved on first load and restart Explorer">Revert changes</button>
+        <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
       </div>
       <details id="explorer-preferences" aria-labelledby="preferences-title">
         <summary>
@@ -56,6 +56,30 @@
           </div>
           <button id="taskbar-centering-toggle" disabled>Toggle</button>
         </div>
+        <div class="preference">
+          <div>
+            <h3>Hide Task View button</h3>
+            <p class="preference-description">Hides the Task View button on the taskbar. Win+Tab still works.</p>
+            <p id="task-view" class="preference-value">Loading…</p>
+          </div>
+          <button id="task-view-toggle" disabled>Toggle</button>
+        </div>
+        <div class="preference">
+          <div>
+            <h3>Disable Widgets</h3>
+            <p class="preference-description">Disables the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
+            <p id="widgets" class="preference-value">Loading…</p>
+          </div>
+          <button id="widgets-toggle" disabled>Toggle</button>
+        </div>
+        <div class="preference">
+          <div>
+            <h3>Enable taskbar End task</h3>
+            <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
+            <p id="taskbar-end-task" class="preference-value">Loading…</p>
+          </div>
+          <button id="taskbar-end-task-toggle" disabled>Toggle</button>
+        </div>
         <h3 class="preference-group">Desktop</h3>
         <div class="preference">
           <div>
@@ -69,7 +93,7 @@
         <div class="preference folder-view-preference">
           <div>
             <h3 id="folder-sort-label">Default folder sorting</h3>
-            <p class="preference-description">Sets sorting across all folder types. Resets saved folder views.</p>
+            <p class="preference-description">Sets sorting across all folder types. Resets saved views, including individual folder layouts.</p>
             <p id="folder-sort-value" class="preference-value">Loading…</p>
           </div>
           <div class="folder-view-controls">
@@ -83,7 +107,7 @@
         <div class="preference folder-view-preference">
           <div>
             <h3 id="folder-grouping-label">Default folder grouping</h3>
-            <p class="preference-description">Sets grouping across all folder types. Resets saved folder views.</p>
+            <p class="preference-description">Sets grouping across all folder types. Resets saved views, including individual folder layouts.</p>
             <p id="folder-grouping-value" class="preference-value">Loading…</p>
           </div>
           <div class="folder-view-controls">
@@ -106,7 +130,7 @@
         <div class="preference">
           <div>
             <h3>Disable Windows 11 context menu</h3>
-            <p class="preference-description">Uses the classic Windows 10-style right-click menu.</p>
+            <p class="preference-description">Requests the classic Windows 10-style right-click menu.</p>
             <p id="modern-context-menu" class="preference-value">Loading…</p>
           </div>
           <button id="modern-context-menu-toggle" disabled>Toggle</button>
@@ -131,10 +155,18 @@
         <div class="preference">
           <div>
             <h3>Hide recently used files</h3>
-            <p class="preference-description">Hides recent files and recommendations in Quick Access.</p>
+            <p class="preference-description">Hides recently used files in File Explorer Home or Quick Access.</p>
             <p id="recent-files" class="preference-value">Loading…</p>
           </div>
           <button id="recent-files-toggle" disabled>Toggle</button>
+        </div>
+        <div class="preference">
+          <div>
+            <h3>Hide recommendations</h3>
+            <p class="preference-description">Hides the Recommended section in File Explorer Home.</p>
+            <p id="recommendations" class="preference-value">Loading…</p>
+          </div>
+          <button id="recommendations-toggle" disabled>Toggle</button>
         </div>
         <div class="preference">
           <div>
@@ -146,8 +178,8 @@
         </div>
         <div class="preference">
           <div>
-            <h3>Hide files from Office.com</h3>
-            <p class="preference-description">Hides cloud files from your Office.com account.</p>
+            <h3>Hide cloud files and account-based recommendations</h3>
+            <p class="preference-description">Hides account and cloud-provider content in File Explorer. Availability depends on your account.</p>
             <p id="office-files" class="preference-value">Loading…</p>
           </div>
           <button id="office-files-toggle" disabled>Toggle</button>
@@ -195,7 +227,7 @@
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
         <div id="recommendation-list" class="changes-list" role="group" aria-label="Recommended changes"></div>
-        <p class="note">Changing folder sorting or grouping resets saved folder views.</p>
+        <p class="note">Changing folder sorting or grouping resets saved views, including individual folder layouts. Reverting restores their earlier snapshot and replaces later layout changes.</p>
       </div>
     </details>
     <p class="note">Windows Explorer will restart to apply this change.</p>
@@ -223,7 +255,7 @@
       <div id="import-list" class="changes-scroll changes-list" role="group" aria-label="Imported tweaks compared with current settings"></div>
     </details>
     <p id="import-summary" class="note" role="status" aria-live="polite"></p>
-    <p class="note">Only selected changes will be applied. Other tweaks stay as they are. Windows Explorer will restart; changing folder sorting or grouping resets saved folder views.</p>
+    <p class="note">Only selected changes will be applied. Windows Explorer will restart. Changing folder sorting or grouping resets saved views, including individual folder layouts. Reverting restores their earlier snapshot and replaces later layout changes.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
       <button id="import-apply" value="apply" class="primary" disabled>Apply &amp; restart</button>

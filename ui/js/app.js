@@ -26,14 +26,18 @@ byId("skip-prompts-toggle").addEventListener("click", () => {
 renderToggle("skip-prompts", skipPrompts);
 
 const explorerPreferences = [
-  { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", visual: true },
-  { id: "explorer-spacing", field: "disable_explorer_spacing", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?" },
-  { id: "modern-context-menu", field: "disable_modern_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", windows11: true },
-  { id: "recent-files", field: "hide_recent_files", apply: "Hide recent files and recommendations in Quick Access?", restore: "Show recent files and recommendations in Quick Access?" },
+  { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", supported: "windows11_supported", visual: true },
+  { id: "task-view", field: "hide_task_view", apply: "Hide the Task View button? Win+Tab will still work.", restore: "Show the Task View button?", visual: true },
+  { id: "widgets", field: "disable_widgets", apply: "Disable Widgets, including the widgets board and taskbar content?", restore: "Allow Widgets again?", supported: "windows11_supported", requiresAdmin: true },
+  { id: "taskbar-end-task", field: "enable_taskbar_end_task", apply: "Add End task to app menus on the taskbar? It force-closes apps and can discard unsaved work.", restore: "Remove End task from app menus on the taskbar?", supported: "taskbar_end_task_supported" },
+  { id: "explorer-spacing", field: "disable_explorer_spacing", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
+  { id: "modern-context-menu", field: "disable_modern_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
+  { id: "recent-files", field: "hide_recent_files", apply: "Hide recently used files in File Explorer Home?", restore: "Show recently used files in File Explorer Home?" },
+  { id: "recommendations", field: "hide_recommendations", apply: "Hide the Recommended section in File Explorer Home?", restore: "Show the Recommended section in File Explorer Home?", supported: "windows11_supported" },
   { id: "frequent-folders", field: "hide_frequent_folders", apply: "Hide frequently used folders in Quick Access?", restore: "Show frequently used folders in Quick Access?" },
-  { id: "office-files", field: "hide_office_files", apply: "Hide Office.com cloud files in Quick Access?", restore: "Show Office.com cloud files in Quick Access?", windows11: true },
-  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", windows11: true, requiresAdmin: true, visual: true },
-  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", windows11: true, requiresAdmin: true, visual: true },
+  { id: "office-files", field: "hide_office_files", apply: "Hide cloud files and account-based recommendations in File Explorer?", restore: "Allow cloud files and account-based recommendations in File Explorer?", supported: "windows11_supported" },
+  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", supported: "home_supported", requiresAdmin: true, visual: true },
+  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true, visual: true },
   { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true, visual: true },
 ];
 
@@ -41,6 +45,15 @@ const folderViews = [
   { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting" },
   { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping" },
 ];
+
+function preferenceAvailable(preference) {
+  return Boolean(settings) && (!preference.supported || settings[preference.supported]);
+}
+
+function preferenceValue(preference, enabled) {
+  if (enabled === null) return "Custom or missing overlay icon";
+  return enabled ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled");
+}
 
 function setStatus(message, error = false) {
   const notice = byId("administrator-notice");
@@ -63,8 +76,7 @@ function setBusy(value) {
   }
   for (const view of folderViews) view.picker.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
-    byId(`${preference.id}-toggle`).disabled = busy || !settings
-      || (preference.windows11 && !settings.windows11_supported);
+    byId(`${preference.id}-toggle`).disabled = busy || !preferenceAvailable(preference);
   }
 }
 
@@ -78,11 +90,8 @@ function renderSettings() {
   document.querySelectorAll(".admin-warning").forEach(adminWarning);
   for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
   for (const preference of explorerPreferences) {
-    setPreferenceValue(preference.id, !settings ? "Unavailable"
-      : preference.windows11 && !settings.windows11_supported
-      ? "Requires Windows 11"
-      : settings[preference.field] === null ? "Custom or missing overlay icon"
-      : settings[preference.field] ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"),
+    setPreferenceValue(preference.id, preferenceAvailable(preference)
+      ? preferenceValue(preference, settings[preference.field]) : "Unavailable",
       preference.visual);
   }
 }
@@ -205,7 +214,7 @@ function confirmChange(description, title = "Change preference?", recommendation
     const text = document.createElement("span");
     const preference = explorerPreferences.find(preference => preference.field === id);
     text.textContent = preference
-      ? byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").firstChild.textContent.trim()
+      ? preference.label
       : id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None";
     if (preference?.requiresAdmin) text.append(adminWarning());
     if (preference?.visual || folderViews.some(view => view.field === id)) {
@@ -308,7 +317,7 @@ byId("apply-recommended").addEventListener("click", (event) => applyChange(
   "apply_recommended_settings", {}, "", event.shiftKey,
 ));
 byId("restore-original").addEventListener("click", () => applyChange(
-  "restore_original_settings", {}, "", true, "Original settings restored. Explorer restarted.",
+  "restore_original_settings", {}, "Restore your original settings? If folder views were changed, this also restores their saved layout snapshot and replaces layout changes made since then.", false, "Original settings restored. Explorer restarted.",
 ));
 for (const view of folderViews) {
   byId(`${view.id}-apply`).addEventListener("click", (event) => {
@@ -316,16 +325,16 @@ for (const view of folderViews) {
     if (selected !== null) applyChange(
       view.command,
       { [view.argument]: selected },
-      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset.`,
+      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved views, including individual folder layouts, will be reset.`,
       event.shiftKey,
       `Default folder ${view.label} saved. Explorer restarted.`,
     );
   });
 }
 for (const preference of explorerPreferences) {
-  if (preference.requiresAdmin) {
-    byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").append(adminWarning());
-  }
+  const title = byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3");
+  preference.label = title.textContent.trim();
+  if (preference.requiresAdmin) title.append(adminWarning());
   byId(`${preference.id}-toggle`).addEventListener("click", (event) => applyChange(
     "toggle_preference",
     { preference: preference.field },

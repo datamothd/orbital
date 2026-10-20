@@ -442,13 +442,11 @@ dialog p {
   margin: 8px 0;
 }
 
-dialog > :first-child,
-.changes-dialog > :first-child {
+dialog > :first-child {
   margin-top: 0;
 }
 
-dialog > :last-child,
-.changes-dialog > :last-child {
+dialog > :last-child {
   margin-bottom: 0;
 }
 

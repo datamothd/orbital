@@ -6,15 +6,14 @@ function importedRows(profile) {
   const rows = importedTweaks.map(([field, enabled]) => {
     const preference = explorerPreferences.find(preference => preference.field === field);
     const matching = settings[field] === enabled;
-    const blocked = !matching && (preference.windows11 && !settings.windows11_supported
-      ? "Requires Windows 11" : preference.requiresAdmin && !settings.is_administrator
+    const blocked = !matching && (!preferenceAvailable(preference)
+      ? "Unavailable" : preference.requiresAdmin && !settings.is_administrator
       ? "Requires administrator access" : "");
     return {
       field,
-      label: byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").firstChild.textContent.trim(),
-      current: settings[field] === null ? "Custom or missing overlay icon"
-        : settings[field] ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"),
-      imported: enabled ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"),
+      label: preference.label,
+      current: preferenceValue(preference, settings[field]),
+      imported: preferenceValue(preference, enabled),
       matching, blocked,
     };
   });
@@ -117,11 +116,10 @@ byId("import-tweaks").addEventListener("click", async () => {
     };
     setStatus("Importing tweaks and restarting Explorer…");
     const { changed: count, error } = await savePreferences("apply_imported_tweaks", { profile: selection });
+    setStatus("");
     if (error) {
-      setStatus(error, true);
       showResult("Could not complete import", `${error} Some changes may already have been applied. Review your current settings before trying again.`);
     } else {
-      setStatus("");
       showResult("Tweaks imported", count === 0 ? "The selected tweaks already match. No changes were needed."
         : `${count} ${count === 1 ? "change" : "changes"} applied. Explorer restarted.`);
     }

@@ -98,10 +98,10 @@ pub async fn import_tweaks(window: tauri::Window) -> Result<Option<TweakProfile>
                 "The file is too large. Choose an Orbital tweaks JSON file under 1 MiB.".into(),
             );
         }
-        let profile: TweakProfile =
+        let mut profile: TweakProfile =
             serde_json::from_slice(json.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&json))
                 .map_err(|error| format!("Invalid Orbital tweaks file: {error}"))?;
-        profile.validate().map_err(|error| error.to_string())?;
+        profile.normalize().map_err(|error| error.to_string())?;
         Ok(Some(profile))
     })
     .await
