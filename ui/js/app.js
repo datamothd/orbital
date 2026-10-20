@@ -189,7 +189,7 @@ function confirmChange(description, title = "Change preference?", recommendation
     }
     label.append(checkbox, text);
     return label;
-  }));
+  }).sort((a, b) => Number(b.classList.contains("visual-preference")) - Number(a.classList.contains("visual-preference"))));
   byId("confirm-apply").disabled = false;
   dialog.returnValue = "cancel";
   return new Promise((resolve) => {
@@ -204,7 +204,8 @@ function showApplyResult(count, error) {
   byId("apply-result-title").textContent = completed
     ? "Recommended settings applied" : "Could not complete recommendations";
   byId("apply-result-description").textContent = completed
-    ? `${count} ${count === 1 ? "change" : "changes"} made.${count ? " Explorer restarted." : " All recommended settings are already enabled."}`
+    ? count === 0 ? "0 changes are made. All recommended settings are already enabled."
+      : `${count} ${count === 1 ? "change" : "changes"} made. Explorer restarted.`
     : "The number of changes could not be confirmed.";
   errorNotice.hidden = !error;
   errorNotice.textContent = error || "";
