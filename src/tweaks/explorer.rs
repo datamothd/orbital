@@ -567,15 +567,41 @@ pub fn save_original_settings() -> io::Result<()> {
     original_settings_in(HKCU, HKLM, supports_windows11()?).map(|_| ())
 }
 
-pub fn apply_recommended_settings(preview: bool) -> io::Result<usize> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Recommendation {
+    DisableExplorerSpacing,
+    DisableModernContextMenu,
+    HideRecentFiles,
+    HideFrequentFolders,
+    HideOfficeFiles,
+    HideHomeFolder,
+    HideGallery,
+    HideShortcutArrow,
+    FolderSort,
+    FolderGrouping,
+}
+
+pub fn apply_recommended_settings(
+    preview: bool,
+    selected: Option<&[Recommendation]>,
+) -> io::Result<Vec<Recommendation>> {
     let windows11 = supports_windows11()?;
     let icon = blank_icon_path()?;
-    let changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
-    let view_changes = folder_views::recommended_changes()?;
-    let missing_icon = !icon.is_file();
-    let count = changed_preferences(&changes, missing_icon) + view_changes.len();
-    if preview || count == 0 {
-        return Ok(count);
+    let selected = |preference| selected.is_none_or(|items| items.contains(&preference));
+    let mut changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
+    changes.retain(|change| recommendation(change).is_some_and(selected));
+    let mut view_changes = folder_views::recommended_changes()?;
+    let view_id = |change: &folder_views::ViewChange| match change {
+        folder_views::ViewChange::Sort(_) => Recommendation::FolderSort,
+        folder_views::ViewChange::Grouping(_) => Recommendation::FolderGrouping,
+    };
+    view_changes.retain(|change| selected(view_id(change)));
+    let missing_icon = selected(Recommendation::HideShortcutArrow) && !icon.is_file();
+    let mut preferences = changed_preferences(&changes, missing_icon);
+    preferences.extend(view_changes.iter().map(view_id));
+    if preview || preferences.is_empty() {
+        return Ok(preferences);
     }
     original_settings_in(HKCU, HKLM, windows11)?;
     let prepared = prepare_changes(&changes)?;
@@ -584,27 +610,36 @@ pub fn apply_recommended_settings(preview: bool) -> io::Result<usize> {
     }
     folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
     restart_explorer("Recommended settings")?;
-    Ok(count)
+    Ok(preferences)
 }
 
-fn changed_preferences(changes: &[RegistryChange<'_>], missing_icon: bool) -> usize {
-    let mut preferences = std::collections::HashSet::new();
-    for change in changes {
-        let preference = if change.name == "ShowRecommendations" {
-            "ShowRecent"
-        } else if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) {
-            HOME_CLSID
-        } else if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) {
-            GALLERY_CLSID
-        } else {
-            &change.name
-        };
-        preferences.insert(preference);
+fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {
+    use Recommendation::*;
+    Some(match change.name.as_str() {
+        "UseCompactMode" => DisableExplorerSpacing,
+        "ShowRecent" | "ShowRecommendations" => HideRecentFiles,
+        "ShowFrequent" => HideFrequentFolders,
+        "ShowCloudFilesInQuickAccess" => HideOfficeFiles,
+        "" if change.path == CLASSIC_CONTEXT_MENU_KEY => DisableModernContextMenu,
+        "29" if change.path == SHELL_ICONS_KEY => HideShortcutArrow,
+        _ if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) => HideHomeFolder,
+        _ if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) => HideGallery,
+        _ => return None,
+    })
+}
+
+fn changed_preferences(changes: &[RegistryChange<'_>], missing_icon: bool) -> Vec<Recommendation> {
+    let mut preferences = Vec::new();
+    for preference in changes
+        .iter()
+        .filter_map(recommendation)
+        .chain(missing_icon.then_some(Recommendation::HideShortcutArrow))
+    {
+        if !preferences.contains(&preference) {
+            preferences.push(preference);
+        }
     }
-    if missing_icon {
-        preferences.insert("29");
-    }
-    preferences.len()
+    preferences
 }
 
 fn pending_changes(changes: Vec<RegistryChange<'_>>) -> io::Result<Vec<RegistryChange<'_>>> {
@@ -998,14 +1033,58 @@ mod tests {
     fn completion_counts_preferences_instead_of_registry_values() {
         let mut changes = settings_changes(HKCU, HKLM, true);
         changes.retain(|change| change.name != "TaskbarAl");
-        assert_eq!(changed_preferences(&changes, false), 8);
-        assert_eq!(changed_preferences(&changes, true), 8);
+        assert_eq!(changed_preferences(&changes, false).len(), 8);
+        assert_eq!(changed_preferences(&changes, true).len(), 8);
         let recent = HIDE_RECENT_FILES.changes_in(HKCU, true);
-        assert_eq!(changed_preferences(&recent, false), 1);
+        assert_eq!(
+            changed_preferences(&recent, false),
+            [Recommendation::HideRecentFiles]
+        );
         let home = namespace_changes(HKCU, HKLM, HOME_CLSID, false);
-        assert_eq!(changed_preferences(&home, false), 1);
-        assert_eq!(changed_preferences(&[], false), 0);
-        assert_eq!(changed_preferences(&[], true), 1);
+        assert_eq!(
+            changed_preferences(&home, false),
+            [Recommendation::HideHomeFolder]
+        );
+        assert!(changed_preferences(&[], false).is_empty());
+        assert_eq!(
+            changed_preferences(&[], true),
+            [Recommendation::HideShortcutArrow]
+        );
+    }
+
+    #[test]
+    fn selected_recommendations_preserve_unchecked_settings() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let changes =
+            recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
+                .unwrap();
+        let originals: Vec<_> = changes
+            .iter()
+            .map(|change| read_original(change.root, &change.path, &change.name).unwrap())
+            .collect();
+        let selected = [
+            Recommendation::HideRecentFiles,
+            Recommendation::HideHomeFolder,
+        ];
+        let mut selected_changes =
+            recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
+                .unwrap();
+        selected_changes
+            .retain(|change| recommendation(change).is_some_and(|id| selected.contains(&id)));
+        let prepared = prepare_changes(&selected_changes).unwrap();
+        apply_changes(&selected_changes, &prepared).unwrap();
+        assert_eq!(changed_preferences(&selected_changes, false), selected);
+        assert!(HIDE_RECENT_FILES.enabled_in(&user.key).unwrap());
+        assert!(!namespace_visible_in(&user.key, &machine.key, HOME_CLSID).unwrap());
+        for (change, original) in changes.iter().zip(originals) {
+            if !recommendation(change).is_some_and(|id| selected.contains(&id)) {
+                assert_eq!(
+                    read_original(change.root, &change.path, &change.name).unwrap(),
+                    original
+                );
+            }
+        }
     }
 
     #[test]

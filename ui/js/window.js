@@ -8,25 +8,16 @@ try {
 } catch {
 }
 
-const smoothScrollToggle = document.getElementById("smooth-scroll-toggle");
-const smoothScrollValue = document.getElementById("smooth-scroll-value");
-
-function renderSmoothScrolling() {
-  smoothScrollToggle.setAttribute("aria-checked", String(smoothScrolling));
-  smoothScrollValue.textContent = smoothScrolling ? "Enabled" : "Disabled";
-  smoothScrollValue.dataset.state = smoothScrolling ? "enabled" : "disabled";
-}
-
-smoothScrollToggle.addEventListener("click", () => {
+byId("smooth-scroll-toggle").addEventListener("click", () => {
   smoothScrolling = !smoothScrolling;
   stopScrolling();
-  renderSmoothScrolling();
+  renderToggle("smooth-scroll", smoothScrolling);
   try {
     localStorage.setItem("orbital.smoothScrolling", String(smoothScrolling));
   } catch {
   }
 });
-renderSmoothScrolling();
+renderToggle("smooth-scroll", smoothScrolling);
 
 function stopScrolling() {
   cancelAnimationFrame(scrollFrame);

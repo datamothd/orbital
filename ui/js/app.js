@@ -10,20 +10,20 @@ try {
 } catch {
 }
 
-function renderSkipPrompts() {
-  byId("skip-prompts-toggle").setAttribute("aria-checked", String(skipPrompts));
-  setPreferenceValue("skip-prompts-value", skipPrompts ? "Enabled" : "Disabled");
+function renderToggle(id, enabled) {
+  byId(`${id}-toggle`).setAttribute("aria-checked", String(enabled));
+  setPreferenceValue(`${id}-value`, enabled ? "Enabled" : "Disabled");
 }
 
 byId("skip-prompts-toggle").addEventListener("click", () => {
   skipPrompts = !skipPrompts;
-  renderSkipPrompts();
+  renderToggle("skip-prompts", skipPrompts);
   try {
     localStorage.setItem("orbital.skipPrompts", String(skipPrompts));
   } catch {
   }
 });
-renderSkipPrompts();
+renderToggle("skip-prompts", skipPrompts);
 
 const explorerPreferences = [
   { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?" },
@@ -43,17 +43,15 @@ const folderViews = [
 ];
 
 function setStatus(message, error = false) {
-  const administrator = error && message.includes("requires administrator access");
   const notice = byId("administrator-notice");
-  if (administrator) {
+  if (error && message.includes("requires administrator access")) {
     byId("administrator-description").textContent = message;
     if (!notice.open) notice.showModal();
     return;
   }
   if (notice.open) notice.close();
   const status = byId("status");
-  status.textContent = message;
-  status.hidden = !message;
+  status.textContent = message || "Ready.";
   status.classList.toggle("error", error);
 }
 
@@ -76,6 +74,7 @@ function setPreferenceValue(id, value) {
 }
 
 function renderSettings() {
+  document.querySelectorAll(".admin-warning").forEach(adminWarning);
   for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, !settings ? "Unavailable"
@@ -154,10 +153,42 @@ async function refresh() {
   setBusy(false);
 }
 
-function confirmChange(description, title = "Change preference?") {
+function adminWarning(warning = document.createElement("span")) {
+  const administrator = settings?.is_administrator;
+  warning.className = "admin-warning";
+  warning.dataset.state = administrator === true ? "granted" : administrator === false ? "missing" : "unknown";
+  warning.textContent = `⚠${administrator === true ? " ✓" : administrator === false ? " ✕" : ""}`;
+  warning.title = `Requires administrator access${administrator === true ? " · Access found" : administrator === false ? " · Access not found" : ""}`;
+  warning.setAttribute("role", "img");
+  warning.setAttribute("aria-label", warning.title);
+  return warning;
+}
+
+function confirmChange(description, title = "Change preference?", recommendations = []) {
   const dialog = byId("confirmation");
   byId("confirm-title").textContent = title;
   byId("confirm-description").textContent = description;
+  byId("recommended-options").hidden = !recommendations.length;
+  const list = byId("recommendation-list");
+  list.replaceChildren(...recommendations.map((id) => {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = id;
+    checkbox.checked = true;
+    const text = document.createElement("span");
+    const preference = explorerPreferences.find(preference => preference.field === id);
+    text.textContent = preference
+      ? byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").firstChild.textContent.trim()
+      : id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None";
+    if (preference?.requiresAdmin) text.append(adminWarning());
+    if (!["hide_recent_files", "hide_frequent_folders", "hide_office_files"].includes(id)) {
+      label.className = "visual-preference";
+    }
+    label.append(checkbox, text);
+    return label;
+  }));
+  byId("confirm-apply").disabled = false;
   dialog.returnValue = "cancel";
   return new Promise((resolve) => {
     dialog.addEventListener("close", () => resolve(dialog.returnValue === "apply"), { once: true });
@@ -181,28 +212,35 @@ function showApplyResult(count, error) {
 async function applyChange(command, args, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   const recommended = command === "apply_recommended_settings";
+  const skip = skipPrompts || skipConfirmation;
   const preference = explorerPreferences.find(preference => preference.field === args.preference);
   if (preference?.requiresAdmin && !settings.is_administrator) {
     setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
     return;
   }
   setBusy(true);
+  let changed;
+  let error = null;
   try {
+    let recommendations = [];
     if (recommended) {
       setStatus("");
-      const count = await invoke(command, { preview: true });
-      if (count === 0) {
+      recommendations = await invoke(command, { preview: true });
+      if (!recommendations.length) {
         showApplyResult(0);
         return;
       }
-      description = `Apply ${count} recommended ${count === 1 ? "change" : "changes"}?`;
+      description = "Uncheck any settings you want to keep.";
     }
-    if (!skipPrompts && !skipConfirmation && !await confirmChange(description, recommended ? "Apply recommended settings?" : undefined)) return;
+    if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : undefined, recommendations)) return;
+    if (recommended) {
+      args.selected = skip ? recommendations
+        : [...byId("recommendation-list").querySelectorAll("input:checked")].map(input => input.value);
+    }
     setStatus("Saving preferences and restarting Explorer…");
-    let error = null;
-    let changed;
     try {
       changed = await invoke(command, args);
+      if (recommended) changed = changed.length;
     } catch (reason) {
       error = String(reason);
     }
@@ -211,18 +249,25 @@ async function applyChange(command, args, description, skipConfirmation = false,
     } catch (reason) {
       error = [error, `Could not refresh preferences: ${reason}`].filter(Boolean).join(" · ");
     }
-    setStatus(error || (changed === false || changed === 0 ? "" : success), Boolean(error));
-    if (recommended) showApplyResult(changed, error);
   } catch (reason) {
-    setStatus(String(reason), true);
+    error = String(reason);
   } finally {
     setBusy(false);
   }
+  if (recommended) {
+    setStatus("");
+    showApplyResult(changed, error);
+  } else {
+    setStatus(error || (changed === false || changed === 0 ? "" : success), Boolean(error));
+  }
 }
 
+byId("recommendation-list").addEventListener("change", (event) => {
+  byId("confirm-apply").disabled = !event.currentTarget.querySelector("input:checked");
+});
 byId("refresh").addEventListener("click", refresh);
 byId("apply-recommended").addEventListener("click", (event) => applyChange(
-  "apply_recommended_settings", {}, "", event.shiftKey, "Recommended settings enabled. Explorer restarted.",
+  "apply_recommended_settings", {}, "", event.shiftKey,
 ));
 byId("restore-original").addEventListener("click", () => applyChange(
   "restore_original_settings", {}, "", true, "Original settings restored. Explorer restarted.",
@@ -240,6 +285,9 @@ for (const view of folderViews) {
   });
 }
 for (const preference of explorerPreferences) {
+  if (preference.requiresAdmin) {
+    byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").append(adminWarning());
+  }
   byId(`${preference.id}-toggle`).addEventListener("click", (event) => applyChange(
     "toggle_preference",
     { preference: preference.field },

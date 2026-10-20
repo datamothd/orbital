@@ -17,130 +17,130 @@
       <button id="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel" tabindex="-1">settings</button>
     </nav>
     <div id="tweaks-panel" role="tabpanel" aria-labelledby="tweaks-tab">
-    <section aria-labelledby="system-title">
-      <header class="section-header">
-        <h2 id="system-title">System Information</h2>
-        <button id="refresh" disabled>Refresh</button>
-      </header>
-      <dl id="system"><dt>System information</dt><dd>Loading…</dd></dl>
-    </section>
-    <div class="settings-actions" role="group" aria-label="Settings actions">
-      <button id="apply-recommended" disabled title="Enable supported recommendations, sort folders by Type, set Group by to None, and restart Explorer. Hold Shift to skip confirmation.">Enable recommended settings</button>
-      <button id="restore-original" disabled title="Restore settings saved on first load and restart Explorer">Revert changes</button>
-    </div>
-    <details id="explorer-preferences" aria-labelledby="preferences-title">
-      <summary>
-        <h2 id="preferences-title">Explorer Settings</h2>
-      </summary>
-      <hr class="preferences-divider" aria-hidden="true">
-      <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.</p>
-      <h3 class="preference-group">Personal preferences</h3>
-      <div class="preference">
-        <div>
-          <h3>Taskbar alignment</h3>
-          <p class="preference-description">Choose left or centered taskbar icons.</p>
-          <p id="taskbar-centering" class="preference-value">Loading…</p>
-        </div>
-        <button id="taskbar-centering-toggle" disabled>Toggle</button>
+      <section aria-labelledby="system-title">
+        <header class="section-header">
+          <h2 id="system-title">System Information</h2>
+          <button id="refresh" disabled>Refresh</button>
+        </header>
+        <dl id="system"><dt>System information</dt><dd>Loading…</dd></dl>
+      </section>
+      <div class="settings-actions" role="group" aria-label="Settings actions">
+        <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Enable recommended settings</button>
+        <button id="restore-original" disabled title="Restore settings saved on first load and restart Explorer">Revert changes</button>
       </div>
-      <div class="preference folder-view-preference">
-        <div>
-          <h3 id="folder-sort-label">Default folder sorting</h3>
-          <p class="preference-description">Sets sorting across all folder types. Resets saved folder views.</p>
-          <p id="folder-sort-value" class="preference-value">Loading…</p>
+      <details id="explorer-preferences" aria-labelledby="preferences-title">
+        <summary>
+          <h2 id="preferences-title">Explorer Settings</h2>
+        </summary>
+        <hr class="preferences-divider" aria-hidden="true">
+        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.</p>
+        <h3 class="preference-group">Personal preferences</h3>
+        <div class="preference">
+          <div>
+            <h3>Taskbar alignment</h3>
+            <p class="preference-description">Choose left or centered taskbar icons.</p>
+            <p id="taskbar-centering" class="preference-value">Loading…</p>
+          </div>
+          <button id="taskbar-centering-toggle" disabled>Toggle</button>
         </div>
-        <div class="folder-view-controls">
-          <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
-            <span id="folder-sort-selection">Choose sorting</span>
-            <span class="picker-arrow" aria-hidden="true"></span>
-          </button>
-          <button id="folder-sort-apply" disabled>Apply</button>
+        <div class="preference folder-view-preference">
+          <div>
+            <h3 id="folder-sort-label">Default folder sorting</h3>
+            <p class="preference-description">Sets sorting across all folder types. Resets saved folder views.</p>
+            <p id="folder-sort-value" class="preference-value">Loading…</p>
+          </div>
+          <div class="folder-view-controls">
+            <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
+              <span id="folder-sort-selection">Choose sorting</span>
+              <span class="picker-arrow" aria-hidden="true"></span>
+            </button>
+            <button id="folder-sort-apply" disabled>Apply</button>
+          </div>
         </div>
-      </div>
-      <div class="preference folder-view-preference">
-        <div>
-          <h3 id="folder-grouping-label">Default folder grouping</h3>
-          <p class="preference-description">Sets grouping across all folder types. Resets saved folder views.</p>
-          <p id="folder-grouping-value" class="preference-value">Loading…</p>
+        <div class="preference folder-view-preference">
+          <div>
+            <h3 id="folder-grouping-label">Default folder grouping</h3>
+            <p class="preference-description">Sets grouping across all folder types. Resets saved folder views.</p>
+            <p id="folder-grouping-value" class="preference-value">Loading…</p>
+          </div>
+          <div class="folder-view-controls">
+            <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
+              <span id="folder-grouping-selection">Choose grouping</span>
+              <span class="picker-arrow" aria-hidden="true"></span>
+            </button>
+            <button id="folder-grouping-apply" disabled>Apply</button>
+          </div>
         </div>
-        <div class="folder-view-controls">
-          <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
-            <span id="folder-grouping-selection">Choose grouping</span>
-            <span class="picker-arrow" aria-hidden="true"></span>
-          </button>
-          <button id="folder-grouping-apply" disabled>Apply</button>
+        <h3 class="preference-group">File Explorer</h3>
+        <div class="preference">
+          <div>
+            <h3>Disable extra spacing</h3>
+            <p class="preference-description">Uses compact spacing in File Explorer.</p>
+            <p id="explorer-spacing" class="preference-value">Loading…</p>
+          </div>
+          <button id="explorer-spacing-toggle" disabled>Toggle</button>
         </div>
-      </div>
-      <h3 class="preference-group">File Explorer</h3>
-      <div class="preference">
-        <div>
-          <h3>Disable extra spacing</h3>
-          <p class="preference-description">Uses compact spacing in File Explorer.</p>
-          <p id="explorer-spacing" class="preference-value">Loading…</p>
+        <div class="preference">
+          <div>
+            <h3>Disable Windows 11 context menu</h3>
+            <p class="preference-description">Uses the classic Windows 10-style right-click menu.</p>
+            <p id="modern-context-menu" class="preference-value">Loading…</p>
+          </div>
+          <button id="modern-context-menu-toggle" disabled>Toggle</button>
         </div>
-        <button id="explorer-spacing-toggle" disabled>Toggle</button>
-      </div>
-      <div class="preference">
-        <div>
-          <h3>Disable Windows 11 context menu</h3>
-          <p class="preference-description">Uses the classic Windows 10-style right-click menu.</p>
-          <p id="modern-context-menu" class="preference-value">Loading…</p>
+        <h3 class="preference-group">Quick Access</h3>
+        <div class="preference">
+          <div>
+            <h3>Hide recently used files</h3>
+            <p class="preference-description">Hides recent files and recommendations in Quick Access.</p>
+            <p id="recent-files" class="preference-value">Loading…</p>
+          </div>
+          <button id="recent-files-toggle" disabled>Toggle</button>
         </div>
-        <button id="modern-context-menu-toggle" disabled>Toggle</button>
-      </div>
-      <h3 class="preference-group">Quick Access</h3>
-      <div class="preference">
-        <div>
-          <h3>Hide recently used files</h3>
-          <p class="preference-description">Hides recent files and recommendations in Quick Access.</p>
-          <p id="recent-files" class="preference-value">Loading…</p>
+        <div class="preference">
+          <div>
+            <h3>Hide frequently used folders</h3>
+            <p class="preference-description">Hides your most accessed folders in Quick Access.</p>
+            <p id="frequent-folders" class="preference-value">Loading…</p>
+          </div>
+          <button id="frequent-folders-toggle" disabled>Toggle</button>
         </div>
-        <button id="recent-files-toggle" disabled>Toggle</button>
-      </div>
-      <div class="preference">
-        <div>
-          <h3>Hide frequently used folders</h3>
-          <p class="preference-description">Hides your most accessed folders in Quick Access.</p>
-          <p id="frequent-folders" class="preference-value">Loading…</p>
+        <div class="preference">
+          <div>
+            <h3>Hide files from Office.com</h3>
+            <p class="preference-description">Hides cloud files from your Office.com account.</p>
+            <p id="office-files" class="preference-value">Loading…</p>
+          </div>
+          <button id="office-files-toggle" disabled>Toggle</button>
         </div>
-        <button id="frequent-folders-toggle" disabled>Toggle</button>
-      </div>
-      <div class="preference">
-        <div>
-          <h3>Hide files from Office.com</h3>
-          <p class="preference-description">Hides cloud files from your Office.com account.</p>
-          <p id="office-files" class="preference-value">Loading…</p>
+        <h3 class="preference-group">Navigation Pane</h3>
+        <div class="preference">
+          <div>
+            <h3>Hide Home folder</h3>
+            <p class="preference-description">Hides Home from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+            <p id="home-folder" class="preference-value">Loading…</p>
+          </div>
+          <button id="home-folder-toggle" disabled>Toggle</button>
         </div>
-        <button id="office-files-toggle" disabled>Toggle</button>
-      </div>
-      <h3 class="preference-group">Navigation Pane</h3>
-      <div class="preference">
-        <div>
-          <h3>Hide Home folder</h3>
-          <p class="preference-description">Hides Home from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-          <p id="home-folder" class="preference-value">Loading…</p>
+        <div class="preference">
+          <div>
+            <h3>Hide Gallery</h3>
+            <p class="preference-description">Hides Gallery from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+            <p id="gallery" class="preference-value">Loading…</p>
+          </div>
+          <button id="gallery-toggle" disabled>Toggle</button>
         </div>
-        <button id="home-folder-toggle" disabled>Toggle</button>
-      </div>
-      <div class="preference">
-        <div>
-          <h3>Hide Gallery</h3>
-          <p class="preference-description">Hides Gallery from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-          <p id="gallery" class="preference-value">Loading…</p>
+        <h3 class="preference-group">Desktop</h3>
+        <div class="preference">
+          <div>
+            <h3>Hide shortcut arrow icon</h3>
+            <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
+            <p id="shortcut-arrow" class="preference-value">Loading…</p>
+          </div>
+          <button id="shortcut-arrow-toggle" disabled>Toggle</button>
         </div>
-        <button id="gallery-toggle" disabled>Toggle</button>
-      </div>
-      <h3 class="preference-group">Desktop</h3>
-      <div class="preference">
-        <div>
-          <h3>Hide shortcut arrow icon</h3>
-          <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
-          <p id="shortcut-arrow" class="preference-value">Loading…</p>
-        </div>
-        <button id="shortcut-arrow-toggle" disabled>Toggle</button>
-      </div>
-    </details>
-    <p id="status" role="status" aria-live="polite">Reading your system…</p>
+      </details>
+      <p id="status" role="status" aria-live="polite">Reading your system…</p>
     </div>
     <div id="settings-panel" role="tabpanel" aria-labelledby="settings-tab" hidden>
       <section aria-labelledby="settings-title">
@@ -176,10 +176,15 @@
   <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
     <h2 id="confirm-title">Change preference?</h2>
     <p id="confirm-description"></p>
+    <div id="recommended-options" hidden>
+      <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Appearance or personal preference</span></p>
+      <div id="recommendation-list" role="group" aria-label="Recommended changes"></div>
+      <p class="note">Changing folder sorting or grouping resets saved folder views.</p>
+    </div>
     <p class="note">Windows Explorer will restart to apply this change.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
-      <button value="apply" class="primary">Apply &amp; restart</button>
+      <button id="confirm-apply" value="apply" class="primary">Apply &amp; restart</button>
     </form>
   </dialog>
   <dialog id="apply-result" aria-labelledby="apply-result-title" aria-describedby="apply-result-description">

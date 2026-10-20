@@ -43,7 +43,6 @@ main {
   margin: auto;
 }
 
-#tweaks-panel:has(> #status[hidden]) > details:last-of-type,
 #settings-panel > section:last-child {
   margin-bottom: 0;
 }
@@ -274,7 +273,8 @@ button:disabled {
   margin: 0 0 6px;
 }
 
-.admin-requirement {
+.admin-requirement,
+.admin-warning {
   color: #b97575;
 }
 
@@ -402,6 +402,68 @@ dialog::backdrop {
 
 dialog p {
   line-height: 1.6;
+}
+
+#confirmation {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+#confirmation:has(#recommended-options:not([hidden])) {
+  max-width: 460px;
+}
+
+.admin-warning {
+  margin-left: 6px;
+  font-family: "Segoe UI Symbol", sans-serif;
+  font-size: 12px;
+}
+
+.admin-warning[data-state="missing"] {
+  color: #f87171;
+}
+
+.recommended-color,
+#recommendation-list {
+  color: #4ade80;
+}
+
+.visual-preference {
+  color: #facc15;
+}
+
+#recommendation-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 12px;
+  padding: 3px;
+  background: #000000;
+  border: 1px solid #555555;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+#recommendation-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+#recommendation-list label:hover,
+#recommendation-list label:focus-within {
+  background: #1f2937;
+  outline: 1px solid #475569;
+  outline-offset: -1px;
+}
+
+#recommendation-list input {
+  flex-shrink: 0;
+  margin: 0;
+  color: inherit;
+  accent-color: currentColor;
 }
 
 dialog form {

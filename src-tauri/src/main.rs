@@ -36,8 +36,11 @@ async fn set_folder_grouping(grouping: explorer::FolderGrouping) -> Result<(), S
 }
 
 #[tauri::command]
-async fn apply_recommended_settings(preview: Option<bool>) -> Result<usize, String> {
-    explorer::apply_recommended_settings(preview.unwrap_or(false))
+async fn apply_recommended_settings(
+    preview: Option<bool>,
+    selected: Option<Vec<explorer::Recommendation>>,
+) -> Result<Vec<explorer::Recommendation>, String> {
+    explorer::apply_recommended_settings(preview.unwrap_or(false), selected.as_deref())
         .map_err(|error| error.to_string())
 }
 
