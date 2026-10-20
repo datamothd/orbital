@@ -26,15 +26,15 @@ byId("skip-prompts-toggle").addEventListener("click", () => {
 renderToggle("skip-prompts", skipPrompts);
 
 const explorerPreferences = [
-  { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?" },
+  { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", visual: true },
   { id: "explorer-spacing", field: "disable_explorer_spacing", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?" },
   { id: "modern-context-menu", field: "disable_modern_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", windows11: true },
   { id: "recent-files", field: "hide_recent_files", apply: "Hide recent files and recommendations in Quick Access?", restore: "Show recent files and recommendations in Quick Access?" },
   { id: "frequent-folders", field: "hide_frequent_folders", apply: "Hide frequently used folders in Quick Access?", restore: "Show frequently used folders in Quick Access?" },
   { id: "office-files", field: "hide_office_files", apply: "Hide Office.com cloud files in Quick Access?", restore: "Show Office.com cloud files in Quick Access?", windows11: true },
-  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", windows11: true, requiresAdmin: true },
-  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", windows11: true, requiresAdmin: true },
-  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true },
+  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", windows11: true, requiresAdmin: true, visual: true },
+  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", windows11: true, requiresAdmin: true, visual: true },
+  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true, visual: true },
 ];
 
 const folderViews = [
@@ -67,10 +67,10 @@ function setBusy(value) {
   }
 }
 
-function setPreferenceValue(id, value) {
+function setPreferenceValue(id, value, visual = false) {
   const element = byId(id);
   element.textContent = value;
-  element.dataset.state = value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
+  element.dataset.state = visual ? "visual" : value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
 }
 
 function renderSettings() {
@@ -81,7 +81,8 @@ function renderSettings() {
       : preference.windows11 && !settings.windows11_supported
       ? "Requires Windows 11"
       : settings[preference.field] === null ? "Custom or missing overlay icon"
-      : settings[preference.field] ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"));
+      : settings[preference.field] ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled"),
+      preference.visual);
   }
 }
 
@@ -169,6 +170,7 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("confirm-title").textContent = title;
   byId("confirm-description").textContent = description;
   byId("recommended-options").hidden = !recommendations.length;
+  byId("recommended-options").open = true;
   const list = byId("recommendation-list");
   list.replaceChildren(...recommendations.map((id) => {
     const label = document.createElement("label");
@@ -182,7 +184,7 @@ function confirmChange(description, title = "Change preference?", recommendation
       ? byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3").firstChild.textContent.trim()
       : id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None";
     if (preference?.requiresAdmin) text.append(adminWarning());
-    if (!["hide_recent_files", "hide_frequent_folders", "hide_office_files"].includes(id)) {
+    if (preference?.visual || folderViews.some(view => view.field === id)) {
       label.className = "visual-preference";
     }
     label.append(checkbox, text);

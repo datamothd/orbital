@@ -31,6 +31,11 @@
 
 html {
   overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+html:has(dialog:modal) {
+  overflow: hidden;
 }
 
 body {
@@ -128,9 +133,9 @@ summary::after {
   height: 8px;
   border-right: 2px solid #ffffff;
   border-bottom: 2px solid #ffffff;
-  transform: rotate(45deg);
+  transform: translateY(-2px) rotate(45deg);
   flex-shrink: 0;
-  margin: 0 3px 4px;
+  margin: 0 3px;
 }
 
 details[open] summary {
@@ -144,8 +149,7 @@ details[open] summary {
 }
 
 details[open] summary::after {
-  transform: rotate(225deg);
-  margin-bottom: 0;
+  transform: translateY(2px) rotate(225deg);
 }
 
 summary:focus-visible {
@@ -387,6 +391,7 @@ button:disabled {
 }
 
 dialog {
+  overscroll-behavior: contain;
   background: #0a0a0a;
   color: #ffffff;
   border: 1px solid #555555;
@@ -411,6 +416,12 @@ dialog p {
 
 #confirmation:has(#recommended-options:not([hidden])) {
   max-width: 460px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+#confirmation:has(#recommended-options:not([hidden])) > :is(h2, p, form) {
+  margin: 8px 0;
 }
 
 .admin-warning {
@@ -432,14 +443,37 @@ dialog p {
   color: #facc15;
 }
 
-#recommendation-list {
-  max-height: 220px;
-  overflow-y: auto;
-  margin-top: 12px;
-  padding: 3px;
+#recommended-options {
+  margin: 12px 0 0;
+  padding: 0;
   background: #000000;
-  border: 1px solid #555555;
+  border-color: #555555;
   border-radius: 3px;
+}
+
+#recommended-options > summary {
+  margin: 0;
+  padding: 8px 10px;
+  background: #171717;
+  font-size: 12px;
+}
+
+#recommended-options[open] > summary {
+  border-bottom: 1px solid #555555;
+}
+
+#recommendation-scroll > .note {
+  margin: 8px 10px;
+}
+
+#recommendation-scroll {
+  max-height: clamp(48px, calc(100vh - 252px), 300px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+#recommendation-list {
+  padding: 3px;
   font-size: 12px;
 }
 

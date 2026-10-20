@@ -27,7 +27,7 @@ window.addEventListener("pointerdown", stopScrolling);
 window.addEventListener("keydown", stopScrolling);
 window.addEventListener("wheel", (event) => {
   if (!smoothScrolling || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
-    || event.target.closest(".folder-view-options, dialog")) return;
+    || document.querySelector("dialog:modal") || event.target.closest(".folder-view-options, dialog")) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
   const page = document.scrollingElement;
@@ -37,6 +37,10 @@ window.addEventListener("wheel", (event) => {
   const start = page.scrollTop;
   const started = performance.now();
   function step(now) {
+    if (document.querySelector("dialog:modal")) {
+      stopScrolling();
+      return;
+    }
     const progress = Math.min(1, (now - started) / 180);
     page.scrollTop = start + (scrollTarget - start) * (1 - (1 - progress) ** 3);
     scrollFrame = progress < 1 ? requestAnimationFrame(step) : 0;

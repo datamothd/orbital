@@ -33,7 +33,7 @@
           <h2 id="preferences-title">Explorer Settings</h2>
         </summary>
         <hr class="preferences-divider" aria-hidden="true">
-        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.</p>
+        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
         <h3 class="preference-group">Personal preferences</h3>
         <div class="preference">
           <div>
@@ -176,11 +176,15 @@
   <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
     <h2 id="confirm-title">Change preference?</h2>
     <p id="confirm-description"></p>
-    <div id="recommended-options" hidden>
-      <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Appearance or personal preference</span></p>
-      <div id="recommendation-list" role="group" aria-label="Recommended changes"></div>
-      <p class="note">Changing folder sorting or grouping resets saved folder views.</p>
-    </div>
+    <details id="recommended-options" hidden open>
+      <summary>List of changes</summary>
+      <div id="recommendation-scroll">
+        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
+        <hr class="preferences-divider" aria-hidden="true">
+        <div id="recommendation-list" role="group" aria-label="Recommended changes"></div>
+        <p class="note">Changing folder sorting or grouping resets saved folder views.</p>
+      </div>
+    </details>
     <p class="note">Windows Explorer will restart to apply this change.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
