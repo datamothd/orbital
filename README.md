@@ -65,7 +65,7 @@ Show the available commands:
 cargo run -- --help
 ```
 
-Apply recommended settings (add `--yes` to skip confirmation):
+Preview pending recommended changes and confirm before applying (add `--yes` to skip confirmation):
 
 ```powershell
 cargo run -- apply-recommended-settings
