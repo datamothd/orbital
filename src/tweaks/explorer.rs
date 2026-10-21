@@ -4,7 +4,7 @@ mod folder_views;
 mod profiles;
 
 pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
-pub use profiles::{TweakProfile, apply_imported_tweaks, export_tweaks};
+pub use profiles::{SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks};
 
 use std::os::windows::process::CommandExt;
 use std::{
@@ -710,38 +710,7 @@ pub enum Recommendation {
 }
 
 pub fn apply_recommended(yes: bool) -> io::Result<()> {
-    let pending = apply_recommended_settings(true, None, false)?;
-    if pending.is_empty() {
-        println!("All recommended settings are already enabled.");
-        return Ok(());
-    }
-    println!("Recommended changes:");
-    for preference in &pending {
-        let name = match preference {
-            Recommendation::HideTaskView => HIDE_TASK_VIEW.name,
-            Recommendation::DisableWidgets => DISABLE_WIDGETS.name,
-            Recommendation::EnableTaskbarEndTask => ENABLE_TASKBAR_END_TASK.name,
-            Recommendation::DisableExplorerSpacing => DISABLE_EXPLORER_SPACING.name,
-            Recommendation::DisableModernContextMenu => "Disable Windows 11 context menu",
-            Recommendation::HideRecentFiles => HIDE_RECENT_FILES.name,
-            Recommendation::HideRecommendations => HIDE_RECOMMENDATIONS.name,
-            Recommendation::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.name,
-            Recommendation::HideOfficeFiles => HIDE_OFFICE_FILES.name,
-            Recommendation::HideHomeFolder => "Hide Home folder",
-            Recommendation::HideGallery => "Hide Gallery",
-            Recommendation::HideShortcutArrow => "Hide shortcut arrow icon",
-            Recommendation::FolderSort => "Sort folders by Type - A to Z",
-            Recommendation::FolderGrouping => "Set folder grouping to None",
-        };
-        println!("  - {name}");
-    }
-    if !yes && !confirm("Apply recommended settings and restart Explorer?")? {
-        println!("Cancelled.");
-        return Ok(());
-    }
-    let changed = apply_recommended_settings(false, Some(&pending), true)?;
-    println!("{} recommended settings applied.", changed.len());
-    Ok(())
+    apply_batch(&[SettingsCommand::Recommended], yes)
 }
 
 pub fn apply_recommended_settings(

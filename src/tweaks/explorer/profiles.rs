@@ -12,6 +12,11 @@ pub struct TweakProfile {
     pub folder_grouping: Option<FolderGrouping>,
 }
 
+pub enum SettingsCommand {
+    Toggle(Preference),
+    Recommended,
+}
+
 impl TweakProfile {
     pub fn validate(&self) -> io::Result<()> {
         if self.format != "orbital-tweaks" || !matches!(self.version, 1..=3) {
@@ -53,6 +58,24 @@ impl TweakProfile {
 }
 
 impl Preference {
+    fn name(self) -> &'static str {
+        match self {
+            Self::DisableTaskbarCentering => DISABLE_TASKBAR_CENTERING.name,
+            Self::HideTaskView => HIDE_TASK_VIEW.name,
+            Self::DisableWidgets => DISABLE_WIDGETS.name,
+            Self::EnableTaskbarEndTask => ENABLE_TASKBAR_END_TASK.name,
+            Self::DisableExplorerSpacing => DISABLE_EXPLORER_SPACING.name,
+            Self::DisableModernContextMenu => "Disable Windows 11 context menu",
+            Self::HideRecentFiles => HIDE_RECENT_FILES.name,
+            Self::HideRecommendations => HIDE_RECOMMENDATIONS.name,
+            Self::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.name,
+            Self::HideOfficeFiles => HIDE_OFFICE_FILES.name,
+            Self::HideHomeFolder => "Hide Home folder",
+            Self::HideGallery => "Hide Gallery",
+            Self::HideShortcutArrow => "Hide shortcut arrow icon",
+        }
+    }
+
     fn state(self, current: &ExplorerSettings) -> Option<bool> {
         Some(match self {
             Self::DisableTaskbarCentering => current.disable_taskbar_centering,
@@ -128,6 +151,96 @@ fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
         folder_sort: current.folder_sort,
         folder_grouping: current.folder_grouping,
     }
+}
+
+fn batch_profile(
+    commands: &[SettingsCommand],
+    current: &ExplorerSettings,
+) -> io::Result<TweakProfile> {
+    let mut profile = profile_from_settings(current);
+    for command in commands {
+        match command {
+            SettingsCommand::Toggle(preference) => {
+                if !preference.supported(current) {
+                    return Err(io::Error::other(format!(
+                        "{} is unavailable on this system",
+                        preference.name()
+                    )));
+                }
+                if let Some(index) = profile.tweaks.iter().position(|item| item == preference) {
+                    profile.tweaks.remove(index);
+                    profile.disabled_tweaks.push(*preference);
+                } else {
+                    profile.disabled_tweaks.retain(|item| item != preference);
+                    profile.tweaks.push(*preference);
+                }
+            }
+            SettingsCommand::Recommended => {
+                for preference in std::mem::take(&mut profile.disabled_tweaks) {
+                    if preference == Preference::DisableTaskbarCentering {
+                        profile.disabled_tweaks.push(preference);
+                    } else {
+                        profile.tweaks.push(preference);
+                    }
+                }
+                if !profile.tweaks.contains(&Preference::HideShortcutArrow) {
+                    profile.tweaks.push(Preference::HideShortcutArrow);
+                }
+                profile.folder_sort = Some(FolderSort {
+                    column: SortColumn::Type,
+                    descending: false,
+                });
+                profile.folder_grouping = Some(FolderGrouping::None);
+            }
+        }
+    }
+    profile
+        .tweaks
+        .retain(|tweak| tweak.state(current) != Some(true));
+    profile
+        .disabled_tweaks
+        .retain(|tweak| tweak.state(current) != Some(false));
+    profile.folder_sort = profile
+        .folder_sort
+        .filter(|sort| current.folder_sort != Some(*sort));
+    profile.folder_grouping = profile
+        .folder_grouping
+        .filter(|grouping| current.folder_grouping != Some(*grouping));
+    Ok(profile)
+}
+
+pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
+    let profile = batch_profile(commands, &settings()?)?;
+    if profile.tweaks.is_empty()
+        && profile.disabled_tweaks.is_empty()
+        && profile.folder_sort.is_none()
+        && profile.folder_grouping.is_none()
+    {
+        println!("No settings need to change.");
+        return Ok(());
+    }
+    println!("Planned changes:");
+    for (preferences, state) in [
+        (&profile.tweaks, "enabled"),
+        (&profile.disabled_tweaks, "disabled"),
+    ] {
+        for preference in preferences {
+            println!("  - {}: {state}", preference.name());
+        }
+    }
+    if profile.folder_sort.is_some() {
+        println!("  - Sort folders by Type - A to Z");
+    }
+    if profile.folder_grouping.is_some() {
+        println!("  - Set folder grouping to None");
+    }
+    if !yes && !confirm("Apply these changes and restart Explorer?")? {
+        println!("Cancelled.");
+        return Ok(());
+    }
+    let changed = apply_imported_tweaks(profile, true)?;
+    println!("{changed} settings applied.");
+    Ok(())
 }
 
 fn imported_changes<'a>(
@@ -236,13 +349,101 @@ pub fn apply_imported_tweaks(
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&views, || apply_changes(&changes, &prepared))?;
-    restart_explorer("Imported tweaks")?;
+    restart_explorer("Settings")?;
     Ok(count)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn batch_keeps_only_final_selected_changes() {
+        let current = ExplorerSettings {
+            hide_recent_files: true,
+            ..Default::default()
+        };
+        let profile = batch_profile(
+            &[
+                SettingsCommand::Toggle(Preference::HideRecentFiles),
+                SettingsCommand::Toggle(Preference::HideTaskView),
+                SettingsCommand::Toggle(Preference::HideFrequentFolders),
+                SettingsCommand::Toggle(Preference::HideTaskView),
+            ],
+            &current,
+        )
+        .unwrap();
+        assert_eq!(profile.tweaks, [Preference::HideFrequentFolders]);
+        assert_eq!(profile.disabled_tweaks, [Preference::HideRecentFiles]);
+        assert_eq!(profile.folder_sort, None);
+        assert_eq!(profile.folder_grouping, None);
+        profile.validate().unwrap();
+    }
+
+    #[test]
+    fn batch_recommendations_respect_command_order_and_preserve_alignment() {
+        let current = ExplorerSettings {
+            windows11_supported: true,
+            ..Default::default()
+        };
+        for (commands, recent) in [
+            (
+                [
+                    SettingsCommand::Recommended,
+                    SettingsCommand::Toggle(Preference::HideRecentFiles),
+                ],
+                false,
+            ),
+            (
+                [
+                    SettingsCommand::Toggle(Preference::HideRecentFiles),
+                    SettingsCommand::Recommended,
+                ],
+                true,
+            ),
+            (
+                [SettingsCommand::Recommended, SettingsCommand::Recommended],
+                true,
+            ),
+        ] {
+            let profile = batch_profile(&commands, &current).unwrap();
+            assert_eq!(
+                profile.tweaks.contains(&Preference::HideRecentFiles),
+                recent
+            );
+            assert!(profile.tweaks.contains(&Preference::HideShortcutArrow));
+            assert!(
+                !profile
+                    .tweaks
+                    .contains(&Preference::DisableTaskbarCentering)
+            );
+            assert!(!profile.tweaks.contains(&Preference::EnableTaskbarEndTask));
+            assert!(!profile.tweaks.contains(&Preference::HideHomeFolder));
+            assert!(!profile.tweaks.contains(&Preference::HideGallery));
+            assert!(profile.disabled_tweaks.is_empty());
+            assert_eq!(
+                profile.folder_sort,
+                Some(FolderSort {
+                    column: SortColumn::Type,
+                    descending: false
+                })
+            );
+            assert_eq!(profile.folder_grouping, Some(FolderGrouping::None));
+            profile.validate().unwrap();
+        }
+    }
+
+    #[test]
+    fn batch_rejects_unavailable_tweaks_before_applying() {
+        let result = batch_profile(
+            &[
+                SettingsCommand::Toggle(Preference::HideRecentFiles),
+                SettingsCommand::Toggle(Preference::EnableTaskbarEndTask),
+            ],
+            &ExplorerSettings::default(),
+        );
+        assert!(result.unwrap_err().to_string().contains("unavailable"));
+    }
 
     #[test]
     fn mixed_recent_and_recommendation_states_survive_export() {
