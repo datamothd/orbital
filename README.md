@@ -65,6 +65,12 @@ Show the available commands:
 cargo run -- --help
 ```
 
+Apply recommended settings (add `--yes` to skip confirmation):
+
+```powershell
+cargo run -- apply-recommended-settings
+```
+
 To build an executable:
 
 ```powershell

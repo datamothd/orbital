@@ -709,6 +709,16 @@ pub enum Recommendation {
     FolderGrouping,
 }
 
+pub fn apply_recommended(yes: bool) -> io::Result<()> {
+    if !yes && !confirm("Apply recommended settings and restart Explorer?")? {
+        println!("Cancelled.");
+        return Ok(());
+    }
+    let changed = apply_recommended_settings(false, None, true)?;
+    println!("{} recommended settings applied.", changed.len());
+    Ok(())
+}
+
 pub fn apply_recommended_settings(
     preview: bool,
     selected: Option<&[Recommendation]>,

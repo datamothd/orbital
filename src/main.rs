@@ -14,6 +14,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Sysinfo,
+    ApplyRecommendedSettings,
     #[command(flatten)]
     Explorer(explorer::Preference),
 }
@@ -21,6 +22,7 @@ enum Command {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Command::ApplyRecommendedSettings => explorer::apply_recommended(cli.yes),
         Command::Explorer(preference) => explorer::toggle_preference(preference, cli.yes, true),
         Command::Sysinfo => sysinfo::show(),
     }
