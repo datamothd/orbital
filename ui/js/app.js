@@ -4,26 +4,32 @@ const invoke = window.__TAURI__?.core.invoke;
 const byId = (id) => document.getElementById(id);
 let settings = null;
 let busy = false;
-let skipPrompts = false;
-try {
-  skipPrompts = localStorage.getItem("orbital.skipPrompts") === "true";
-} catch {
-}
 
-function renderToggle(id, enabled) {
-  byId(`${id}-toggle`).setAttribute("aria-checked", String(enabled));
-  setPreferenceValue(`${id}-value`, enabled ? "Enabled" : "Disabled");
-}
-
-byId("skip-prompts-toggle").addEventListener("click", () => {
-  skipPrompts = !skipPrompts;
-  renderToggle("skip-prompts", skipPrompts);
+function createSettingToggle(id, key, defaultValue, onChange) {
+  const setting = { enabled: defaultValue };
   try {
-    localStorage.setItem("orbital.skipPrompts", String(skipPrompts));
+    const stored = localStorage.getItem(`orbital.${key}`);
+    setting.enabled = defaultValue ? stored !== "false" : stored === "true";
   } catch {
   }
-});
-renderToggle("skip-prompts", skipPrompts);
+  function render() {
+    byId(`${id}-toggle`).setAttribute("aria-checked", String(setting.enabled));
+    setPreferenceValue(`${id}-value`, setting.enabled ? "Enabled" : "Disabled");
+  }
+  byId(`${id}-toggle`).addEventListener("click", () => {
+    setting.enabled = !setting.enabled;
+    onChange?.();
+    render();
+    try {
+      localStorage.setItem(`orbital.${key}`, String(setting.enabled));
+    } catch {
+    }
+  });
+  render();
+  return setting;
+}
+
+const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 
 const explorerPreferences = [
   { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", supported: "windows11_supported", visual: true },
@@ -110,9 +116,6 @@ async function loadSystem() {
   const testedOs = /^Windows 11 Pro$/i.test(info.os.trim());
   const testedVersion = windows11 && windowsVersion === "25H2";
   const release = /^(\d{2})H([12])$/.exec(windowsVersion);
-  const olderWindows11 = windows11
-    && release !== null
-    && (Number(release[1]) < 25 || (Number(release[1]) === 25 && Number(release[2]) < 2));
   const newerWindows11 = windows11 && release !== null && Number(release[1]) > 25;
   const rows = [
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
@@ -126,7 +129,7 @@ async function loadSystem() {
     description.textContent = value;
     const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
     const yellowDash = (label === "OS" && windows11 && !testedOs)
-      || (label === "Windows" && (olderWindows11 || newerWindows11));
+      || (label === "Windows" && windows11 && release !== null && !testedVersion);
     const redCross = label === "OS" && !windows11;
     if (greenCheck || yellowDash || redCross) {
       const check = document.createElement("span");
@@ -180,8 +183,12 @@ function missingAdminCount(ids) {
   return ids.filter(id => explorerPreferences.some(preference => preference.field === id && preference.requiresAdmin)).length;
 }
 
+function selectedValues(id) {
+  return [...byId(id).querySelectorAll("input:checked:enabled")].map(input => input.value);
+}
+
 function updateRecommendedSelection() {
-  const selected = [...byId("recommendation-list").querySelectorAll("input:checked")].map(input => input.value);
+  const selected = selectedValues("recommendation-list");
   const count = missingAdminCount(selected);
   const note = byId("confirm-admin-note");
   note.hidden = count === 0;
@@ -233,12 +240,14 @@ function confirmChange(description, title = "Change preference?", recommendation
   return confirmDialog(dialog);
 }
 
-function showResult(title, description, error = "") {
+function showResult(title, description, error = "", replaceIcon = false) {
   const errorNotice = byId("apply-result-error");
   byId("apply-result-title").textContent = title;
   byId("apply-result-description").textContent = description;
   errorNotice.hidden = !error;
   errorNotice.textContent = error;
+  byId("replace-icon-apply").hidden = !replaceIcon;
+  if (replaceIcon) return confirmDialog(byId("apply-result"));
   byId("apply-result").showModal();
 }
 
@@ -255,6 +264,12 @@ async function savePreferences(command, args) {
   try {
     changed = await invoke(command, args);
   } catch (reason) {
+    if (!args.replaceBlankIcon && typeof reason?.blank_icon_conflict === "string") {
+      setStatus("");
+      if (!await showResult("blank.ico already exists", `${reason.blank_icon_conflict} already exists and is not Orbital's transparent icon. Replace it to hide shortcut arrows?`, "", true)) return { cancelled: true };
+      setStatus("Saving preferences and restarting Explorer…");
+      return savePreferences(command, { ...args, replaceBlankIcon: true });
+    }
     error = String(reason);
   }
   try {
@@ -268,7 +283,7 @@ async function savePreferences(command, args) {
 async function applyChange(command, args, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   const recommended = command === "apply_recommended_settings";
-  let skip = skipPrompts || skipConfirmation;
+  let skip = skipPrompts.enabled || skipConfirmation;
   const preference = explorerPreferences.find(preference => preference.field === args.preference);
   if (preference?.requiresAdmin && !settings.is_administrator) {
     setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
@@ -291,12 +306,13 @@ async function applyChange(command, args, description, skipConfirmation = false,
     }
     if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : undefined, recommendations)) return;
     if (recommended) {
-      args.selected = skip ? recommendations
-        : [...byId("recommendation-list").querySelectorAll("input:checked")].map(input => input.value);
+      args.selected = skip ? recommendations : selectedValues("recommendation-list");
       if (!args.selected.length || missingAdminCount(args.selected)) return;
     }
     setStatus("Saving preferences and restarting Explorer…");
-    ({ changed, error } = await savePreferences(command, args));
+    const result = await savePreferences(command, args);
+    if (result.cancelled) return;
+    ({ changed, error } = result);
     if (recommended && changed) changed = changed.length;
   } catch (reason) {
     error = String(reason);

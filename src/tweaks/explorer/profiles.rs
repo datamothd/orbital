@@ -98,8 +98,7 @@ impl Preference {
 }
 
 pub fn export_tweaks() -> io::Result<TweakProfile> {
-    let current = settings()?;
-    Ok(profile_from_settings(&current))
+    Ok(profile_from_settings(&settings()?))
 }
 
 fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
@@ -183,7 +182,10 @@ fn imported_changes<'a>(
     changes
 }
 
-pub fn apply_imported_tweaks(mut profile: TweakProfile) -> io::Result<usize> {
+pub fn apply_imported_tweaks(
+    mut profile: TweakProfile,
+    replace_blank_icon: bool,
+) -> io::Result<usize> {
     profile.normalize()?;
     let current = settings()?;
     profile
@@ -231,7 +233,7 @@ pub fn apply_imported_tweaks(mut profile: TweakProfile) -> io::Result<usize> {
     save_original_settings()?;
     let prepared = prepare_changes(&changes)?;
     if profile.tweaks.contains(&Preference::HideShortcutArrow) {
-        ensure_blank_icon()?;
+        ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&views, || apply_changes(&changes, &prepared))?;
     restart_explorer("Imported tweaks")?;

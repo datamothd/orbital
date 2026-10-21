@@ -421,15 +421,18 @@ fn apply_in(user: &RegKey, machine: &RegKey, sort: FolderSort) -> io::Result<()>
 }
 
 fn change_views_in(user: &RegKey, machine: &RegKey, change: ViewChange) -> io::Result<()> {
-    change_many_views_in(user, machine, &[change], || Ok(()))
+    apply_recommended_in(user, machine, &[change], || Ok(()))
 }
 
-fn change_many_views_in(
+fn apply_recommended_in(
     user: &RegKey,
     machine: &RegKey,
     changes: &[ViewChange],
     apply_other: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<()> {
+    if changes.is_empty() {
+        return apply_other();
+    }
     let defaults = machine.open_subkey(FOLDER_TYPES)?;
     let grouping = changes
         .iter()
@@ -531,19 +534,6 @@ pub(super) fn apply_recommended(
     apply_other: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<()> {
     apply_recommended_in(HKCU, HKLM, changes, apply_other)
-}
-
-fn apply_recommended_in(
-    user: &RegKey,
-    machine: &RegKey,
-    changes: &[ViewChange],
-    apply_other: impl FnOnce() -> io::Result<()>,
-) -> io::Result<()> {
-    if changes.is_empty() {
-        apply_other()
-    } else {
-        change_many_views_in(user, machine, changes, apply_other)
-    }
 }
 
 pub(super) fn restore() -> io::Result<bool> {

@@ -19,8 +19,7 @@ use winreg::{
     types::ToRegValue,
 };
 
-const CLASSIC_CONTEXT_MENU_KEY: &str =
-    r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
+const CLASSIC_CONTEXT_MENU_KEY: &str = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
 const TASKBAR_DEVELOPER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
@@ -151,11 +150,11 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         hide_recommendations: windows11_supported && HIDE_RECOMMENDATIONS.enabled_in(HKCU)?,
         hide_frequent_folders: HIDE_FREQUENT_FOLDERS.enabled_in(HKCU)?,
         hide_office_files: windows11_supported && HIDE_OFFICE_FILES.enabled_in(HKCU)?,
-        hide_home_folder: home_supported && !namespace_visible(HOME_CLSID)?,
+        hide_home_folder: home_supported && !namespace_visible_in(HKCU, HKLM, HOME_CLSID)?,
         home_supported,
-        hide_gallery: gallery_supported && !namespace_visible(GALLERY_CLSID)?,
+        hide_gallery: gallery_supported && !namespace_visible_in(HKCU, HKLM, GALLERY_CLSID)?,
         gallery_supported,
-        hide_shortcut_arrow: shortcut_arrows_hidden()?,
+        hide_shortcut_arrow: shortcut_arrows_hidden_in(HKLM, &blank_icon_path()?)?,
     })
 }
 
@@ -195,44 +194,40 @@ pub enum Preference {
     HideShortcutArrow,
 }
 
-pub fn toggle_preference(preference: Preference, yes: bool) -> io::Result<()> {
+pub fn toggle_preference(
+    preference: Preference,
+    yes: bool,
+    replace_blank_icon: bool,
+) -> io::Result<()> {
+    let (setting, root) = match preference {
+        Preference::DisableTaskbarCentering => (&DISABLE_TASKBAR_CENTERING, HKCU),
+        Preference::HideTaskView => (&HIDE_TASK_VIEW, HKCU),
+        Preference::DisableWidgets => (&DISABLE_WIDGETS, HKLM),
+        Preference::EnableTaskbarEndTask => (&ENABLE_TASKBAR_END_TASK, HKCU),
+        Preference::DisableExplorerSpacing => (&DISABLE_EXPLORER_SPACING, HKCU),
+        Preference::HideRecentFiles => (&HIDE_RECENT_FILES, HKCU),
+        Preference::HideRecommendations => (&HIDE_RECOMMENDATIONS, HKCU),
+        Preference::HideFrequentFolders => (&HIDE_FREQUENT_FOLDERS, HKCU),
+        Preference::HideOfficeFiles => (&HIDE_OFFICE_FILES, HKCU),
+        Preference::DisableModernContextMenu => return toggle_modern_context_menu(yes),
+        Preference::HideHomeFolder => return toggle_namespace("Hide Home folder", HOME_CLSID, yes),
+        Preference::HideGallery => return toggle_namespace("Hide Gallery", GALLERY_CLSID, yes),
+        Preference::HideShortcutArrow => return toggle_shortcut_arrow(yes, replace_blank_icon),
+    };
     match preference {
-        Preference::DisableTaskbarCentering => {
-            require_windows11(DISABLE_TASKBAR_CENTERING.name)?;
-            DISABLE_TASKBAR_CENTERING.toggle(HKCU, yes)
-        }
-        Preference::HideTaskView => HIDE_TASK_VIEW.toggle(HKCU, yes),
-        Preference::DisableWidgets => {
-            require_windows11(DISABLE_WIDGETS.name)?;
-            DISABLE_WIDGETS.toggle(HKLM, yes)
-        }
+        Preference::HideTaskView
+        | Preference::HideRecentFiles
+        | Preference::HideFrequentFolders => {}
         Preference::EnableTaskbarEndTask => {
             if !supports_taskbar_end_task(windows_build()?)? {
                 return Err(io::Error::other(
                     "Taskbar End task is unavailable on this system",
                 ));
             }
-            ENABLE_TASKBAR_END_TASK.toggle(HKCU, yes)
         }
-        Preference::DisableExplorerSpacing => {
-            require_windows11(DISABLE_EXPLORER_SPACING.name)?;
-            DISABLE_EXPLORER_SPACING.toggle(HKCU, yes)
-        }
-        Preference::DisableModernContextMenu => toggle_modern_context_menu(yes),
-        Preference::HideRecentFiles => HIDE_RECENT_FILES.toggle(HKCU, yes),
-        Preference::HideRecommendations => {
-            require_windows11(HIDE_RECOMMENDATIONS.name)?;
-            HIDE_RECOMMENDATIONS.toggle(HKCU, yes)
-        }
-        Preference::HideFrequentFolders => HIDE_FREQUENT_FOLDERS.toggle(HKCU, yes),
-        Preference::HideOfficeFiles => {
-            require_windows11(HIDE_OFFICE_FILES.name)?;
-            HIDE_OFFICE_FILES.toggle(HKCU, yes)
-        }
-        Preference::HideHomeFolder => toggle_namespace("Hide Home folder", HOME_CLSID, yes),
-        Preference::HideGallery => toggle_namespace("Hide Gallery", GALLERY_CLSID, yes),
-        Preference::HideShortcutArrow => toggle_shortcut_arrow(yes),
+        _ => require_windows11(setting.name)?,
     }
+    setting.toggle(root, yes)
 }
 
 fn toggle_modern_context_menu(yes: bool) -> io::Result<()> {
@@ -243,11 +238,7 @@ fn toggle_modern_context_menu(yes: bool) -> io::Result<()> {
         HKCU,
         CLASSIC_CONTEXT_MENU_KEY,
         "",
-        if current {
-            None
-        } else {
-            Some("".to_reg_value())
-        },
+        (!current).then(|| "".to_reg_value()),
     )];
     apply_toggle(name, current, yes, &changes)
 }
@@ -269,10 +260,6 @@ fn namespace_paths(clsid: &str) -> (String, String, String) {
         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\NonEnum".into(),
         format!(r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{clsid}"),
     )
-}
-
-fn namespace_visible(clsid: &str) -> io::Result<bool> {
-    namespace_visible_in(HKCU, HKLM, clsid)
 }
 
 fn namespace_supported_in(machine: &RegKey, clsid: &str) -> io::Result<bool> {
@@ -298,10 +285,6 @@ fn blank_icon_path() -> io::Result<PathBuf> {
         return Err(io::Error::other("SystemRoot must be an absolute path"));
     }
     Ok(root.join("blank.ico"))
-}
-
-fn shortcut_arrows_hidden() -> io::Result<Option<bool>> {
-    shortcut_arrows_hidden_in(HKLM, &blank_icon_path()?)
 }
 
 fn shortcut_arrows_hidden_in(root: &RegKey, blank_path: &Path) -> io::Result<Option<bool>> {
@@ -549,7 +532,7 @@ fn toggle_namespace(name: &str, clsid: &str, yes: bool) -> io::Result<()> {
             "{name} is unavailable on this system"
         )));
     }
-    let current = !namespace_visible(clsid)?;
+    let current = !namespace_visible_in(HKCU, HKLM, clsid)?;
     let changes = namespace_changes(HKCU, HKLM, clsid, current);
     apply_toggle(name, current, yes, &changes)
 }
@@ -729,6 +712,7 @@ pub enum Recommendation {
 pub fn apply_recommended_settings(
     preview: bool,
     selected: Option<&[Recommendation]>,
+    replace_blank_icon: bool,
 ) -> io::Result<Vec<Recommendation>> {
     let build = windows_build()?;
     let windows11 = build >= 22000;
@@ -754,7 +738,7 @@ pub fn apply_recommended_settings(
     original_settings_in(HKCU, HKLM, windows11)?;
     let prepared = prepare_changes(&changes)?;
     if missing_icon {
-        ensure_blank_icon()?;
+        ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
     restart_explorer("Recommended settings")?;
@@ -866,32 +850,56 @@ fn blank_icon_valid(path: &Path) -> io::Result<bool> {
     Ok(optional(std::fs::read(path))?.is_some_and(|bytes| bytes == expected))
 }
 
-fn ensure_blank_icon() -> io::Result<PathBuf> {
-    let path = blank_icon_path()?;
-    match OpenOptions::new().write(true).create_new(true).open(&path) {
+#[derive(Debug)]
+pub struct BlankIconConflict(pub PathBuf);
+
+impl std::fmt::Display for BlankIconConflict {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "{} already exists and is not Orbital's transparent icon. Replace, move or rename it before hiding shortcut arrows.",
+            self.0.display()
+        )
+    }
+}
+
+impl std::error::Error for BlankIconConflict {}
+
+fn ensure_blank_icon_at(path: &Path, replace: bool) -> io::Result<()> {
+    match OpenOptions::new().write(true).create_new(true).open(path) {
         Ok(mut file) => {
             if let Err(error) = file.write_all(&transparent_icon()) {
                 drop(file);
-                let _ = std::fs::remove_file(&path);
+                let _ = std::fs::remove_file(path);
                 return Err(setting_error(error));
             }
         }
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            if !blank_icon_valid(&path)? {
-                return Err(io::Error::other(format!(
-                    "{} already exists and is not Orbital's transparent icon. Move or rename it before hiding shortcut arrows.",
-                    path.display()
-                )));
+            if !blank_icon_valid(path)? {
+                use std::os::windows::fs::MetadataExt;
+                let metadata = std::fs::symlink_metadata(path)?;
+                if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+                    return Err(io::Error::other(format!(
+                        "{} is not a regular file and cannot be replaced by Orbital.",
+                        path.display()
+                    )));
+                }
+                if !replace {
+                    return Err(io::Error::other(BlankIconConflict(path.to_path_buf())));
+                }
+                std::fs::remove_file(path).map_err(setting_error)?;
+                ensure_blank_icon_at(path, false)?;
             }
         }
         Err(error) => return Err(setting_error(error)),
     }
-    Ok(path)
+    Ok(())
 }
 
-fn toggle_shortcut_arrow(yes: bool) -> io::Result<()> {
+fn toggle_shortcut_arrow(yes: bool, replace_blank_icon: bool) -> io::Result<()> {
     let name = "Hide shortcut arrow icon";
-    let current = shortcut_arrows_hidden()?.unwrap_or(false);
+    let path = blank_icon_path()?;
+    let current = shortcut_arrows_hidden_in(HKLM, &path)?.unwrap_or(false);
     if !confirm_toggle(name, current, yes)? {
         return Ok(());
     }
@@ -899,7 +907,7 @@ fn toggle_shortcut_arrow(yes: bool) -> io::Result<()> {
     let mut changes = [RegistryChange::new(HKLM, SHELL_ICONS_KEY, "29", None)];
     let prepared = prepare_changes(&changes)?;
     if !current {
-        let path = ensure_blank_icon()?;
+        ensure_blank_icon_at(&path, replace_blank_icon)?;
         changes[0] = RegistryChange::new(
             HKLM,
             SHELL_ICONS_KEY,
@@ -1479,64 +1487,53 @@ mod tests {
 
     #[test]
     fn shortcut_hiding_distinguishes_default_blank_and_custom_overlays() {
-        struct TestIcon(PathBuf);
-        impl Drop for TestIcon {
-            fn drop(&mut self) {
-                let _ = std::fs::remove_file(&self.0);
-            }
-        }
         let registry = TestRegistry::new();
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let icon = TestIcon(
-            std::env::temp_dir().join(format!("orbital-test-{}-{unique}.ico", std::process::id())),
-        );
-        std::fs::write(&icon.0, transparent_icon()).unwrap();
+        let directory = TestIconDirectory::new();
+        let icon = directory.0.join("blank.ico");
+        std::fs::write(&icon, transparent_icon()).unwrap();
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             Some(false)
         );
         let (key, _) = registry.key.create_subkey(SHELL_ICONS_KEY).unwrap();
         key.set_value("29", &r"C:\custom-overlay.ico").unwrap();
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             None
         );
-        key.set_value("29", &icon.0.to_string_lossy().as_ref())
+        key.set_value("29", &icon.to_string_lossy().as_ref())
             .unwrap();
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             Some(true)
         );
-        std::fs::write(&icon.0, b"not an icon").unwrap();
+        std::fs::write(&icon, b"not an icon").unwrap();
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             None
         );
-        std::fs::write(&icon.0, transparent_icon()).unwrap();
+        std::fs::write(&icon, transparent_icon()).unwrap();
         assert!(
-            recommended_changes(&registry.key, &registry.key, true, &icon.0)
+            recommended_changes(&registry.key, &registry.key, true, &icon)
                 .unwrap()
                 .iter()
                 .all(|change| change.path != SHELL_ICONS_KEY)
         );
         delete_value_if_present(&key, "29").unwrap();
-        assert!(icon.0.is_file());
+        assert!(icon.is_file());
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             Some(false)
         );
-        key.set_value("29", &icon.0.to_string_lossy().as_ref())
+        key.set_value("29", &icon.to_string_lossy().as_ref())
             .unwrap();
-        std::fs::remove_file(&icon.0).unwrap();
+        std::fs::remove_file(&icon).unwrap();
         assert_eq!(
-            shortcut_arrows_hidden_in(&registry.key, &icon.0).unwrap(),
+            shortcut_arrows_hidden_in(&registry.key, &icon).unwrap(),
             None
         );
         assert!(
-            recommended_changes(&registry.key, &registry.key, true, &icon.0)
+            recommended_changes(&registry.key, &registry.key, true, &icon)
                 .unwrap()
                 .iter()
                 .any(|change| change.path == SHELL_ICONS_KEY && change.name == "29")
@@ -1558,14 +1555,8 @@ mod tests {
 
     #[test]
     fn blank_icon_validation_rejects_existing_invalid_files() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "orbital-icon-validation-{}-{unique}.ico",
-            std::process::id()
-        ));
+        let directory = TestIconDirectory::new();
+        let path = directory.0.join("blank.ico");
         assert!(!blank_icon_valid(&path).unwrap());
         std::fs::write(&path, b"not an icon").unwrap();
         assert!(!blank_icon_valid(&path).unwrap());
@@ -1575,6 +1566,83 @@ mod tests {
         assert!(!blank_icon_valid(&path).unwrap());
         std::fs::write(&path, transparent_icon()).unwrap();
         assert!(blank_icon_valid(&path).unwrap());
-        std::fs::remove_file(path).unwrap();
+    }
+
+    struct TestIconDirectory(PathBuf);
+
+    impl TestIconDirectory {
+        fn new() -> Self {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "orbital-icon-replacement-{}-{unique}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for TestIconDirectory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn blank_icon_replacement_requires_opt_in_and_creates_no_backups() {
+        let directory = TestIconDirectory::new();
+        let path = directory.0.join("blank.ico");
+        ensure_blank_icon_at(&path, false).unwrap();
+        assert!(blank_icon_valid(&path).unwrap());
+        ensure_blank_icon_at(&path, true).unwrap();
+        assert_eq!(std::fs::read_dir(&directory.0).unwrap().count(), 1);
+
+        let original = b"custom icon from another tool";
+        std::fs::write(&path, original).unwrap();
+        let error = ensure_blank_icon_at(&path, false).unwrap_err();
+        let conflict = error
+            .get_ref()
+            .unwrap()
+            .downcast_ref::<BlankIconConflict>()
+            .unwrap();
+        assert_eq!(conflict.0, path);
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        ensure_blank_icon_at(&path, true).unwrap();
+        assert!(blank_icon_valid(&path).unwrap());
+        ensure_blank_icon_at(&path, false).unwrap();
+        ensure_blank_icon_at(&path, true).unwrap();
+        assert_eq!(std::fs::read_dir(&directory.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn blank_icon_replacement_does_not_write_if_deletion_fails() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let directory = TestIconDirectory::new();
+        let path = directory.0.join("blank.ico");
+        std::fs::write(&path, b"original icon").unwrap();
+        let locked = OpenOptions::new()
+            .read(true)
+            .share_mode(3)
+            .open(&path)
+            .unwrap();
+        let result = ensure_blank_icon_at(&path, true);
+        drop(locked);
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"original icon");
+        assert_eq!(std::fs::read_dir(&directory.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn blank_icon_replacement_rejects_directories() {
+        let directory = TestIconDirectory::new();
+        let path = directory.0.join("blank.ico");
+        std::fs::create_dir(&path).unwrap();
+        assert!(ensure_blank_icon_at(&path, true).is_err());
+        assert!(path.is_dir());
+        assert_eq!(std::fs::read_dir(&directory.0).unwrap().count(), 1);
     }
 }

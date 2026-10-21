@@ -3,6 +3,17 @@
 use orbital::{explorer, sysinfo};
 mod profiles;
 
+fn preference_error(error: std::io::Error) -> serde_json::Value {
+    if let Some(conflict) = error
+        .get_ref()
+        .and_then(|error| error.downcast_ref::<explorer::BlankIconConflict>())
+    {
+        serde_json::json!({ "blank_icon_conflict": conflict.0.to_string_lossy() })
+    } else {
+        serde_json::Value::String(error.to_string())
+    }
+}
+
 #[tauri::command]
 async fn system_info() -> Result<sysinfo::SystemInfo, String> {
     let info = sysinfo::collect().map_err(|error| error.to_string())?;
@@ -40,9 +51,14 @@ async fn set_folder_grouping(grouping: explorer::FolderGrouping) -> Result<(), S
 async fn apply_recommended_settings(
     preview: Option<bool>,
     selected: Option<Vec<explorer::Recommendation>>,
-) -> Result<Vec<explorer::Recommendation>, String> {
-    explorer::apply_recommended_settings(preview.unwrap_or(false), selected.as_deref())
-        .map_err(|error| error.to_string())
+    replace_blank_icon: Option<bool>,
+) -> Result<Vec<explorer::Recommendation>, serde_json::Value> {
+    explorer::apply_recommended_settings(
+        preview.unwrap_or(false),
+        selected.as_deref(),
+        replace_blank_icon.unwrap_or(false),
+    )
+    .map_err(preference_error)
 }
 
 #[tauri::command]
@@ -51,8 +67,12 @@ async fn restore_original_settings() -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn toggle_preference(preference: explorer::Preference) -> Result<(), String> {
-    explorer::toggle_preference(preference, true).map_err(|error| error.to_string())
+async fn toggle_preference(
+    preference: explorer::Preference,
+    replace_blank_icon: Option<bool>,
+) -> Result<(), serde_json::Value> {
+    explorer::toggle_preference(preference, true, replace_blank_icon.unwrap_or(false))
+        .map_err(preference_error)
 }
 
 fn main() {
@@ -71,4 +91,22 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn icon_conflicts_include_the_path_and_other_errors_remain_strings() {
+        let path = std::path::PathBuf::from(r"C:\Windows\blank.ico");
+        assert_eq!(
+            preference_error(std::io::Error::other(explorer::BlankIconConflict(path))),
+            serde_json::json!({ "blank_icon_conflict": r"C:\Windows\blank.ico" })
+        );
+        assert_eq!(
+            preference_error(std::io::Error::other("other error")),
+            serde_json::json!("other error")
+        );
+    }
 }

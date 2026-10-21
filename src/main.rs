@@ -21,7 +21,7 @@ enum Command {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Explorer(preference) => explorer::toggle_preference(preference, cli.yes),
+        Command::Explorer(preference) => explorer::toggle_preference(preference, cli.yes, true),
         Command::Sysinfo => sysinfo::show(),
     }
 }

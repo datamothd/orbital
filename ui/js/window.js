@@ -2,22 +2,7 @@
 
 let scrollFrame = 0;
 let scrollTarget = 0;
-let smoothScrolling = true;
-try {
-  smoothScrolling = localStorage.getItem("orbital.smoothScrolling") !== "false";
-} catch {
-}
-
-byId("smooth-scroll-toggle").addEventListener("click", () => {
-  smoothScrolling = !smoothScrolling;
-  stopScrolling();
-  renderToggle("smooth-scroll", smoothScrolling);
-  try {
-    localStorage.setItem("orbital.smoothScrolling", String(smoothScrolling));
-  } catch {
-  }
-});
-renderToggle("smooth-scroll", smoothScrolling);
+const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", true, stopScrolling);
 
 function stopScrolling() {
   cancelAnimationFrame(scrollFrame);
@@ -26,7 +11,7 @@ function stopScrolling() {
 window.addEventListener("pointerdown", stopScrolling);
 window.addEventListener("keydown", stopScrolling);
 window.addEventListener("wheel", (event) => {
-  if (!smoothScrolling || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
+  if (!smoothScrolling.enabled || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
     || document.querySelector("dialog:modal") || event.target.closest(".folder-view-options, dialog")) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;

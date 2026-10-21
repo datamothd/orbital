@@ -105,7 +105,7 @@ byId("import-tweaks").addEventListener("click", async () => {
     if (!profile) return;
     await loadSettings();
     if (!await previewImport(profile)) return;
-    const selected = new Set([...byId("import-list").querySelectorAll("input:checked:enabled")].map(input => input.value));
+    const selected = new Set(selectedValues("import-list"));
     if (!selected.size) return;
     const selection = {
       ...profile,
@@ -115,8 +115,9 @@ byId("import-tweaks").addEventListener("click", async () => {
       folder_grouping: selected.has("folder_grouping") ? profile.folder_grouping : null,
     };
     setStatus("Importing tweaks and restarting Explorer…");
-    const { changed: count, error } = await savePreferences("apply_imported_tweaks", { profile: selection });
+    const { changed: count, error, cancelled } = await savePreferences("apply_imported_tweaks", { profile: selection });
     setStatus("");
+    if (cancelled) return;
     if (error) {
       showResult("Could not complete import", `${error} Some changes may already have been applied. Review your current settings before trying again.`);
     } else {

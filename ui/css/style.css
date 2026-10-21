@@ -392,10 +392,6 @@ button:disabled {
   margin: 14px 0 0;
 }
 
-#explorer-preferences > .note {
-  margin: 10px 0;
-}
-
 #status {
   margin: 0;
   font-size: 12px;

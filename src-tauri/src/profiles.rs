@@ -109,8 +109,12 @@ pub async fn import_tweaks(window: tauri::Window) -> Result<Option<TweakProfile>
 }
 
 #[tauri::command]
-pub async fn apply_imported_tweaks(profile: TweakProfile) -> Result<usize, String> {
-    explorer::apply_imported_tweaks(profile).map_err(|error| error.to_string())
+pub async fn apply_imported_tweaks(
+    profile: TweakProfile,
+    replace_blank_icon: Option<bool>,
+) -> Result<usize, serde_json::Value> {
+    explorer::apply_imported_tweaks(profile, replace_blank_icon.unwrap_or(false))
+        .map_err(crate::preference_error)
 }
 
 #[cfg(test)]
