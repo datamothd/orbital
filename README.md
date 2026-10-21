@@ -71,17 +71,15 @@ Preview pending recommended changes and confirm before applying (add `--yes` to 
 cargo run -- apply-recommended-settings
 ```
 
-Apply multiple commands as one batch (add `--yes` to skip confirmation):
-
-```powershell
-cargo run -- hide-task-view hide-recent-files hide-frequent-folders
-```
-
-All commands are validated first, then a combined preview appears before one confirmation. Settings are saved together and Explorer restarts once. Commands determine the final settings in the order listed; changes that cancel each other out are skipped.
-
 To build an executable:
 
 ```powershell
 cargo build --release
 .\target\release\orbital.exe --help
+```
+
+Once the CLI executable is built, it can be called directly from the command prompt while in the same directory.
+
+```powershell
+orbital hide-task-view hide-recent-files hide-frequent-folders
 ```
