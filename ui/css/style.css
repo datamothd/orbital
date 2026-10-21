@@ -31,7 +31,6 @@
 
 html {
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 html:has(dialog:modal) {
@@ -390,6 +389,10 @@ button:disabled {
   font-size: 12px;
   line-height: 1.6;
   margin: 14px 0 0;
+}
+
+#explorer-preferences > .note {
+  margin-bottom: 6px;
 }
 
 #status {
