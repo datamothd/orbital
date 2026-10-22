@@ -266,7 +266,7 @@ async function savePreferences(command, args) {
   } catch (reason) {
     if (!args.replaceBlankIcon && typeof reason?.blank_icon_conflict === "string") {
       setStatus("");
-      if (!await showResult("blank.ico already exists", `${reason.blank_icon_conflict} already exists and is not Orbital's transparent icon. Replace it to hide shortcut arrows?`, "", true)) return { cancelled: true };
+      if (!await showResult("Shortcut icon already exists", `${reason.blank_icon_conflict} already exists and is not Orbital's transparent icon. Replace it to hide shortcut arrows?`, "", true)) return { cancelled: true };
       setStatus("Saving preferences and restarting Explorer…");
       return savePreferences(command, { ...args, replaceBlankIcon: true });
     }

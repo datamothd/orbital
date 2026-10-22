@@ -284,7 +284,7 @@ fn blank_icon_path() -> io::Result<PathBuf> {
     if !root.is_absolute() {
         return Err(io::Error::other("SystemRoot must be an absolute path"));
     }
-    Ok(root.join("blank.ico"))
+    Ok(root.join("orbital-shortcut.ico"))
 }
 
 fn shortcut_arrows_hidden_in(root: &RegKey, blank_path: &Path) -> io::Result<Option<bool>> {
@@ -419,7 +419,7 @@ fn apply_toggle(
         "{name} saved: {}",
         if current { "disabled" } else { "enabled" }
     );
-    restart_explorer(name)
+    restart_explorer(name, false)
 }
 
 struct DwordPreference {
@@ -745,7 +745,7 @@ pub fn apply_recommended_settings(
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
-    restart_explorer("Recommended settings")?;
+    restart_explorer("Recommended settings", preferences.contains(&Recommendation::HideShortcutArrow))?;
     Ok(preferences)
 }
 
@@ -815,18 +815,18 @@ pub fn restore_original_settings() -> io::Result<bool> {
         return Ok(false);
     }
     apply_changes(&changes, &prepared)?;
-    restart_explorer("Original settings")?;
+    restart_explorer("Original settings", changes.iter().any(|change| recommendation(change) == Some(Recommendation::HideShortcutArrow)))?;
     Ok(true)
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
     folder_views::apply(sort)?;
-    restart_explorer("Folder sorting")
+    restart_explorer("Folder sorting", false)
 }
 
 pub fn set_folder_grouping(grouping: FolderGrouping) -> io::Result<()> {
     folder_views::apply_grouping(grouping)?;
-    restart_explorer("Folder grouping")
+    restart_explorer("Folder grouping", false)
 }
 
 fn transparent_icon() -> Vec<u8> {
@@ -839,6 +839,12 @@ fn transparent_icon() -> Vec<u8> {
     }
     bytes.extend_from_slice(&[1, 0, 32, 0]);
     bytes.resize(22 + 40 + 32 * 32 * 4, 0);
+    bytes[42..46].copy_from_slice(&4096u32.to_le_bytes());
+    for row in 0..4 {
+        for column in 0..4 {
+            bytes[65 + (row * 32 + column) * 4] = 1;
+        }
+    }
     bytes.resize(22 + image_size, 0xff);
     bytes
 }
@@ -924,10 +930,22 @@ fn toggle_shortcut_arrow(yes: bool, replace_blank_icon: bool) -> io::Result<()> 
         "{name} saved: {}",
         if current { "disabled" } else { "enabled" }
     );
-    restart_explorer(name)
+    restart_explorer(name, true)
 }
 
-fn restart_explorer(setting: &str) -> io::Result<()> {
+fn clear_icon_cache(local: &Path) -> io::Result<()> {
+    for entry in optional(std::fs::read_dir(local.join(r"Microsoft\Windows\Explorer")))?.into_iter().flatten() {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with("iconcache") && name.ends_with(".db") && entry.file_type()?.is_file() {
+            optional(std::fs::remove_file(entry.path()))?;
+        }
+    }
+    optional(std::fs::remove_file(local.join("IconCache.db"))).map(|_| ())
+}
+
+fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
     #[link(name = "user32")]
     unsafe extern "system" {
         fn GetShellWindow() -> *mut std::ffi::c_void;
@@ -942,6 +960,11 @@ fn restart_explorer(setting: &str) -> io::Result<()> {
             String::from_utf8_lossy(&stopped.stderr).trim()
         )));
     }
+    let cache_result = if rebuild_icons {
+        std::env::var_os("LOCALAPPDATA")
+            .ok_or_else(|| io::Error::other("LOCALAPPDATA is unavailable"))
+            .and_then(|local| clear_icon_cache(Path::new(&local)))
+    } else { Ok(()) };
     ProcessCommand::new("explorer.exe")
         .creation_flags(0x08000000)
         .spawn()?;
@@ -954,7 +977,7 @@ fn restart_explorer(setting: &str) -> io::Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    Ok(())
+    cache_result.map_err(|error| io::Error::other(format!("{setting} saved, but the icon cache could not be rebuilt: {error}")))
 }
 
 #[cfg(test)]
@@ -1553,8 +1576,29 @@ mod tests {
         assert_eq!(dword(22), 40);
         assert_eq!(dword(26), 32);
         assert_eq!(dword(30), 64);
-        assert!(icon[62..62 + 4096].iter().all(|byte| *byte == 0));
-        assert!(icon[62 + 4096..].iter().all(|byte| *byte == 0xff));
+        assert_eq!(dword(42), 4096);
+        for (index, pixel) in icon[62..4158].chunks_exact(4).enumerate() {
+            assert_eq!(&pixel[..3], &[0, 0, 0]);
+            assert_eq!(pixel[3], u8::from(index / 32 < 4 && index % 32 < 4));
+        }
+        assert!(icon[4158..].iter().all(|byte| *byte == 0xff));
+    }
+
+    #[test]
+    fn icon_cache_rebuild_preserves_other_files_and_handles_missing_caches() {
+        let directory = TestIconDirectory::new();
+        clear_icon_cache(&directory.0).unwrap();
+        let explorer = directory.0.join(r"Microsoft\Windows\Explorer");
+        std::fs::create_dir_all(&explorer).unwrap();
+        for name in ["iconcache_32.db", "iconcache_idx.db", "thumbcache_32.db", "other.db"] {
+            std::fs::write(explorer.join(name), b"cache").unwrap();
+        }
+        std::fs::write(directory.0.join("IconCache.db"), b"cache").unwrap();
+        clear_icon_cache(&directory.0).unwrap();
+        assert!(!directory.0.join("IconCache.db").exists());
+        assert_eq!(std::fs::read_dir(&explorer).unwrap().count(), 2);
+        assert!(["thumbcache_32.db", "other.db"].iter().all(|name| explorer.join(name).is_file()));
+        clear_icon_cache(&directory.0).unwrap();
     }
 
     #[test]

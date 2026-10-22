@@ -349,7 +349,7 @@ pub fn apply_imported_tweaks(
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&views, || apply_changes(&changes, &prepared))?;
-    restart_explorer("Settings")?;
+    restart_explorer("Settings", selected().any(|tweak| *tweak == Preference::HideShortcutArrow))?;
     Ok(count)
 }
 
