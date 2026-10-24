@@ -55,6 +55,18 @@ impl TweakProfile {
         }
         Ok(())
     }
+
+    fn retain_changes(&mut self, current: &ExplorerSettings) {
+        for (tweaks, enabled) in [(&mut self.tweaks, true), (&mut self.disabled_tweaks, false)] {
+            tweaks.retain(|tweak| tweak.state(current) != Some(enabled));
+        }
+        self.folder_sort = self
+            .folder_sort
+            .filter(|sort| current.folder_sort != Some(*sort));
+        self.folder_grouping = self
+            .folder_grouping
+            .filter(|grouping| current.folder_grouping != Some(*grouping));
+    }
 }
 
 impl Preference {
@@ -194,18 +206,7 @@ fn batch_profile(
             }
         }
     }
-    profile
-        .tweaks
-        .retain(|tweak| tweak.state(current) != Some(true));
-    profile
-        .disabled_tweaks
-        .retain(|tweak| tweak.state(current) != Some(false));
-    profile.folder_sort = profile
-        .folder_sort
-        .filter(|sort| current.folder_sort != Some(*sort));
-    profile.folder_grouping = profile
-        .folder_grouping
-        .filter(|grouping| current.folder_grouping != Some(*grouping));
+    profile.retain_changes(current);
     Ok(profile)
 }
 
@@ -301,12 +302,7 @@ pub fn apply_imported_tweaks(
 ) -> io::Result<usize> {
     profile.normalize()?;
     let current = settings()?;
-    profile
-        .tweaks
-        .retain(|tweak| tweak.state(&current) != Some(true));
-    profile
-        .disabled_tweaks
-        .retain(|tweak| tweak.state(&current) != Some(false));
+    profile.retain_changes(&current);
     let selected = || profile.tweaks.iter().chain(&profile.disabled_tweaks);
     if selected().any(|tweak| !tweak.supported(&current)) {
         return Err(io::Error::other(
@@ -319,16 +315,10 @@ pub fn apply_imported_tweaks(
         ));
     }
     let mut views = Vec::new();
-    if let Some(sort) = profile
-        .folder_sort
-        .filter(|sort| current.folder_sort != Some(*sort))
-    {
+    if let Some(sort) = profile.folder_sort {
         views.push(folder_views::ViewChange::Sort(sort));
     }
-    if let Some(grouping) = profile
-        .folder_grouping
-        .filter(|grouping| current.folder_grouping != Some(*grouping))
-    {
+    if let Some(grouping) = profile.folder_grouping {
         views.push(folder_views::ViewChange::Grouping(grouping));
     }
     let count = profile.tweaks.len() + profile.disabled_tweaks.len() + views.len();

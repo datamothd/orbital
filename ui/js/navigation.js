@@ -7,7 +7,7 @@ function selectNavigationTab(selectedTab) {
     const selected = tab === selectedTab;
     tab.setAttribute("aria-selected", String(selected));
     tab.tabIndex = selected ? 0 : -1;
-    document.getElementById(tab.getAttribute("aria-controls")).hidden = !selected;
+    byId(tab.getAttribute("aria-controls")).hidden = !selected;
   }
 }
 

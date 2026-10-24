@@ -51,7 +51,7 @@ main {
   margin: auto;
 }
 
-#settings-panel > section:last-child {
+[role="tabpanel"] > section:last-child {
   margin-bottom: 0;
 }
 
@@ -88,10 +88,6 @@ main {
   gap: 6px;
 }
 
-.profile-actions svg {
-  flex-shrink: 0;
-}
-
 .navigation-tabs button[aria-selected="true"] {
   color: #ffffff;
   background: #171717;
@@ -113,7 +109,8 @@ summary,
 }
 
 .section-header button,
-.preference > button {
+.preference > button,
+.profile-actions svg {
   flex-shrink: 0;
 }
 
@@ -194,8 +191,36 @@ dl {
 
 dt,
 .preference .preference-description,
-.note {
+.note,
+.import-comparison {
   color: #b3b3b3;
+}
+
+#apply-recommended,
+.tested-system-check,
+.recommended-color,
+#recommendation-list,
+.preference .preference-value[data-state="enabled"],
+.import-state,
+.inject-tree .ready,
+.inject-file.selected .inject-name {
+  color: #4ade80;
+}
+
+#restore-original,
+.older-system-dash,
+.visual-preference,
+.preference .preference-value,
+.folder-view-picker,
+.import-row[data-state="blocked"] .import-state {
+  color: #facc15;
+}
+
+.unsupported-system-cross,
+.admin-warning[data-state="missing"],
+.preference .preference-value[data-state="disabled"],
+#inject-status.error {
+  color: #f87171;
 }
 
 dd {
@@ -208,18 +233,9 @@ dd {
 .unsupported-system-cross {
   display: inline-block;
   margin-left: 6px;
-  color: #4ade80;
   font-family: "Segoe UI Symbol", sans-serif;
   font-size: 12px;
   font-weight: 700;
-}
-
-.older-system-dash {
-  color: #facc15;
-}
-
-.unsupported-system-cross {
-  color: #f87171;
 }
 
 button {
@@ -257,19 +273,11 @@ button:disabled {
   flex: 1;
   font-size: 14px;
   background: #0a0a0a;
-  border: 1px solid #333333;
+  border-color: #333333;
 }
 
 .settings-actions button:hover:not(:disabled) {
   background: #161616;
-}
-
-#apply-recommended {
-  color: #4ade80;
-}
-
-#restore-original {
-  color: #facc15;
 }
 
 .preference {
@@ -322,18 +330,6 @@ button:disabled {
   font-size: 12px;
 }
 
-.preference .preference-value {
-  color: #facc15;
-}
-
-.preference .preference-value[data-state="enabled"] {
-  color: #4ade80;
-}
-
-.preference .preference-value[data-state="disabled"] {
-  color: #f87171;
-}
-
 .folder-view-controls {
   display: flex;
   flex-direction: column;
@@ -347,7 +343,6 @@ button:disabled {
   gap: 10px;
   width: 100%;
   text-align: left;
-  color: #facc15;
 }
 
 .picker-arrow {
@@ -461,19 +456,6 @@ dialog > :last-child {
   margin-left: 6px;
   font-family: "Segoe UI Symbol", sans-serif;
   font-size: 12px;
-}
-
-.admin-warning[data-state="missing"] {
-  color: #f87171;
-}
-
-.recommended-color,
-#recommendation-list {
-  color: #4ade80;
-}
-
-.visual-preference {
-  color: #facc15;
 }
 
 .changes-options {
@@ -602,16 +584,7 @@ dialog .confirmation-footer {
 .import-comparison,
 .import-state {
   display: block;
-  color: #b3b3b3;
   margin-top: 3px;
-}
-
-.import-state {
-  color: #4ade80;
-}
-
-.import-row[data-state="blocked"] .import-state {
-  color: #facc15;
 }
 
 .import-row[data-state="matching"] {
@@ -626,10 +599,6 @@ button.primary {
 
 button.primary:hover:not(:disabled) {
   background: #d9d9d9;
-}
-
-.inject-workspace {
-  margin-bottom: 10px;
 }
 
 .inject-workspace .section-header {
@@ -746,7 +715,8 @@ button.primary:hover:not(:disabled) {
 
 .inject-file .note,
 .inject-later .note,
-.inject-footer .note {
+.inject-footer .note,
+.inject-choices .note {
   margin: 0;
 }
 
@@ -796,30 +766,63 @@ button.primary:hover:not(:disabled) {
   font-size: 12px;
 }
 
-.inject-tree .ready,
-.inject-file.selected .inject-name {
-  color: #4ade80;
-}
-
 .inject-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
   gap: 10px;
   padding-top: 16px;
 }
 
-.inject-footer .note {
-  flex: 1 1 160px;
+.inject-feedback {
+  display: grid;
+  flex: 1 1 240px;
+  min-width: 0;
+  gap: 6px;
+}
+
+.inject-workspace:has(#inject-progress:not([hidden])) #inject-availability {
+  display: none;
 }
 
 #inject-status {
-  margin: 0;
   overflow-wrap: anywhere;
 }
 
-#inject-status.error {
-  color: #f87171;
+#inject-progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  accent-color: #4ade80;
+}
+
+#inject-progress[hidden] {
+  display: none;
+}
+
+#inject-confirm {
+  max-width: 420px;
+}
+
+.inject-choices {
+  display: grid;
+  margin-top: 16px;
+}
+
+.inject-choices button {
+  text-align: left;
+}
+
+.inject-choices button span {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
+
+.inject-dismiss {
+  justify-self: end;
 }
 
 @media (max-width: 440px) {

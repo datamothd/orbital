@@ -6,7 +6,7 @@ A Windows preference and configurator tool that lets users change certain aspect
 
 The idea comes from frustration with existing Windows configuration tools that require a proprietary parent app, don't let you change settings before the OS is installed, or leave out the options you actually want. All while making the process less clear than some power users would like.
 
-In the future, I would like to implement an actual ISO injector for autounattend.xml files and Windows PE customization to streamline the entire Windows setup process, but these features are not currently available in Orbital.
+The Inject page adds an autounattend.xml answer file to a Windows installation ISO. Windows PE customization and bundling the Orbital CLI for post-install configuration are planned for a future update.
 
 Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the future.
 
@@ -17,10 +17,11 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 - Tauri app interface for value editing.
 - Setting preference state in mass and change reverting.
 - Import and export enabled and disabled tweak values as JSON, with a selectable comparison preview before importing.
+- Inject an answer file into a Windows ISO, either replacing the selected image or saving an injected copy. Includes progress, cancellation, and verification of setup files and BIOS/UEFI boot images.
 
 ## Planned features
-- ISO configuration
-- Autounattend.xml configuration
+- An in-app autounattend.xml editor
+- Orbital CLI integration in installation images
 - More preferences, especially tailoring to security and performance
 - 26H2 support (as soon as I even get the update offered, thanks Windows).
 
@@ -56,6 +57,12 @@ Build the small standalone desktop executable (no installer):
 npm run build
 .\src-tauri\target\release\orbital-desktop.exe
 ```
+
+### Injecting an ISO
+
+Open Inject, choose an official Windows installation ISO and an answer XML file, then click Inject ISO. Choose Duplicate & inject to save a new image, or Inject selected ISO to replace the selected file. Any existing autounattend.xml at the image root is replaced.
+
+Orbital uses Windows' built-in image APIs, preserves the original BIOS/UEFI boot images, and compares every setup file with the rebuilt image before saving it. Failed or cancelled operations leave the source unchanged. Allow free space for the rebuilt image as well as temporary staging files. Eject an ISO mounted in File Explorer before choosing to replace it.
 
 ### Command line
 

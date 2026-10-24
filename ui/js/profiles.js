@@ -36,7 +36,7 @@ function importedRows(profile) {
 
 function updateImportSelection() {
   const list = byId("import-list");
-  const selected = list.querySelectorAll("input:checked:enabled").length;
+  const selected = selectedValues("import-list").length;
   const matching = list.querySelectorAll('[data-state="matching"]').length;
   const blocked = list.querySelectorAll('[data-state="blocked"]').length;
   byId("import-apply").disabled = selected === 0;
@@ -52,16 +52,11 @@ function previewImport(profile) {
   byId("import-options").open = true;
   byId("import-options").hidden = !rows.length;
   byId("import-list").replaceChildren(...rows.map((row) => {
-    const label = document.createElement("label");
+    const { row: label, checkbox, text } = createChangeRow(row.field, row.label);
     label.className = "import-row";
     label.dataset.state = row.matching ? "matching" : row.blocked ? "blocked" : "change";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = row.field;
     checkbox.disabled = row.matching || Boolean(row.blocked);
     checkbox.checked = !checkbox.disabled;
-    const text = document.createElement("span");
-    text.textContent = row.label;
     if (!row.matching) {
       const comparison = document.createElement("span");
       comparison.className = "import-comparison";
@@ -74,7 +69,6 @@ function previewImport(profile) {
       ? row.imported === "Enabled" ? "Already enabled" : row.imported === "Disabled" ? "Already disabled" : "Already matches"
       : row.blocked || "Will change";
     text.append(state);
-    label.append(checkbox, text);
     return label;
   }));
   updateImportSelection();

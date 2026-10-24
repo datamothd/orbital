@@ -1,72 +1,24 @@
 use orbital::explorer::{self, TweakProfile};
-use std::{io::Read, os::windows::ffi::OsStringExt, path::PathBuf};
-use windows_sys::Win32::UI::Controls::Dialogs::{
-    CommDlgExtendedError, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST,
-    OFN_NOCHANGEDIR, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
-};
+use std::path::{Path, PathBuf};
 use windows_sys::core::w;
 
 fn choose_file(owner: usize, save: bool) -> Result<Option<PathBuf>, String> {
-    let mut filename = vec![0u16; 32768];
-    if save {
-        for (slot, ch) in filename
-            .iter_mut()
-            .zip("orbital-tweaks.json".encode_utf16())
-        {
-            *slot = ch;
-        }
-    }
-    let mut dialog = OPENFILENAMEW {
-        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: owner as _,
-        lpstrFilter: w!("Orbital tweaks (*.json)\0*.json\0"),
-        nFilterIndex: 1,
-        lpstrFile: filename.as_mut_ptr(),
-        nMaxFile: filename.len() as u32,
-        lpstrTitle: if save {
+    crate::files::choose(
+        owner,
+        w!("Orbital tweaks (*.json)\0*.json\0"),
+        if save {
             w!("Export tweak settings")
         } else {
             w!("Import tweaks")
         },
-        lpstrDefExt: w!("json"),
-        Flags: OFN_EXPLORER
-            | OFN_NOCHANGEDIR
-            | OFN_PATHMUSTEXIST
-            | if save {
-                OFN_OVERWRITEPROMPT
-            } else {
-                OFN_FILEMUSTEXIST
-            },
-        ..Default::default()
-    };
-    let chosen = unsafe {
-        if save {
-            GetSaveFileNameW(&mut dialog)
-        } else {
-            GetOpenFileNameW(&mut dialog)
-        }
-    };
-    if chosen == 0 {
-        let error = unsafe { CommDlgExtendedError() };
-        return if error == 0 {
-            Ok(None)
-        } else {
-            Err(format!("Could not open the file dialog ({error:#x})."))
-        };
-    }
-    let length = filename
-        .iter()
-        .position(|ch| *ch == 0)
-        .unwrap_or(filename.len());
-    Ok(Some(
-        std::ffi::OsString::from_wide(&filename[..length]).into(),
-    ))
+        w!("json"),
+        save.then_some(Path::new("orbital-tweaks.json")),
+    )
 }
 
 #[tauri::command]
 pub async fn export_tweaks(window: tauri::Window) -> Result<bool, String> {
-    let owner = window.hwnd().map_err(|error| error.to_string())?.0 as usize;
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::files::with_dialog(window, move |owner| {
         let Some(path) = choose_file(owner, true)? else {
             return Ok(false);
         };
@@ -77,27 +29,16 @@ pub async fn export_tweaks(window: tauri::Window) -> Result<bool, String> {
         Ok(true)
     })
     .await
-    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
 pub async fn import_tweaks(window: tauri::Window) -> Result<Option<TweakProfile>, String> {
-    let owner = window.hwnd().map_err(|error| error.to_string())?.0 as usize;
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::files::with_dialog(window, move |owner| {
         let Some(path) = choose_file(owner, false)? else {
             return Ok(None);
         };
-        let file = std::fs::File::open(path)
+        let json = crate::files::read_document(&path)
             .map_err(|error| format!("Could not read the file: {error}"))?;
-        let mut json = Vec::new();
-        file.take(1_048_577)
-            .read_to_end(&mut json)
-            .map_err(|error| format!("Could not read the file: {error}"))?;
-        if json.len() > 1_048_576 {
-            return Err(
-                "The file is too large. Choose an Orbital tweaks JSON file under 1 MiB.".into(),
-            );
-        }
         let mut profile: TweakProfile =
             serde_json::from_slice(json.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&json))
                 .map_err(|error| format!("Invalid Orbital tweaks file: {error}"))?;
@@ -105,7 +46,6 @@ pub async fn import_tweaks(window: tauri::Window) -> Result<Option<TweakProfile>
         Ok(Some(profile))
     })
     .await
-    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

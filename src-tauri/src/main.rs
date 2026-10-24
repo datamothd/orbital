@@ -2,6 +2,8 @@
 
 use orbital::{explorer, sysinfo};
 use windows_sys::{Win32::UI::Shell::ShellExecuteW, core::w};
+mod files;
+mod inject;
 mod profiles;
 
 fn preference_error(error: std::io::Error) -> serde_json::Value {
@@ -96,6 +98,7 @@ async fn open_windows_download() -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(inject::InjectionState::default())
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
@@ -105,6 +108,10 @@ fn main() {
             restore_original_settings,
             toggle_preference,
             open_windows_download,
+            inject::select_injection_file,
+            inject::clear_injection_file,
+            inject::inject_iso,
+            inject::cancel_injection,
             profiles::export_tweaks,
             profiles::import_tweaks,
             profiles::apply_imported_tweaks,

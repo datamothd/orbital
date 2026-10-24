@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Orbital</title>
   <link rel="stylesheet" href="css/style.css">
+  <script src="js/shared.js" defer></script>
   <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
   <script src="js/profiles.js" defer></script>
@@ -50,46 +51,36 @@
         <hr class="preferences-divider" aria-hidden="true">
         <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
         <h3 class="preference-group">Taskbar</h3>
-        <div class="preference">
+        <div class="preference" data-preference="taskbar-centering">
           <div>
             <h3>Taskbar alignment</h3>
             <p class="preference-description">Choose left or centered taskbar icons.</p>
-            <p id="taskbar-centering" class="preference-value">Loading…</p>
           </div>
-          <button id="taskbar-centering-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="task-view">
           <div>
             <h3>Hide Task View button</h3>
             <p class="preference-description">Hides the Task View button on the taskbar. Win+Tab still works.</p>
-            <p id="task-view" class="preference-value">Loading…</p>
           </div>
-          <button id="task-view-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="widgets">
           <div>
             <h3>Disable Widgets</h3>
             <p class="preference-description">Disables the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
-            <p id="widgets" class="preference-value">Loading…</p>
           </div>
-          <button id="widgets-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="taskbar-end-task">
           <div>
             <h3>Enable taskbar End task</h3>
             <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
-            <p id="taskbar-end-task" class="preference-value">Loading…</p>
           </div>
-          <button id="taskbar-end-task-toggle" disabled>Toggle</button>
         </div>
         <h3 class="preference-group">Desktop</h3>
-        <div class="preference">
+        <div class="preference" data-preference="shortcut-arrow">
           <div>
             <h3>Hide shortcut arrow icon</h3>
             <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
-            <p id="shortcut-arrow" class="preference-value">Loading…</p>
           </div>
-          <button id="shortcut-arrow-toggle" disabled>Toggle</button>
         </div>
         <h3 class="preference-group">File Explorer · Folder views</h3>
         <div class="preference folder-view-preference">
@@ -121,79 +112,63 @@
           </div>
         </div>
         <h3 class="preference-group">File Explorer · Appearance</h3>
-        <div class="preference">
+        <div class="preference" data-preference="explorer-spacing">
           <div>
             <h3>Disable extra spacing</h3>
             <p class="preference-description">Uses compact spacing in File Explorer.</p>
-            <p id="explorer-spacing" class="preference-value">Loading…</p>
           </div>
-          <button id="explorer-spacing-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="modern-context-menu">
           <div>
             <h3>Disable Windows 11 context menu</h3>
             <p class="preference-description">Requests the classic Windows 10-style right-click menu.</p>
-            <p id="modern-context-menu" class="preference-value">Loading…</p>
           </div>
-          <button id="modern-context-menu-toggle" disabled>Toggle</button>
         </div>
         <h3 class="preference-group">File Explorer · Navigation pane</h3>
-        <div class="preference">
+        <div class="preference" data-preference="home-folder">
           <div>
             <h3>Hide Home folder</h3>
             <p class="preference-description">Hides Home from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-            <p id="home-folder" class="preference-value">Loading…</p>
           </div>
-          <button id="home-folder-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="gallery">
           <div>
             <h3>Hide Gallery</h3>
             <p class="preference-description">Hides Gallery from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-            <p id="gallery" class="preference-value">Loading…</p>
           </div>
-          <button id="gallery-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="recent-files">
           <div>
             <h3>Hide recently used files</h3>
             <p class="preference-description">Hides recently used files in File Explorer Home or Quick Access.</p>
-            <p id="recent-files" class="preference-value">Loading…</p>
           </div>
-          <button id="recent-files-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="recommendations">
           <div>
             <h3>Hide recommendations</h3>
             <p class="preference-description">Hides the Recommended section in File Explorer Home.</p>
-            <p id="recommendations" class="preference-value">Loading…</p>
           </div>
-          <button id="recommendations-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="frequent-folders">
           <div>
             <h3>Hide frequently used folders</h3>
             <p class="preference-description">Hides your most accessed folders in Quick Access.</p>
-            <p id="frequent-folders" class="preference-value">Loading…</p>
           </div>
-          <button id="frequent-folders-toggle" disabled>Toggle</button>
         </div>
-        <div class="preference">
+        <div class="preference" data-preference="office-files">
           <div>
             <h3>Hide cloud files and account-based recommendations</h3>
             <p class="preference-description">Hides account and cloud-provider content in File Explorer. Availability depends on your account.</p>
-            <p id="office-files" class="preference-value">Loading…</p>
           </div>
-          <button id="office-files-toggle" disabled>Toggle</button>
         </div>
       </details>
-      <p id="status" role="status" aria-live="polite">Reading your system…</p>
+      <p id="status" role="status">Reading your system…</p>
     </div>
     <div id="inject-panel" role="tabpanel" aria-labelledby="inject-tab" hidden>
-      <section class="inject-workspace" aria-labelledby="inject-title">
+      <section id="inject-workspace" class="inject-workspace" aria-labelledby="inject-title">
         <header class="section-header">
           <h2 id="inject-title">Inject</h2>
-          <span class="inject-tag">in development</span>
+          <span class="inject-tag">Windows setup</span>
         </header>
         <p class="note inject-intro">Inject your Windows image with answer files for an automated setup.</p>
         <div class="inject-inputs">
@@ -238,11 +213,15 @@
           </div>
         </div>
         <footer class="inject-footer">
-          <span id="inject-availability" class="note">ISO writing is in development.</span>
-          <button type="button" class="primary" disabled aria-describedby="inject-availability">Inject ISO</button>
+          <div class="inject-feedback">
+            <span id="inject-availability" class="note">Choose how to save your ISO before writing.</span>
+            <p id="inject-status" class="note" role="status">Select an ISO and an answer file to prepare your image.</p>
+            <progress id="inject-progress" aria-label="ISO injection progress" max="100" hidden></progress>
+          </div>
+          <button id="inject-cancel" type="button" hidden>Cancel</button>
+          <button id="inject-start" type="button" class="primary" disabled aria-describedby="inject-availability">Inject ISO</button>
         </footer>
       </section>
-      <p id="inject-status" class="note" role="status" aria-live="polite">Select an ISO and an answer file to preview the image. No files are modified (yet).</p>
     </div>
     <div id="settings-panel" role="tabpanel" aria-labelledby="settings-tab" hidden>
       <section aria-labelledby="settings-title">
@@ -268,6 +247,16 @@
   </main>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
   <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
+  <dialog id="inject-confirm" aria-labelledby="inject-confirm-title" aria-describedby="inject-confirm-description inject-replace-note">
+    <h2 id="inject-confirm-title">How do you want to inject?</h2>
+    <p id="inject-confirm-description" class="note">Choose whether to update the selected ISO or save an injected copy.</p>
+    <form method="dialog" class="inject-choices">
+      <button value="copy"><strong>Duplicate &amp; inject</strong><span>Keep the original and choose where to save the new ISO.</span></button>
+      <button value="original"><strong>Inject selected ISO</strong><span>Replace the selected ISO after verification.</span></button>
+      <span id="inject-replace-note" class="note">Any existing autounattend.xml at the image root will be replaced.</span>
+      <button value="cancel" class="inject-dismiss" autofocus>Cancel</button>
+    </form>
+  </dialog>
   <dialog id="administrator-notice" aria-labelledby="administrator-title" aria-describedby="administrator-description">
     <h2 id="administrator-title">Administrator access required</h2>
     <p id="administrator-description"></p>
@@ -289,7 +278,7 @@
     </details>
     <p class="note">Windows Explorer will restart to apply this change.</p>
     <form method="dialog" class="confirmation-footer">
-      <p id="confirm-admin-note" class="note" role="status" aria-live="polite" hidden></p>
+      <p id="confirm-admin-note" class="note" role="status" hidden></p>
       <span class="confirmation-buttons">
         <button value="cancel" autofocus>Cancel</button>
         <button id="confirm-apply" value="apply" class="primary" aria-describedby="confirm-admin-note">Apply &amp; restart</button>
@@ -312,7 +301,7 @@
       <summary>List of changes</summary>
       <div id="import-list" class="changes-scroll changes-list" role="group" aria-label="Imported tweaks compared with current settings"></div>
     </details>
-    <p id="import-summary" class="note" role="status" aria-live="polite"></p>
+    <p id="import-summary" class="note" role="status"></p>
     <p class="note">Only selected changes will be applied. Windows Explorer will restart. Changing folder sorting or grouping resets saved views, including individual folder layouts. Reverting restores their earlier snapshot and replaces later layout changes.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>

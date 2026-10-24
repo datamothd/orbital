@@ -113,10 +113,7 @@ impl BagGrouping {
     }
 
     fn direction(&self) -> u32 {
-        if matches!(
-            self.grouping,
-            FolderGrouping::DateModified | FolderGrouping::DateCreated
-        ) {
+        if self.grouping.descending() {
             u32::MAX
         } else {
             1
@@ -174,6 +171,10 @@ fn grouping_bag_paths(folder_types: &RegKey) -> io::Result<Vec<String>> {
 }
 
 impl FolderGrouping {
+    fn descending(self) -> bool {
+        matches!(self, Self::DateModified | Self::DateCreated)
+    }
+
     fn property(self) -> &'static str {
         match self {
             Self::None => "",
@@ -467,13 +468,7 @@ fn apply_recommended_in(
                     }
                     ViewChange::Grouping(grouping) => {
                         view.set_value("GroupBy", &grouping.property())?;
-                        view.set_value(
-                            "GroupAscending",
-                            &u32::from(!matches!(
-                                grouping,
-                                FolderGrouping::DateModified | FolderGrouping::DateCreated
-                            )),
-                        )?;
+                        view.set_value("GroupAscending", &u32::from(!grouping.descending()))?;
                     }
                 }
             }

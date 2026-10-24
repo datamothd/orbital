@@ -1,11 +1,11 @@
 "use strict";
 
 function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
-  const picker = document.getElementById(`${id}-picker`);
-  const menu = document.getElementById(`${id}-options`);
-  const selection = document.getElementById(`${id}-selection`);
-  const apply = document.getElementById(`${id}-apply`);
-  const value = document.getElementById(`${id}-value`);
+  const picker = byId(`${id}-picker`);
+  const menu = byId(`${id}-options`);
+  const selection = byId(`${id}-selection`);
+  const apply = byId(`${id}-apply`);
+  const value = byId(`${id}-value`);
   let selected = -1;
   let active = 0;
 
@@ -34,11 +34,15 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
     options[active].scrollIntoView({ block: "nearest" });
   }
 
-  function choose(index) {
+  function select(index) {
     selected = index;
-    selection.textContent = choices[index].label;
+    selection.textContent = choices[index]?.label || placeholder;
     options.forEach((option, index) => option.setAttribute("aria-selected", String(index === selected)));
-    apply.disabled = picker.disabled;
+    apply.disabled = picker.disabled || selected < 0;
+  }
+
+  function choose(index) {
+    select(index);
     close(true);
   }
 
@@ -100,10 +104,8 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
       return choices.find(choice => matches(choice.value, value))?.label || fallback;
     },
     load(current, available = true) {
-      selected = choices.findIndex(choice => matches(choice.value, current));
-      selection.textContent = selected < 0 ? placeholder : choices[selected].label;
+      select(choices.findIndex(choice => matches(choice.value, current)));
       value.textContent = !available ? "Unavailable" : selected < 0 ? fallback : choices[selected].label;
-      options.forEach((option, index) => option.setAttribute("aria-selected", String(index === selected)));
       close();
     },
     setDisabled(disabled) {

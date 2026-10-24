@@ -1,7 +1,5 @@
 "use strict";
 
-const invoke = window.__TAURI__?.core.invoke;
-const byId = (id) => document.getElementById(id);
 let settings = null;
 let busy = false;
 
@@ -196,14 +194,6 @@ function updateRecommendedSelection() {
   byId("confirm-apply").disabled = !selected.length || count > 0;
 }
 
-function confirmDialog(dialog) {
-  dialog.returnValue = "cancel";
-  return new Promise((resolve) => {
-    dialog.addEventListener("close", () => resolve(dialog.returnValue === "apply"), { once: true });
-    dialog.showModal();
-  });
-}
-
 function confirmChange(description, title = "Change preference?", recommendations = []) {
   const dialog = byId("confirmation");
   dialog.classList.toggle("changes-dialog", recommendations.length > 0);
@@ -213,22 +203,14 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("recommended-options").open = true;
   const list = byId("recommendation-list");
   list.replaceChildren(...recommendations.map((id) => {
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = id;
-    checkbox.checked = true;
-    const text = document.createElement("span");
     const preference = explorerPreferences.find(preference => preference.field === id);
-    text.textContent = preference
-      ? preference.label
-      : id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None";
+    const { row, text } = createChangeRow(id, preference?.label
+      || (id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None"));
     if (preference?.requiresAdmin) text.append(adminWarning());
     if (preference?.visual || folderViews.some(view => view.field === id)) {
-      label.className = "visual-preference";
+      row.className = "visual-preference";
     }
-    label.append(checkbox, text);
-    return label;
+    return row;
   }).sort((a, b) => Number(b.classList.contains("visual-preference")) - Number(a.classList.contains("visual-preference"))));
   if (recommendations.length) {
     updateRecommendedSelection();
@@ -348,10 +330,20 @@ for (const view of folderViews) {
   });
 }
 for (const preference of explorerPreferences) {
-  const title = byId(`${preference.id}-toggle`).closest(".preference").querySelector("h3");
+  const row = document.querySelector(`[data-preference="${preference.id}"]`);
+  const title = row.querySelector("h3");
   preference.label = title.textContent.trim();
   if (preference.requiresAdmin) title.append(adminWarning());
-  byId(`${preference.id}-toggle`).addEventListener("click", (event) => applyChange(
+  const value = document.createElement("p");
+  value.id = preference.id;
+  value.className = "preference-value";
+  title.parentElement.append(value);
+  const toggle = document.createElement("button");
+  toggle.id = `${preference.id}-toggle`;
+  toggle.textContent = "Toggle";
+  toggle.disabled = true;
+  row.append(toggle);
+  toggle.addEventListener("click", (event) => applyChange(
     "toggle_preference",
     { preference: preference.field },
     settings?.[preference.field] ? preference.restore : preference.apply,
