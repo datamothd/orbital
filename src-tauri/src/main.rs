@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use orbital::{explorer, sysinfo};
+use windows_sys::{Win32::UI::Shell::ShellExecuteW, core::w};
 mod profiles;
 
 fn preference_error(error: std::io::Error) -> serde_json::Value {
@@ -75,6 +76,24 @@ async fn toggle_preference(
         .map_err(preference_error)
 }
 
+#[tauri::command]
+async fn open_windows_download() -> Result<(), String> {
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            w!("open"),
+            w!("https://www.microsoft.com/en-us/software-download/windows11"),
+            std::ptr::null(),
+            std::ptr::null(),
+            1,
+        )
+    } as isize;
+    if result <= 32 {
+        return Err(format!("Could not launch the browser ({result})."));
+    }
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -85,6 +104,7 @@ fn main() {
             apply_recommended_settings,
             restore_original_settings,
             toggle_preference,
+            open_windows_download,
             profiles::export_tweaks,
             profiles::import_tweaks,
             profiles::apply_imported_tweaks,

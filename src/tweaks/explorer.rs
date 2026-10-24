@@ -4,7 +4,9 @@ mod folder_views;
 mod profiles;
 
 pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
-pub use profiles::{SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks};
+pub use profiles::{
+    SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
+};
 
 use std::os::windows::process::CommandExt;
 use std::{
@@ -19,10 +21,12 @@ use winreg::{
     types::ToRegValue,
 };
 
-const CLASSIC_CONTEXT_MENU_KEY: &str = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
+const CLASSIC_CONTEXT_MENU_KEY: &str =
+    r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
-const TASKBAR_DEVELOPER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
+const TASKBAR_DEVELOPER_KEY: &str =
+    r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
 const WIDGETS_KEY: &str = r"SOFTWARE\Policies\Microsoft\Dsh";
 const SHELL_ICONS_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons";
 const HOME_CLSID: &str = "{f874310e-b6b7-47dc-bc84-b9e6b38f5903}";
@@ -745,7 +749,10 @@ pub fn apply_recommended_settings(
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
-    restart_explorer("Recommended settings", preferences.contains(&Recommendation::HideShortcutArrow))?;
+    restart_explorer(
+        "Recommended settings",
+        preferences.contains(&Recommendation::HideShortcutArrow),
+    )?;
     Ok(preferences)
 }
 
@@ -815,7 +822,12 @@ pub fn restore_original_settings() -> io::Result<bool> {
         return Ok(false);
     }
     apply_changes(&changes, &prepared)?;
-    restart_explorer("Original settings", changes.iter().any(|change| recommendation(change) == Some(Recommendation::HideShortcutArrow)))?;
+    restart_explorer(
+        "Original settings",
+        changes
+            .iter()
+            .any(|change| recommendation(change) == Some(Recommendation::HideShortcutArrow)),
+    )?;
     Ok(true)
 }
 
@@ -934,7 +946,10 @@ fn toggle_shortcut_arrow(yes: bool, replace_blank_icon: bool) -> io::Result<()> 
 }
 
 fn clear_icon_cache(local: &Path) -> io::Result<()> {
-    for entry in optional(std::fs::read_dir(local.join(r"Microsoft\Windows\Explorer")))?.into_iter().flatten() {
+    for entry in optional(std::fs::read_dir(local.join(r"Microsoft\Windows\Explorer")))?
+        .into_iter()
+        .flatten()
+    {
         let entry = entry?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
@@ -964,7 +979,9 @@ fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
         std::env::var_os("LOCALAPPDATA")
             .ok_or_else(|| io::Error::other("LOCALAPPDATA is unavailable"))
             .and_then(|local| clear_icon_cache(Path::new(&local)))
-    } else { Ok(()) };
+    } else {
+        Ok(())
+    };
     ProcessCommand::new("explorer.exe")
         .creation_flags(0x08000000)
         .spawn()?;
@@ -977,7 +994,11 @@ fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    cache_result.map_err(|error| io::Error::other(format!("{setting} saved, but the icon cache could not be rebuilt: {error}")))
+    cache_result.map_err(|error| {
+        io::Error::other(format!(
+            "{setting} saved, but the icon cache could not be rebuilt: {error}"
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -1577,7 +1598,7 @@ mod tests {
         assert_eq!(dword(26), 32);
         assert_eq!(dword(30), 64);
         assert_eq!(dword(42), 4096);
-        for (index, pixel) in icon[62..4158].chunks_exact(4).enumerate() {
+        for (index, pixel) in icon[62..4158].as_chunks::<4>().0.iter().enumerate() {
             assert_eq!(&pixel[..3], &[0, 0, 0]);
             assert_eq!(pixel[3], u8::from(index / 32 < 4 && index % 32 < 4));
         }
@@ -1590,14 +1611,23 @@ mod tests {
         clear_icon_cache(&directory.0).unwrap();
         let explorer = directory.0.join(r"Microsoft\Windows\Explorer");
         std::fs::create_dir_all(&explorer).unwrap();
-        for name in ["iconcache_32.db", "iconcache_idx.db", "thumbcache_32.db", "other.db"] {
+        for name in [
+            "iconcache_32.db",
+            "iconcache_idx.db",
+            "thumbcache_32.db",
+            "other.db",
+        ] {
             std::fs::write(explorer.join(name), b"cache").unwrap();
         }
         std::fs::write(directory.0.join("IconCache.db"), b"cache").unwrap();
         clear_icon_cache(&directory.0).unwrap();
         assert!(!directory.0.join("IconCache.db").exists());
         assert_eq!(std::fs::read_dir(&explorer).unwrap().count(), 2);
-        assert!(["thumbcache_32.db", "other.db"].iter().all(|name| explorer.join(name).is_file()));
+        assert!(
+            ["thumbcache_32.db", "other.db"]
+                .iter()
+                .all(|name| explorer.join(name).is_file())
+        );
         clear_icon_cache(&directory.0).unwrap();
     }
 

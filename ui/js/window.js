@@ -52,7 +52,9 @@ if (window.__TAURI__) {
     try {
       do {
         pending = false;
-        const height = Math.min(maxHeight, Math.ceil(main.getBoundingClientRect().height));
+        const contentHeight = Math.ceil(main.getBoundingClientRect().height);
+        document.documentElement.toggleAttribute("data-window-content-fits", contentHeight <= maxHeight);
+        const height = Math.min(maxHeight, contentHeight);
         if (height !== lastHeight) {
           await appWindow.setSize(new LogicalSize(640, height));
           lastHeight = height;
@@ -60,13 +62,14 @@ if (window.__TAURI__) {
       } while (pending);
     } catch (error) {
       observer.disconnect();
+      document.documentElement.removeAttribute("data-window-content-fits");
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
       resizing = false;
     }
   }
 
-  const observer = new ResizeObserver(() => requestAnimationFrame(fitWindow));
+  const observer = new ResizeObserver(fitWindow);
   observer.observe(main);
   document.fonts.ready.then(fitWindow);
 }

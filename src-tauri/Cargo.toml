@@ -10,7 +10,7 @@ tauri-build = { version = "2", features = [] }
 orbital = { path = ".." }
 tauri = { version = "2", features = [] }
 serde_json = "1"
-windows-sys = { version = "0.61", features = ["Win32_UI_Controls_Dialogs"] }
+windows-sys = { version = "0.61", features = ["Win32_UI_Controls_Dialogs", "Win32_UI_Shell"] }
 
 [profile.release]
 opt-level = "s"

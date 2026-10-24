@@ -33,6 +33,10 @@ html {
   overflow-y: auto;
 }
 
+html[data-window-content-fits] {
+  overflow-y: hidden;
+}
+
 html:has(dialog:modal) {
   overflow: hidden;
 }
@@ -54,7 +58,7 @@ main {
 .top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -63,6 +67,10 @@ main {
 .profile-actions {
   display: flex;
   gap: 8px;
+}
+
+.profile-actions {
+  margin-left: auto;
 }
 
 .navigation-tabs button,
@@ -620,6 +628,200 @@ button.primary:hover:not(:disabled) {
   background: #d9d9d9;
 }
 
+.inject-workspace {
+  margin-bottom: 10px;
+}
+
+.inject-workspace .section-header {
+  margin-bottom: 8px;
+}
+
+.inject-intro {
+  margin: 0 0 20px;
+}
+
+.inject-tag,
+.inject-kicker {
+  color: #b3b3b3;
+  font-size: 11px;
+}
+
+.inject-tag {
+  padding: 3px 6px;
+  border: 1px solid #333333;
+  border-radius: 4px;
+}
+
+.inject-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.inject-file {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px dashed #555555;
+  border-radius: 8px;
+  background: #000000;
+  cursor: pointer;
+}
+
+.inject-file:hover,
+.inject-file:focus-within {
+  background: #111111;
+  border-color: #b3b3b3;
+}
+
+.inject-file:has(:focus-visible) {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+}
+
+.inject-file.selected {
+  border-style: solid;
+}
+
+.inject-file > .inject-kicker {
+  padding-right: 24px;
+}
+
+.inject-remove,
+#inject-download {
+  z-index: 1;
+}
+
+.inject-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 5px;
+  border: 0;
+  background: transparent;
+  color: #b3b3b3;
+}
+
+#inject-download {
+  position: relative;
+  align-self: flex-start;
+  color: #b3b3b3;
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
+#inject-download:hover {
+  color: #ffffff;
+}
+
+.inject-file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.inject-disc {
+  width: 80px;
+  height: 80px;
+  margin: auto 0;
+  color: #777777;
+}
+
+.inject-name,
+#inject-output {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.inject-name,
+.inject-tree {
+  color: #777777;
+}
+
+.inject-file .note,
+.inject-later .note,
+.inject-footer .note {
+  margin: 0;
+}
+
+.inject-browse {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 12px;
+}
+
+.inject-payloads {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inject-later {
+  padding: 16px 18px;
+  border-left: 1px solid #333333;
+}
+
+.inject-later .inject-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.inject-plan {
+  margin-top: 20px;
+  padding: 16px 0;
+  border-top: 1px solid #333333;
+  border-bottom: 1px solid #333333;
+}
+
+#inject-output {
+  margin: 8px 0 12px;
+}
+
+.inject-tree {
+  display: grid;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid #333333;
+  font-size: 12px;
+}
+
+.inject-tree .ready,
+.inject-file.selected .inject-name {
+  color: #4ade80;
+}
+
+.inject-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.inject-footer .note {
+  flex: 1 1 160px;
+}
+
+#inject-status {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#inject-status.error {
+  color: #f87171;
+}
+
 @media (max-width: 440px) {
   :root {
     --panel-padding: 16px;
@@ -646,5 +848,14 @@ button.primary:hover:not(:disabled) {
     flex-direction: row;
     align-items: center;
     width: 100%;
+  }
+
+  .inject-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .inject-disc {
+    width: 56px;
+    height: 56px;
   }
 }
