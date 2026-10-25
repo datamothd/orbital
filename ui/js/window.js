@@ -37,14 +37,30 @@ if (window.__TAURI__) {
   const appWindow = window.__TAURI__.window.getCurrentWindow();
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
+  const root = document.documentElement;
+  const baseWidth = 640;
   const maxHeight = 720;
+  const scrollbar = document.createElement("div");
+  scrollbar.style.cssText = "position:fixed;width:100px;height:100px;overflow:scroll;visibility:hidden";
+  document.body.append(scrollbar);
+  const scrollbarWidth = scrollbar.offsetWidth - scrollbar.clientWidth;
+  scrollbar.remove();
   let resizing = false;
   let pending = false;
+  let needsScrollbar = false;
+  let lastWidth = 0;
   let lastHeight = 0;
+
+  function syncScrollbar() {
+    const sizeReady = Math.abs(window.innerWidth - lastWidth) <= 1
+      && Math.abs(window.innerHeight - lastHeight) <= 1;
+    root.toggleAttribute("data-window-content-fits", !needsScrollbar || pending || !sizeReady);
+  }
 
   async function fitWindow() {
     if (resizing) {
       pending = true;
+      syncScrollbar();
       return;
     }
 
@@ -53,16 +69,22 @@ if (window.__TAURI__) {
       do {
         pending = false;
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
-        document.documentElement.toggleAttribute("data-window-content-fits", contentHeight <= maxHeight);
+        needsScrollbar = contentHeight > maxHeight;
+        const tweaksActive = byId("tweaks-tab").getAttribute("aria-selected") === "true";
+        const width = baseWidth + (tweaksActive && needsScrollbar ? scrollbarWidth : 0);
         const height = Math.min(maxHeight, contentHeight);
-        if (height !== lastHeight) {
-          await appWindow.setSize(new LogicalSize(640, height));
+        if (width !== lastWidth || height !== lastHeight) {
+          lastWidth = width;
           lastHeight = height;
+          syncScrollbar();
+          await appWindow.setSize(new LogicalSize(width, height));
         }
+        syncScrollbar();
       } while (pending);
     } catch (error) {
       observer.disconnect();
-      document.documentElement.removeAttribute("data-window-content-fits");
+      window.removeEventListener("resize", syncScrollbar);
+      root.removeAttribute("data-window-content-fits");
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
       resizing = false;
@@ -71,5 +93,6 @@ if (window.__TAURI__) {
 
   const observer = new ResizeObserver(fitWindow);
   observer.observe(main);
+  window.addEventListener("resize", syncScrollbar);
   document.fonts.ready.then(fitWindow);
 }

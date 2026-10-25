@@ -33,6 +33,10 @@ html {
   overflow-y: auto;
 }
 
+html:has(#tweaks-tab[aria-selected="true"]) {
+  overflow-x: hidden;
+}
+
 html[data-window-content-fits] {
   overflow-y: hidden;
 }
@@ -46,9 +50,13 @@ body {
 }
 
 main {
-  max-width: 720px;
+  max-width: 640px;
   padding: 16px;
-  margin: auto;
+  margin: 0;
+}
+
+html:has(#tweaks-tab[aria-selected="true"]) main {
+  width: min(640px, 100vw);
 }
 
 [role="tabpanel"] > section:last-child {
