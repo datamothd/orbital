@@ -173,7 +173,10 @@ async function loadSystem() {
     const description = document.createElement("dd");
     term.textContent = label;
     description.textContent = value;
-    if (label === "Changes:") description.id = "preferences-made";
+    if (label === "Changes:") {
+      description.className = "changes-count";
+      description.replaceChildren(byId("changes-count").content.cloneNode(true));
+    }
     const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
     const yellowDash = (label === "OS" && windows11 && !testedOs)
       || (label === "Windows" && windows11 && release !== null && !testedVersion);

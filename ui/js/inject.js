@@ -3,6 +3,50 @@
 const injectFiles = { iso: null, xml: null };
 let injectBusy = false;
 
+function drawPixelCircle(context, center, radius) {
+  for (let y = 0; y < radius / Math.SQRT2; y++) {
+    const x = Math.round(Math.sqrt(radius ** 2 - (y + 0.5) ** 2) - 0.5);
+    for (const [dx, dy] of [[x, y], [y, x]]) {
+      context.fillRect(center + dx, center + dy, 1, 1);
+      context.fillRect(center - dx - 1, center + dy, 1, 1);
+      context.fillRect(center + dx, center - dy - 1, 1, 1);
+      context.fillRect(center - dx - 1, center - dy - 1, 1, 1);
+    }
+  }
+}
+
+function drawIsoDisc() {
+  const canvas = document.querySelector(".inject-disc");
+  const context = canvas.getContext("2d");
+  const center = canvas.width / 2;
+  context.strokeStyle = getComputedStyle(canvas).color;
+  context.fillStyle = context.strokeStyle;
+  drawPixelCircle(context, center, 18);
+  for (const radius of [6, 2]) {
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.stroke();
+  }
+  context.beginPath();
+  for (const [startX, startY, endX, endY] of [
+    [7.5, 7.5, 15.5, 15.5],
+    [24.5, 24.5, 32.5, 32.5],
+    [6, 12.5, 13.5, 17.5],
+    [26.5, 22.5, 34, 27.5],
+  ]) {
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
+  }
+  context.stroke();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let alpha = 3; alpha < pixels.data.length; alpha += 4) {
+    pixels.data[alpha] = pixels.data[alpha] >= 128 ? 255 : 0;
+  }
+  context.putImageData(pixels, 0, 0);
+}
+
+drawIsoDisc();
+
 function setInjectBusy(value) {
   injectBusy = value;
   for (const kind of Object.keys(injectFiles)) {

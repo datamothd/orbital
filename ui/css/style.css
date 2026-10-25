@@ -82,6 +82,10 @@ main {
   border-color: #333333;
 }
 
+.navigation-tabs button {
+  font-size: 13px;
+}
+
 .profile-actions button {
   display: inline-flex;
   align-items: center;
@@ -209,6 +213,13 @@ dl {
 #bohr {
   display: block;
   justify-self: end;
+}
+
+.changes-count,
+.inject-browse-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bohr-shell {
@@ -749,6 +760,7 @@ button.primary:hover:not(:disabled) {
   height: 80px;
   margin: auto 0;
   color: #777777;
+  image-rendering: pixelated;
 }
 
 .inject-name,
@@ -771,6 +783,7 @@ button.primary:hover:not(:disabled) {
 
 .inject-browse {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin-top: auto;
   padding-top: 8px;

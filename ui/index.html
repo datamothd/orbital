@@ -187,12 +187,21 @@
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M2 4h12M6 4V2h4v2M4 4l1 10h6l1-10M7 6v6m2-6v6"/></svg>
             </button>
             <span class="inject-kicker">01 / source image</span>
-            <svg class="inject-disc" viewBox="0 0 80 80" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="40" cy="40" r="36"/><circle cx="40" cy="40" r="12"/><circle cx="40" cy="40" r="4"/><path d="m15 15 16 16m18 18 16 16M12 25l15 10m26 10 15 10"/></svg>
+            <canvas class="inject-disc" width="40" height="40" aria-hidden="true"></canvas>
             <strong id="inject-iso-title">Official Windows ISO</strong>
             <span id="inject-iso-name" class="inject-name">No image selected</span>
             <span id="inject-iso-detail" class="note">Use an original .iso from Microsoft.</span>
             <a id="inject-download" href="https://www.microsoft.com/en-us/software-download/windows11" target="_blank" rel="noopener noreferrer">Download Windows 11 ↗</a>
-            <span class="inject-browse"><span id="inject-iso-action">Choose ISO</span><span aria-hidden="true">↗</span></span>
+            <span class="inject-browse">
+              <span class="inject-browse-label">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M20 20H6a2 2 0 0 1-2-2V8"/>
+                  <path d="M20 16H10a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1h4l2 3h6a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2Z"/>
+                </svg>
+                <span id="inject-iso-action">Choose ISO</span>
+              </span>
+              <span aria-hidden="true">↗</span>
+            </span>
           </div>
           <div class="inject-payloads">
             <div class="inject-file">
@@ -204,7 +213,16 @@
               <strong id="inject-xml-title">autounattend.xml</strong>
               <span id="inject-xml-name" class="inject-name">No answer file selected</span>
               <span id="inject-xml-detail" class="note">Answer files are placed at the image root to customize to your liking.</span>
-              <span class="inject-browse"><span id="inject-xml-action">Choose XML</span><span aria-hidden="true">↗</span></span>
+              <span class="inject-browse">
+                <span class="inject-browse-label">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M20 20H6a2 2 0 0 1-2-2V8"/>
+                    <path d="M20 16H10a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1h4l2 3h6a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2Z"/>
+                  </svg>
+                  <span id="inject-xml-action">Choose XML</span>
+                </span>
+                <span aria-hidden="true">↗</span>
+              </span>
             </div>
             <div class="inject-later">
               <div class="inject-kicker">03 / after installation <span class="inject-tag">later</span></div>
@@ -254,6 +272,12 @@
       </section>
     </div>
   </main>
+  <template id="changes-count">
+    <span id="preferences-made">…</span>
+    <svg viewBox="0 0 6 6" width="12" height="12" fill="none" stroke="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+      <circle cx="3" cy="3" r="2"/>
+    </svg>
+  </template>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
   <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
   <dialog id="inject-confirm" aria-labelledby="inject-confirm-title" aria-describedby="inject-confirm-description inject-replace-note">
