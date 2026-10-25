@@ -368,7 +368,7 @@ byId("apply-recommended").addEventListener("click", (event) => applyChange(
   "apply_recommended_settings", {}, "", event.shiftKey,
 ));
 byId("restore-original").addEventListener("click", () => applyChange(
-  "restore_original_settings", {}, "Restore your original settings? If folder views were changed, this also restores their saved layout snapshot and replaces layout changes made since then.", false, "Original settings restored. Explorer restarted.",
+  "restore_original_settings", {}, "Restore your original settings? If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved.", false, "Original settings restored. Explorer restarted.",
 ));
 for (const view of folderViews) {
   byId(`${view.id}-apply`).addEventListener("click", (event) => {
@@ -376,7 +376,7 @@ for (const view of folderViews) {
     if (selected !== null) applyChange(
       view.command,
       { [view.argument]: selected },
-      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved views, including individual folder layouts, will be reset.`,
+      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset. Desktop icon layouts are preserved.`,
       event.shiftKey,
       `Default folder ${view.label} saved. Explorer restarted.`,
     );

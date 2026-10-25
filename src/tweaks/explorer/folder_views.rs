@@ -258,6 +258,76 @@ fn delete_tree(root: &RegKey, path: &str) -> io::Result<()> {
     optional(root.delete_subkey_all(path)).map(|_| ())
 }
 
+fn is_bags_path(path: &str) -> bool {
+    path == VIEW_KEYS[1] || path == VIEW_KEYS[3]
+}
+
+fn clear_view_key(user: &RegKey, path: &str) -> io::Result<()> {
+    if !is_bags_path(path) {
+        return delete_tree(user, path);
+    }
+    let Some(bags) = open_optional(user, path)? else {
+        return Ok(());
+    };
+    let mut retained_desktop = false;
+    for name in bags.enum_keys().collect::<io::Result<Vec<_>>>()? {
+        let bag = bags.open_subkey(&name)?;
+        if open_optional(&bag, "Desktop")?.is_some() {
+            retained_desktop = true;
+            for child in bag.enum_keys().collect::<io::Result<Vec<_>>>()? {
+                if !child.eq_ignore_ascii_case("Desktop") {
+                    delete_tree(user, &format!(r"{path}\{name}\{child}"))?;
+                }
+            }
+        } else {
+            delete_tree(user, &format!(r"{path}\{name}"))?;
+        }
+    }
+    if retained_desktop {
+        let bags = user.open_subkey_with_flags(path, winreg::enums::KEY_ALL_ACCESS)?;
+        for (name, _) in bags.enum_values().collect::<io::Result<Vec<_>>>()? {
+            delete_value_if_present(&bags, &name)?;
+        }
+        Ok(())
+    } else {
+        delete_tree(user, path)
+    }
+}
+
+fn copy_view_key(source: &RegKey, destination: &RegKey, path: &str) -> io::Result<()> {
+    if !is_bags_path(path) {
+        return source.copy_tree("", destination);
+    }
+    for value in source.enum_values() {
+        let (name, value) = value?;
+        destination.set_raw_value(name, &value)?;
+    }
+    for name in source.enum_keys() {
+        let name = name?;
+        let bag = source.open_subkey(&name)?;
+        let mut children = bag.enum_keys().collect::<io::Result<Vec<_>>>()?;
+        let desktop = children
+            .iter()
+            .any(|child| child.eq_ignore_ascii_case("Desktop"));
+        children.retain(|child| !child.eq_ignore_ascii_case("Desktop"));
+        let values = bag.enum_values().collect::<io::Result<Vec<_>>>()?;
+        if desktop && values.is_empty() && children.is_empty() {
+            continue;
+        }
+        let (target, _) = destination.create_subkey(&name)?;
+        if open_optional(&target, "Desktop")?.is_none() {
+            for (name, value) in values {
+                target.set_raw_value(name, &value)?;
+            }
+        }
+        for child in children {
+            let (target, _) = target.create_subkey(&child)?;
+            bag.open_subkey(&child)?.copy_tree("", &target)?;
+        }
+    }
+    Ok(())
+}
+
 fn top_views(root: &RegKey) -> io::Result<Vec<String>> {
     let mut views = Vec::new();
     for folder_type in root.enum_keys() {
@@ -353,10 +423,10 @@ fn restore_snapshot(user: &RegKey, backup: &RegKey) -> io::Result<()> {
         return Err(io::Error::other("The folder view backup is incomplete."));
     }
     for (index, path) in VIEW_KEYS.iter().enumerate() {
-        delete_tree(user, path)?;
+        clear_view_key(user, path)?;
         if let Some(source) = open_optional(backup, &index.to_string())? {
             let (destination, _) = user.create_subkey(path)?;
-            source.copy_tree("", &destination)?;
+            copy_view_key(&source, &destination, path)?;
         }
     }
     Ok(())
@@ -475,16 +545,14 @@ fn apply_recommended_in(
         }
         let pending = user.open_subkey(PENDING)?;
         for path in &VIEW_KEYS[1..] {
-            delete_tree(user, path)?;
+            clear_view_key(user, path)?;
         }
-        for (index, child) in [(1, "AllFolders"), (3, "AllFolders"), (3, r"1\Desktop")] {
+        for (index, child) in [(1, "AllFolders"), (3, "AllFolders")] {
             if let Some(source) = open_optional(&pending, &format!(r"{index}\{child}"))? {
                 let (destination, _) =
                     user.create_subkey(format!(r"{}\{child}", VIEW_KEYS[index]))?;
                 source.copy_tree("", &destination)?;
-                if child == "AllFolders" {
-                    reset_saved_view(&destination, changes)?;
-                }
+                reset_saved_view(&destination, changes)?;
             }
         }
         if let Some(grouping) = &grouping {
@@ -626,6 +694,162 @@ mod tests {
             },
         )
         .unwrap();
+    }
+
+    #[test]
+    fn folder_changes_and_restore_leave_current_desktop_bags_in_place() {
+        let sort = FolderSort {
+            column: SortColumn::Size,
+            descending: true,
+        };
+        for changes in [
+            vec![ViewChange::Sort(sort)],
+            vec![ViewChange::Grouping(FolderGrouping::Type)],
+            vec![
+                ViewChange::Sort(sort),
+                ViewChange::Grouping(FolderGrouping::None),
+            ],
+        ] {
+            let registry = Registry::new();
+            let mut desktops = Vec::new();
+            for (index, slot) in [(1, "7"), (3, "1")] {
+                let bag_path = format!(r"{}\{slot}", VIEW_KEYS[index]);
+                let (bag, _) = registry.user.create_subkey(&bag_path).unwrap();
+                bag.set_value("DesktopMetadata", &42u32).unwrap();
+                let (desktop, _) = bag.create_subkey("Desktop").unwrap();
+                set_binary(&desktop, "IconLayouts", &[1, 2, 3]);
+                set_binary(&desktop, "Sort", &[4, 5, 6]);
+                desktop.set_value("GroupView", &1u32).unwrap();
+                desktop.set_value("FFlags", &0x4020_0220u32).unwrap();
+                desktop
+                    .create_subkey("Resolution")
+                    .unwrap()
+                    .0
+                    .set_value("IconSize", &48u32)
+                    .unwrap();
+                bag.create_subkey("Shell")
+                    .unwrap()
+                    .0
+                    .set_value("FolderView", &1u32)
+                    .unwrap();
+                desktops.push((bag_path, bag, desktop));
+            }
+            apply_recommended_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
+            for (bag_path, bag, desktop) in &desktops {
+                assert_eq!(
+                    desktop.get_raw_value("IconLayouts").unwrap().bytes.as_ref(),
+                    &[1, 2, 3]
+                );
+                assert_eq!(
+                    desktop.get_raw_value("Sort").unwrap().bytes.as_ref(),
+                    &[4, 5, 6]
+                );
+                assert_eq!(desktop.get_value::<u32, _>("GroupView").unwrap(), 1);
+                assert_eq!(desktop.get_value::<u32, _>("FFlags").unwrap(), 0x4020_0220);
+                assert_eq!(
+                    desktop
+                        .open_subkey("Resolution")
+                        .unwrap()
+                        .get_value::<u32, _>("IconSize")
+                        .unwrap(),
+                    48
+                );
+                assert_eq!(bag.get_value::<u32, _>("DesktopMetadata").unwrap(), 42);
+                assert!(
+                    open_optional(&registry.user, &format!(r"{bag_path}\Shell"))
+                        .unwrap()
+                        .is_none()
+                );
+                set_binary(desktop, "IconLayouts", &[9, 8, 7]);
+                bag.set_value("DesktopMetadata", &99u32).unwrap();
+            }
+            assert!(restore_in(&registry.user).unwrap());
+            for (bag_path, bag, desktop) in &desktops {
+                assert_eq!(
+                    desktop.get_raw_value("IconLayouts").unwrap().bytes.as_ref(),
+                    &[9, 8, 7]
+                );
+                assert_eq!(bag.get_value::<u32, _>("DesktopMetadata").unwrap(), 99);
+                assert_eq!(
+                    registry
+                        .user
+                        .open_subkey(format!(r"{bag_path}\Shell"))
+                        .unwrap()
+                        .get_value::<u32, _>("FolderView")
+                        .unwrap(),
+                    1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn restore_preserves_new_desktops_and_does_not_resurrect_old_layouts() {
+        let registry = Registry::new();
+        let old_path = format!(r"{}\1\Desktop", VIEW_KEYS[3]);
+        let (old, _) = registry.user.create_subkey(&old_path).unwrap();
+        set_binary(&old, "IconLayouts", &[1, 2, 3]);
+        apply_in(
+            &registry.user,
+            &registry.machine,
+            FolderSort {
+                column: SortColumn::Name,
+                descending: false,
+            },
+        )
+        .unwrap();
+        delete_tree(&registry.user, &old_path).unwrap();
+        let new_path = format!(r"{}\2\Desktop", VIEW_KEYS[1]);
+        let (new, _) = registry.user.create_subkey(&new_path).unwrap();
+        set_binary(&new, "IconLayouts", &[9, 8, 7]);
+        assert!(restore_in(&registry.user).unwrap());
+        assert!(open_optional(&registry.user, &old_path).unwrap().is_none());
+        assert_eq!(
+            new.get_raw_value("IconLayouts").unwrap().bytes.as_ref(),
+            &[9, 8, 7]
+        );
+    }
+
+    #[test]
+    fn failed_folder_change_preserves_desktop_handles_and_restores_other_views() {
+        let registry = Registry::new();
+        let path = format!(r"{}\1", VIEW_KEYS[3]);
+        let (bag, _) = registry.user.create_subkey(&path).unwrap();
+        let (desktop, _) = bag.create_subkey("Desktop").unwrap();
+        set_binary(&desktop, "IconLayouts", &[1, 2, 3]);
+        bag.create_subkey("Shell")
+            .unwrap()
+            .0
+            .set_value("Original", &1u32)
+            .unwrap();
+        let result = apply_recommended_in(
+            &registry.user,
+            &registry.machine,
+            &[ViewChange::Grouping(FolderGrouping::Size)],
+            || Err(io::Error::other("Simulated failure")),
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Simulated failure")
+        );
+        assert_eq!(
+            desktop.get_raw_value("IconLayouts").unwrap().bytes.as_ref(),
+            &[1, 2, 3]
+        );
+        assert_eq!(
+            bag.open_subkey("Shell")
+                .unwrap()
+                .get_value::<u32, _>("Original")
+                .unwrap(),
+            1
+        );
+        assert!(
+            open_optional(&registry.user, FOLDER_TYPES)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

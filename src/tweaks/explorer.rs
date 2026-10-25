@@ -1,3 +1,5 @@
+#[path = "explorer/desktop_layout.rs"]
+mod desktop_layout;
 #[path = "explorer/folder_views.rs"]
 mod folder_views;
 #[path = "explorer/profiles.rs"]
@@ -21,12 +23,10 @@ use winreg::{
     types::ToRegValue,
 };
 
-const CLASSIC_CONTEXT_MENU_KEY: &str =
-    r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
+const CLASSIC_CONTEXT_MENU_KEY: &str = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
-const TASKBAR_DEVELOPER_KEY: &str =
-    r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
+const TASKBAR_DEVELOPER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
 const WIDGETS_KEY: &str = r"SOFTWARE\Policies\Microsoft\Dsh";
 const SHELL_ICONS_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons";
 const HOME_CLSID: &str = "{f874310e-b6b7-47dc-bc84-b9e6b38f5903}";
@@ -964,10 +964,19 @@ fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
     #[link(name = "user32")]
     unsafe extern "system" {
         fn GetShellWindow() -> *mut std::ffi::c_void;
+        fn GetWindowThreadProcessId(window: *mut std::ffi::c_void, process: *mut u32) -> u32;
+    }
+    let desktop = desktop_layout::DesktopLayout::capture()?;
+    let mut process = 0;
+    unsafe { GetWindowThreadProcessId(GetShellWindow(), &mut process) };
+    if process == 0 {
+        return Err(io::Error::other(format!(
+            "{setting} saved, but the desktop process could not be found."
+        )));
     }
     let stopped = ProcessCommand::new("taskkill")
         .creation_flags(0x08000000)
-        .args(["/F", "/IM", "explorer.exe"])
+        .args(["/F", "/PID", &process.to_string()])
         .output()?;
     if !stopped.status.success() {
         return Err(io::Error::other(format!(
@@ -994,6 +1003,7 @@ fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    desktop.restore()?;
     cache_result.map_err(|error| {
         io::Error::other(format!(
             "{setting} saved, but the icon cache could not be rebuilt: {error}"

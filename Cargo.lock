@@ -223,6 +223,7 @@ dependencies = [
  "clap",
  "serde",
  "sysinfo",
+ "windows",
  "winreg",
 ]
 
