@@ -102,7 +102,13 @@ function renderBohr() {
   diagram.setAttribute("aria-label", `${changes.length} preferences differ from Windows defaults`);
   if (diagram.dataset.changes === changes.join("|")) return;
   diagram.dataset.changes = changes.join("|");
-  const circle = (radius, className, x = 32, y = 32) => {
+  const shellCount = 1 + Math.ceil(Math.max(0, changes.length - 2) / 8);
+  const center = 15.5 + (shellCount - 1) * 8;
+  const size = center * 2;
+  diagram.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  diagram.setAttribute("width", size * 2);
+  diagram.setAttribute("height", size * 2);
+  const circle = (radius, className, x = center, y = center) => {
     const element = document.createElementNS(diagram.namespaceURI, "circle");
     for (const [name, value] of Object.entries({ cx: x, cy: y, r: radius, class: className })) {
       element.setAttribute(name, value);
@@ -118,7 +124,7 @@ function renderBohr() {
     shell.append(circle(radius, "bohr-ring"));
     electrons.forEach((label, position) => {
       const angle = position * Math.PI * 2 / electrons.length - Math.PI / 2;
-      const electron = circle(2, "bohr-electron", 32 + Math.cos(angle) * radius, 32 + Math.sin(angle) * radius);
+      const electron = circle(2, "bohr-electron", center + Math.cos(angle) * radius, center + Math.sin(angle) * radius);
       const title = document.createElementNS(diagram.namespaceURI, "title");
       title.textContent = label;
       electron.append(title);

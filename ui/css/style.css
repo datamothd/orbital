@@ -201,17 +201,18 @@ dl {
 
 .system-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 16px;
 }
 
 #bohr {
   display: block;
+  justify-self: end;
 }
 
 .bohr-shell {
-  transform-origin: 32px 32px;
+  transform-origin: center;
   animation: bohr-spin 60s linear infinite;
 }
 
@@ -880,10 +881,6 @@ button.primary:hover:not(:disabled) {
 
   .system-content {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  #bohr {
-    justify-self: end;
   }
 
   .profile-actions button {
