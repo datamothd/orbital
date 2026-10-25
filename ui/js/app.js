@@ -90,6 +90,46 @@ function setPreferenceValue(id, value, visual = false) {
   element.dataset.state = visual ? "visual" : value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
 }
 
+function renderBohr() {
+  if (!settings) return;
+  const available = explorerPreferences.filter(preference => !preference.visual && preferenceAvailable(preference));
+  const changes = available
+    .filter(preference => settings[preference.field] === true)
+    .map(preference => preference.label);
+  const count = byId("preferences-made");
+  if (count) count.textContent = `${changes.length} / ${available.length}`;
+  const diagram = byId("bohr");
+  diagram.setAttribute("aria-label", `${changes.length} preferences differ from Windows defaults`);
+  if (diagram.dataset.changes === changes.join("|")) return;
+  diagram.dataset.changes = changes.join("|");
+  const circle = (radius, className, x = 32, y = 32) => {
+    const element = document.createElementNS(diagram.namespaceURI, "circle");
+    for (const [name, value] of Object.entries({ cx: x, cy: y, r: radius, class: className })) {
+      element.setAttribute(name, value);
+    }
+    return element;
+  };
+  const shells = [];
+  for (let index = 0, offset = 0; index === 0 || offset < changes.length; index++) {
+    const electrons = changes.slice(offset, offset + (index === 0 ? 2 : 8));
+    const radius = 13 + index * 8;
+    const shell = document.createElementNS(diagram.namespaceURI, "g");
+    shell.classList.add("bohr-shell");
+    shell.append(circle(radius, "bohr-ring"));
+    electrons.forEach((label, position) => {
+      const angle = position * Math.PI * 2 / electrons.length - Math.PI / 2;
+      const electron = circle(2, "bohr-electron", 32 + Math.cos(angle) * radius, 32 + Math.sin(angle) * radius);
+      const title = document.createElementNS(diagram.namespaceURI, "title");
+      title.textContent = label;
+      electron.append(title);
+      shell.append(electron);
+    });
+    shells.push(shell);
+    offset += electrons.length;
+  }
+  diagram.replaceChildren(...shells, circle(6, "bohr-nucleus"));
+}
+
 function renderSettings() {
   document.querySelectorAll(".admin-warning").forEach(adminWarning);
   for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
@@ -98,6 +138,7 @@ function renderSettings() {
       ? preferenceValue(preference, settings[preference.field]) : "Unavailable",
       preference.visual);
   }
+  renderBohr();
 }
 
 async function loadSettings() {
@@ -119,12 +160,14 @@ async function loadSystem() {
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
     ["CPU", info.cpu], ["Threads", info.threads],
     ["Memory", `${info.used_memory_gib.toFixed(1)} / ${info.total_memory_gib.toFixed(1)} GiB`],
+    ["Changes:", "…"],
   ];
   byId("system").replaceChildren(...rows.flatMap(([label, value]) => {
     const term = document.createElement("dt");
     const description = document.createElement("dd");
     term.textContent = label;
     description.textContent = value;
+    if (label === "Changes:") description.id = "preferences-made";
     const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
     const yellowDash = (label === "OS" && windows11 && !testedOs)
       || (label === "Windows" && windows11 && release !== null && !testedVersion);
@@ -150,6 +193,7 @@ async function loadSystem() {
     }
     return [term, description];
   }));
+  renderBohr();
 }
 
 async function refresh() {

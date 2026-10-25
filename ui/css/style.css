@@ -151,6 +151,16 @@ summary h2 {
   margin: 0;
 }
 
+#preferences-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#preferences-title svg {
+  flex-shrink: 0;
+}
+
 summary::after {
   content: "";
   width: 8px;
@@ -183,10 +193,48 @@ summary:focus-visible {
 
 dl {
   display: grid;
-  grid-template-columns: 94px 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 10px 14px;
   margin: 0;
   font-size: 13px;
+}
+
+.system-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: end;
+  gap: 16px;
+}
+
+#bohr {
+  display: block;
+}
+
+.bohr-shell {
+  transform-origin: 32px 32px;
+  animation: bohr-spin 60s linear infinite;
+}
+
+.bohr-shell:nth-child(even) {
+  animation-direction: reverse;
+}
+
+.bohr-ring {
+  fill: none;
+  stroke: #777777;
+}
+
+.bohr-electron {
+  fill: #0a0a0a;
+  stroke: #ffffff;
+}
+
+.bohr-nucleus {
+  fill: #ffffff;
+}
+
+@keyframes bohr-spin {
+  to { transform: rotate(1turn); }
 }
 
 dt,
@@ -828,6 +876,14 @@ button.primary:hover:not(:disabled) {
 @media (max-width: 440px) {
   :root {
     --panel-padding: 16px;
+  }
+
+  .system-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #bohr {
+    justify-self: end;
   }
 
   .profile-actions button {
