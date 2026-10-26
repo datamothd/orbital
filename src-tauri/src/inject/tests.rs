@@ -7,6 +7,21 @@ const ANSWER: &[u8] = br#"<?xml version="1.0"?><unattend xmlns="urn:schemas-micr
 static IMAGE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
+fn invalid_generated_answers_preserve_the_previous_selection() {
+    let mut selection = Selection::default();
+    selection.set_answer(ANSWER.to_vec()).unwrap();
+    assert!(selection.set_answer(b"invalid".to_vec()).is_err());
+    assert_eq!(selection.xml.as_deref(), Some(ANSWER));
+}
+
+#[test]
+fn document_decoding_rejects_malformed_utf16_and_preserves_utf8() {
+    assert_eq!(answer::decode(ANSWER).unwrap().as_bytes(), ANSWER);
+    assert!(answer::decode(&[0xff, 0xfe, 0]).is_err());
+    assert!(answer::decode(&[0xff]).is_err());
+}
+
+#[test]
 fn answer_files_accept_namespaces_scripts_and_supported_encodings() {
     validate_answer(ANSWER).unwrap();
     validate_answer(&[&[0xef, 0xbb, 0xbf], ANSWER].concat()).unwrap();

@@ -3,7 +3,7 @@ use crate::files::MAX_DOCUMENT_SIZE;
 use quick_xml::{NsReader, XmlVersion, events::Event, name::ResolveResult};
 use std::io;
 
-pub(super) fn validate_answer(bytes: &[u8]) -> io::Result<()> {
+pub(super) fn decode(bytes: &[u8]) -> io::Result<String> {
     if bytes.is_empty() || bytes.len() as u64 > MAX_DOCUMENT_SIZE {
         return Err(error("Choose a non-empty answer file under 1 MiB."));
     }
@@ -34,6 +34,11 @@ pub(super) fn validate_answer(bytes: &[u8]) -> io::Result<()> {
         )
         .map_err(|_| error("The answer file must use UTF-8 or UTF-16."))?
     };
+    Ok(text)
+}
+
+pub(super) fn validate_answer(bytes: &[u8]) -> io::Result<()> {
+    let text = decode(bytes)?;
     if text
         .chars()
         .any(|ch| ch < ' ' && !matches!(ch, '\t' | '\n' | '\r'))

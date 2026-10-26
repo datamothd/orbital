@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Orbital</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/answer.css">
   <script src="js/shared.js" defer></script>
   <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
   <script src="js/profiles.js" defer></script>
+  <script src="js/answer.js" defer></script>
   <script src="js/inject.js" defer></script>
   <script src="js/window.js" defer></script>
   <script src="js/navigation.js" defer></script>
@@ -205,7 +207,7 @@
           </div>
           <div class="inject-payloads">
             <div class="inject-file">
-              <input id="inject-xml" type="file" accept=".xml" aria-labelledby="inject-xml-title" aria-describedby="inject-xml-name inject-xml-detail">
+              <button id="inject-xml" class="answer-picker" type="button" aria-haspopup="dialog" aria-controls="answer-source" aria-labelledby="inject-xml-action inject-xml-title" aria-describedby="inject-xml-name inject-xml-detail"></button>
               <button id="inject-xml-remove" class="inject-remove" type="button" aria-label="Remove answer file" title="Remove answer file" hidden>
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M2 4h12M6 4V2h4v2M4 4l1 10h6l1-10M7 6v6m2-6v6"/></svg>
               </button>
@@ -219,7 +221,7 @@
                     <path d="M20 20H6a2 2 0 0 1-2-2V8"/>
                     <path d="M20 16H10a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1h4l2 3h6a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2Z"/>
                   </svg>
-                  <span id="inject-xml-action">Choose XML</span>
+                  <span id="inject-xml-action">Choose answer file</span>
                 </span>
                 <span aria-hidden="true">↗</span>
               </span>
@@ -271,7 +273,32 @@
         </div>
       </section>
     </div>
+    <div id="answer-page" hidden>
+      <header class="answer-actions"><button id="answer-back" type="button">← Back</button><button type="reset" form="answer-form">Reset all changes</button></header>
+      <h1>Configure your installation.</h1>
+      <p class="note">Installation and initial setup only. Y = yes, N = no; click again for Windows defaults. Files may contain passwords.</p>
+      <div class="answer-actions answer-files">
+        <button id="answer-import" type="button">Import settings / XML</button>
+        <button type="button" data-answer-save="json">Save settings</button>
+        <button type="button" data-answer-save="xml">Download XML</button>
+      </div>
+      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"><button id="answer-collapse" type="button">Collapse all</button></div>
+      <form id="answer-form" novalidate autocomplete="off">
+        <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
+        <div id="answer-groups"></div>
+        <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
+      </form>
+    </div>
   </main>
+  <dialog id="answer-source" aria-labelledby="answer-source-title">
+    <h2 id="answer-source-title">Choose your answer file</h2>
+    <form method="dialog" class="answer-source-form">
+      <label><input type="radio" name="answer-source" value="configure" checked autofocus><span><strong>Configure with Orbital</strong><span class="note">Choose installation settings and create an answer file.</span></span></label>
+      <label><input type="radio" name="answer-source" value="upload"><span><strong>Upload XML</strong><span class="note">Use your existing Windows answer file.</span></span></label>
+      <div class="answer-actions"><button value="cancel">Cancel</button><button value="continue" class="primary">Continue</button></div>
+    </form>
+  </dialog>
+  <input id="answer-upload" type="file" accept=".xml,.json" hidden>
   <template id="changes-count">
     <span id="preferences-made">…</span>
     <svg viewBox="0 0 6 6" width="12" height="12" fill="none" stroke="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">

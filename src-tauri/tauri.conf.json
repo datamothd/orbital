@@ -10,6 +10,7 @@
       "label": "main",
       "title": "Orbital",
       "theme": "Dark",
+      "generalAutofillEnabled": false,
       "backgroundColor": "#000000",
       "width": 640,
       "height": 360,

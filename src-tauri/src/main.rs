@@ -109,6 +109,8 @@ fn main() {
             toggle_preference,
             open_windows_download,
             inject::select_injection_file,
+            inject::set_answer_file,
+            inject::answer_document,
             inject::clear_injection_file,
             inject::inject_iso,
             inject::cancel_injection,

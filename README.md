@@ -60,7 +60,11 @@ npm run build
 
 ### Injecting an ISO
 
-Open Inject, choose an official Windows installation ISO and an answer XML file, then click Inject ISO. Choose Duplicate & inject to save a new image, or Inject selected ISO to replace the selected file. Any existing autounattend.xml at the image root is replaced.
+Open Inject, choose an official Windows installation ISO, then choose an answer file. Upload existing XML or configure installation settings in Orbital. The configurator covers image selection, storage, initial accounts, language, welcome screens, networking, encryption prevention and installation drivers. Desktop customization and post-install jobs are excluded.
+
+Leave the installation key blank to skip key entry. Disk erasure requires typing the disk number again, including after importing saved settings. All blocking issues appear together and link to the affected controls. Save editable settings as JSON or export XML; Orbital-generated XML can also be reopened as editable settings. Imported complete XML is preserved. Exports may contain passwords, and password obfuscation is reversible. Validate custom scripts and generated files with the intended Windows image in a disposable VM.
+
+Click Use answer file, then Inject ISO. Choose Duplicate & inject to save a new image, or Inject selected ISO to replace the selected file. Any existing autounattend.xml at the image root is replaced. Installation scripts run only when needed for initial Wi-Fi, built-in Administrator access, recovery handling, or custom deployment work. They run as SYSTEM during device setup and log to ProgramData\Orbital\Logs by default; the ordinary configuration needs no script runner.
 
 Orbital uses Windows' built-in image APIs, preserves the original BIOS/UEFI boot images, and compares every setup file with the rebuilt image before saving it. Failed or cancelled operations leave the source unchanged. Allow free space for the rebuilt image as well as temporary staging files. Eject an ISO mounted in File Explorer before choosing to replace it.
 

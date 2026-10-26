@@ -36,6 +36,14 @@ struct Selection {
     xml: Option<Vec<u8>>,
 }
 
+impl Selection {
+    fn set_answer(&mut self, bytes: Vec<u8>) -> io::Result<()> {
+        validate_answer(&bytes)?;
+        self.xml = Some(bytes);
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 pub struct InjectionState {
     selection: Arc<Mutex<Selection>>,
@@ -104,14 +112,97 @@ pub async fn select_injection_file(
                 selection.iso = Some(path.clone());
             } else {
                 let bytes = crate::files::read_document(&path)?;
-                validate_answer(&bytes)?;
-                selection.xml = Some(bytes);
+                selection.set_answer(bytes)?;
             }
             Ok(Some(json!({
                 "name": path.file_name().unwrap_or_default().to_string_lossy()
             })))
         })();
         result.map_err(|reason| reason.to_string())
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn set_answer_file(state: State<'_, InjectionState>, xml: String) -> Result<Value, String> {
+    state
+        .selection
+        .try_lock()
+        .map_err(|_| "An injection operation is already in progress.")?
+        .set_answer(xml.into_bytes())
+        .map_err(|error| error.to_string())?;
+    Ok(json!({ "name": "Orbital answer file.xml" }))
+}
+
+#[tauri::command]
+pub async fn answer_document(
+    window: Window,
+    content: Option<String>,
+    kind: String,
+) -> Result<Option<String>, String> {
+    crate::files::with_dialog(window, move |owner| {
+        let (filter, ext, name) = match kind.as_str() {
+            "json" => (
+                w!("Orbital settings (*.json)\0*.json\0"),
+                w!("json"),
+                "orbital-answer.json",
+            ),
+            "xml" => (
+                w!("Answer file (*.xml)\0*.xml\0"),
+                w!("xml"),
+                "autounattend.xml",
+            ),
+            "open" if content.is_none() => (
+                w!("Answer settings (*.xml;*.json)\0*.xml;*.json\0"),
+                w!("xml"),
+                "autounattend.xml",
+            ),
+            _ => return Err("Choose XML or JSON.".into()),
+        };
+        if let Some(text) = &content {
+            if text.len() as u64 > crate::files::MAX_DOCUMENT_SIZE {
+                return Err("Choose a file under 1 MiB.".into());
+            }
+            if kind == "xml" {
+                validate_answer(text.as_bytes()).map_err(|error| error.to_string())?;
+            } else {
+                let value: Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
+                if value["format"] != "orbital-answer" || value["version"] != 1 {
+                    return Err("Choose Orbital answer settings.".into());
+                }
+            }
+        }
+        let Some(path) = crate::files::choose(
+            owner,
+            filter,
+            w!("Answer file"),
+            ext,
+            content.as_ref().map(|_| Path::new(name)),
+        )?
+        else {
+            return Ok(None);
+        };
+        if let Some(text) = content {
+            extension(&path, &kind).map_err(|error| error.to_string())?;
+            let workspace = Workspace::new(path.parent().ok_or("Choose an output folder.")?)
+                .map_err(|error| error.to_string())?;
+            let temporary = workspace.0.join("answer.tmp");
+            fs::write(&temporary, text).map_err(|error| error.to_string())?;
+            unsafe {
+                MoveFileExW(
+                    &HSTRING::from(temporary.as_path()),
+                    &HSTRING::from(path.as_path()),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+                )
+            }
+            .map_err(|error| error.to_string())?;
+            Ok(Some("File saved.".into()))
+        } else {
+            let bytes = crate::files::read_document(&path).map_err(|error| error.to_string())?;
+            answer::decode(&bytes)
+                .map(Some)
+                .map_err(|error| error.to_string())
+        }
     })
     .await
 }

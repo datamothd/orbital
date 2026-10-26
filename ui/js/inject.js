@@ -77,6 +77,7 @@ async function changeInjectFile(kind, clear = false) {
   try {
     const file = invoke ? await invoke(clear ? "clear_injection_file" : "select_injection_file", { kind }) : null;
     if (clear || file) setInjectFile(kind, file || null);
+    return clear || Boolean(file);
   } catch (error) {
     setInjectStatus(String(error), true);
   } finally {
@@ -89,7 +90,7 @@ function renderInject() {
   for (const [kind, file] of Object.entries(injectFiles)) {
     byId(`inject-${kind}-name`).textContent = file ? file.name
       : kind === "iso" ? "No image selected" : "No answer file selected";
-    byId(`inject-${kind}-action`).textContent = `${file ? "Replace" : "Choose"} ${kind.toUpperCase()}`;
+    byId(`inject-${kind}-action`).textContent = `${file ? "Replace" : "Choose"} ${kind === "xml" ? "answer file" : "ISO"}`;
     byId(`inject-${kind}`).closest(".inject-file").classList.toggle("selected", Boolean(file));
     byId(`inject-${kind}-remove`).hidden = !file;
   }
@@ -108,29 +109,19 @@ function renderInject() {
 for (const kind of Object.keys(injectFiles)) {
   const input = byId(`inject-${kind}`);
   input.addEventListener("click", (event) => {
+    if (kind === "xml") { answer.choose(); return; }
     if (!invoke) return;
     event.preventDefault();
     changeInjectFile(kind);
   });
   input.addEventListener("change", async () => {
-    if (invoke) return;
+    if (invoke || kind === "xml") return;
     const file = input.files[0];
     if (!file) return;
     let message = "";
     try {
       if (!file.name.toLowerCase().endsWith(`.${kind}`) || !file.size) {
         throw new Error(`Choose a non-empty .${kind} file.`);
-      }
-      if (kind === "xml") {
-        if (file.size > 1_048_576) throw new Error("Choose an answer file under 1 MiB.");
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le"
-          : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : "utf-8";
-        const xml = new DOMParser().parseFromString(new TextDecoder(encoding).decode(bytes), "application/xml");
-        if (xml.querySelector("parsererror") || xml.documentElement.localName !== "unattend"
-          || xml.documentElement.namespaceURI !== "urn:schemas-microsoft-com:unattend") {
-          throw new Error("Choose a valid Windows unattend XML file.");
-        }
       }
     } catch (error) {
       message = error.message || String(error);

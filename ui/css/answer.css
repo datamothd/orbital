@@ -1,0 +1,280 @@
+.answer-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  opacity: 0;
+}
+
+.answer-source-form {
+  display: grid;
+}
+
+.answer-source-form > label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #444;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.answer-source-form > label:has(:checked) {
+  border-color: #4ade80;
+}
+
+.answer-source-form input {
+  accent-color: #4ade80;
+}
+
+.answer-source-form .note {
+  display: block;
+  margin-top: 6px;
+}
+
+.top-bar[hidden], #answer-page[hidden], #answer-page [hidden] {
+  display: none;
+}
+
+#answer-page h1 {
+  font-size: 28px;
+  font-weight: 400;
+  margin: 24px 0 12px;
+}
+
+#answer-page .note {
+  margin: 0;
+}
+
+.answer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.answer-files {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 20px 0;
+}
+
+.answer-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.answer-search input {
+  flex: 1;
+}
+
+#answer-page input, #answer-page select, #answer-page textarea {
+  min-width: 0;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #444;
+  border-radius: 5px;
+  color: #fff;
+  background: #0a0a0a;
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#answer-page input[type="checkbox"] {
+  width: auto;
+  accent-color: #4ade80;
+}
+
+#answer-page select {
+  color: #facc15;
+}
+
+#answer-page textarea {
+  min-height: 128px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+#answer-page :is(input, select, textarea):focus-visible {
+  outline: 1px solid #4ade80;
+}
+
+#answer-page details {
+  padding: 20px 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #333;
+  border-radius: 0;
+  background: transparent;
+}
+
+#answer-page summary {
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  font-weight: 700;
+}
+
+#answer-page summary::after {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+}
+
+#answer-page details[open] > summary {
+  margin-bottom: 16px;
+}
+
+.answer-grid, .answer-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.answer-field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.answer-field > span {
+  line-height: 1.5;
+}
+
+.answer-wide {
+  grid-column: 1 / -1;
+}
+
+.answer-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.answer-toggle button {
+  min-width: 40px;
+}
+
+.answer-toggle button[aria-pressed="true"] {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: #11251a;
+}
+
+.answer-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border: 1px solid #777;
+  border-radius: 50%;
+  color: #b3b3b3;
+  vertical-align: middle;
+  transform: translateY(-1px);
+  cursor: help;
+}
+
+.answer-row {
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid #333;
+  border-radius: 7px;
+}
+
+.answer-row > button {
+  justify-self: start;
+}
+
+.answer-add {
+  margin-top: 14px;
+}
+
+#answer-page footer {
+  margin-top: 16px;
+}
+
+.answer-invalid {
+  outline: 1px solid #7f3c3c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.answer-field-error {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#answer-errors {
+  padding: 14px;
+  margin-bottom: 16px;
+  border: 1px solid #7f3c3c;
+  border-radius: 7px;
+  background: #1b0d0d;
+}
+
+#answer-errors h2 {
+  margin: 0 0 10px;
+  color: #f87171;
+  font-size: 13px;
+}
+
+#answer-errors ul {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+#answer-errors button {
+  width: 100%;
+  border-color: #623333;
+  color: #fca5a5;
+  background: transparent;
+  text-align: left;
+}
+
+.answer-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid #7f3c3c;
+  border-radius: 10px;
+  background: #241010;
+  color: #fca5a5;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.answer-count > span {
+  transform: translateX(1px);
+}
+
+#answer-status.error {
+  color: #f87171;
+}
+
+@media (max-width: 480px) {
+  .answer-grid, .answer-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .answer-actions {
+    flex-wrap: wrap;
+  }
+
+}
