@@ -1,4 +1,4 @@
-<img width="256" height="256" src="https://github.com/datamothd/orbital/blob/main/src-tauri/icons/icon.png" /> 
+<img width="256" height="256" src="exports/bohr-8-of-8.gif" alt="Animated Bohr diagram with all eight changes enabled" />
 
 # Orbital
 
@@ -18,9 +18,9 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 - Setting preference state in mass and change reverting.
 - Import and export enabled and disabled tweak values as JSON, with a selectable comparison preview before importing.
 - Inject an answer file into a Windows ISO, either replacing the selected image or saving an injected copy. Includes progress, cancellation, and verification of setup files and BIOS/UEFI boot images.
+- An in-app autounattend.xml editor
 
 ## Planned features
-- An in-app autounattend.xml editor
 - Orbital CLI integration in installation images
 - More preferences, especially tailoring to security and performance
 - 26H2 support (as soon as I even get the update offered, thanks Windows).
