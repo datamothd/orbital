@@ -96,6 +96,7 @@ const answer = (() => {
   const focusControl = control => control.hidden ? control.closest(".answer-field").querySelector(".answer-dropdown") || control : control;
   function field(parent, id, label, config) {
     const wrapper = element(config.choices || config.suggestions ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "", label);
+    if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) title.append(element("small", "answer-optional", "(optional)"));
     if (config.help) {
       const help = element("span", "answer-info");
       help.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M5 2h2v2H5zM5 5h2v5H5z"/></svg>';
@@ -203,6 +204,7 @@ const answer = (() => {
     }
     for (const row of rows("accounts")) for (const [key, visible] of [["groups", rowValue(row, "group") === "Custom"], ["password", rowValue(row, "password-mode") === "custom"]]) {
       const control = row.querySelector(`[data-key="${key}"]`); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
+      control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", visible);
     }
     for (const picker of byId("answer-form").querySelectorAll("select")) { pickers.get(picker).load(picker.value); pickers.get(picker).setDisabled(picker.disabled); }
     const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
