@@ -154,6 +154,17 @@ async function loadSettings() {
   renderSettings();
 }
 
+async function loadAppVersion() {
+  try {
+    const version = await window.__TAURI__.app.getVersion();
+    const label = byId("app-version");
+    label.textContent = `Orbital version: v${version}`;
+    label.hidden = false;
+  } catch (error) {
+    console.error("Could not read the app version:", error);
+  }
+}
+
 async function loadSystem() {
   const info = await invoke("system_info");
   const windowsVersion = info.windows_version.trim().toUpperCase();
@@ -405,6 +416,7 @@ for (const preference of explorerPreferences) {
 }
 
 if (invoke) {
+  loadAppVersion();
   refresh();
 } else {
   renderSettings();

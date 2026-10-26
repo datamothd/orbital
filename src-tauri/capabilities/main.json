@@ -2,5 +2,5 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
   "windows": ["main"],
-  "permissions": ["core:window:allow-set-size"]
+  "permissions": ["core:window:allow-set-size", "core:app:allow-version"]
 }

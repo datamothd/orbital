@@ -170,6 +170,18 @@ summary h2 {
   margin: 0;
 }
 
+#app-version {
+  margin-top: 4px;
+  color: #b3b3b3;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+#app-version:not([hidden]) {
+  display: block;
+}
+
 #preferences-title {
   display: inline-flex;
   align-items: center;
