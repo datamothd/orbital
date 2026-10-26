@@ -8,6 +8,7 @@
     "withGlobalTauri": true,
     "windows": [{
       "label": "main",
+      "devtools": false,
       "title": "Orbital",
       "theme": "Dark",
       "generalAutofillEnabled": false,

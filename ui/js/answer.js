@@ -128,7 +128,7 @@ const answer = (() => {
         buttons.append(button);
       }
       const forget = element("button", "answer-forget"); forget.type = "button"; forget.title = "Forget change (Windows default)"; forget.setAttribute("aria-label", `Forget change: ${label}`);
-      forget.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M2 4h12M6 4V2h4v2M4 4l1 10h6l1-10M7 6v6m2-6v6"/></svg>';
+      forget.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 1h4v2H6zM2 3h12v2H2zM3 6h2v7h6V6h2v7h-1v2H4v-2H3zM7 6h2v5H7z"/></svg>';
       forget.addEventListener("click", () => { input.value = ""; update(); }); buttons.append(forget); wrapper.append(buttons);
     }
     for (const picker of wrapper.querySelectorAll("select")) {
