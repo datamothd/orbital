@@ -271,7 +271,13 @@
       </section>
     </div>
     <section id="answer-page" aria-labelledby="answer-title" hidden>
-      <header class="answer-actions"><button id="answer-back" type="button">← Back</button><button type="reset" form="answer-form">Reset all changes</button></header>
+      <header class="answer-actions">
+        <button id="answer-back" type="button">← Back</button>
+        <button id="answer-reset" type="reset" form="answer-form">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 1h4v2H6zM2 3h12v2H2zM3 6h2v7h6V6h2v7h-1v2H4v-2H3zM7 6h2v5H7z"/></svg>
+          <span>Reset all changes</span>
+        </button>
+      </header>
       <h1 id="answer-title">Configure your installation.</h1>
       <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords.</p>
       <div class="answer-actions answer-files">

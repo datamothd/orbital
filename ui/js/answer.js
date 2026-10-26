@@ -13,7 +13,7 @@ const answer = (() => {
     ["installation", "Installation", [
       ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise"].map(edition => `Windows ${version} ${edition}`))])],
       ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
-      ["product-key", "Installation product key", { wide: true, help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
+      ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
       ["dynamic-update", "Download updates during setup", choice(yesNo)],
       ["compact", "Compress Windows system files", choice(yesNo, { help: "Compact OS saves disk space and may affect performance." })],
