@@ -5,12 +5,15 @@ const answer = (() => {
   const yesNo = [["", "Windows default"], ["true", "Y"], ["false", "N"]];
   const options = values => values.map(value => Array.isArray(value) ? value : [value, value]);
   const choice = (values, config = {}) => ({ choices: options(values), toggle: values === yesNo, ...config });
+  const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
+  const languages = [["", "Windows default"], ..."ar-SA bg-BG cs-CZ da-DK de-DE el-GR en-GB en-US es-ES es-MX et-EE fi-FI fr-CA fr-FR he-IL hr-HR hu-HU it-IT ja-JP ko-KR lt-LT lv-LV nb-NO nl-NL pl-PL pt-BR pt-PT ro-RO ru-RU sk-SK sl-SI sr-Latn-RS sv-SE th-TH tr-TR uk-UA zh-CN zh-TW".split(" ").map(code => [code, languageNames.of(code)])];
+  const timezones = [["", "Windows default"], ...options(["UTC", "Pacific Standard Time", "Mountain Standard Time", "US Mountain Standard Time", "Central Standard Time", "Eastern Standard Time", "Atlantic Standard Time", "GMT Standard Time", "W. Europe Standard Time", "Romance Standard Time", "India Standard Time", "China Standard Time", "Tokyo Standard Time", "AUS Eastern Standard Time", "New Zealand Standard Time"])];
   const number = (value, min, max) => ({ type: "number", value, min, max, required: true });
   const groups = [
     ["installation", "Installation", [
       ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise"].map(edition => `Windows ${version} ${edition}`))])],
       ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
-      ["product-key", "Installation product key", { help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
+      ["product-key", "Installation product key", { wide: true, help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
       ["dynamic-update", "Download updates during setup", choice(yesNo)],
       ["compact", "Compress Windows system files", choice(yesNo, { help: "Compact OS saves disk space and may affect performance." })],
@@ -26,13 +29,13 @@ const answer = (() => {
       ["recovery-size", "Recovery partition size (MB)", { ...number("2048", 1024, 65536), when: () => value("disk-mode") === "erase" && value("recovery") !== "false" }]
     ]],
     ["language", "Language & region", [
-      ["language", "Windows display language", { placeholder: "en-US" }],
-      ["setup-language", "Setup display language", { placeholder: "en-US" }],
-      ["user-locale", "Regional formats", { placeholder: "en-US" }],
-      ["keyboard", "Keyboard layout", { placeholder: "en-US", help: "Use locale tags or Windows input identifiers. Separate multiple layouts with semicolons." }],
-      ["fallback", "Fallback display language", { placeholder: "en-US" }],
-      ["system-locale", "Legacy application language", { placeholder: "en-US" }],
-      ["timezone", "Windows time zone", { placeholder: "Eastern Standard Time", help: "Use a Windows time zone identifier, such as UTC or Eastern Standard Time." }]
+      ["language", "Display language", { suggestions: languages, placeholder: "en-US" }],
+      ["setup-language", "Setup language", { suggestions: languages, placeholder: "en-US" }],
+      ["user-locale", "Regional formats", { suggestions: languages, placeholder: "en-US" }],
+      ["keyboard", "Keyboard layout", { suggestions: languages, placeholder: "en-US", help: "Choose Custom for Windows input identifiers or multiple layouts separated by semicolons." }],
+      ["fallback", "Fallback language", { suggestions: languages, placeholder: "en-US" }],
+      ["system-locale", "Legacy language", { suggestions: languages, placeholder: "en-US" }],
+      ["timezone", "Time zone", { suggestions: timezones, placeholder: "Eastern Standard Time", help: "Choose Custom for another Windows time zone identifier." }]
     ]],
     ["identity", "Device identity", [
       ["computer", "Computer name", { help: "Leave blank for Windows defaults or enter * for a random name. Custom names are limited to 15 bytes." }],
@@ -45,7 +48,7 @@ const answer = (() => {
       ["builtin-name", "Built-in Administrator sign-in name", { value: "Administrator", required: true, when: () => value("autologon") === "@Administrator", help: "Use the localized or renamed account name in your Windows image." }],
       ["autologon", "Automatically sign in as", choice([["", "Disabled"]])],
       ["logon-count", "Automatic sign-in counter", { ...number("1", 0, 4294967295), when: () => Boolean(value("autologon")), help: "Windows adds one to positive values, so 1 can allow two automatic sign-ins." }],
-      ["obscure", "Obscure account passwords", { type: "checkbox", help: "Uses reversible Base64 encoding, not encryption. Domain and Wi-Fi passwords remain readable." }]
+      ["obscure", "Obscure account passwords", choice(yesNo, { value: "false", help: "Uses reversible Base64 encoding, not encryption. Domain and Wi-Fi passwords remain readable." })]
     ]],
     ["welcome", "Windows welcome", [
       ["hide-license", "Skip license terms page", choice(yesNo)], ["hide-oem", "Skip manufacturer registration", choice(yesNo)],
@@ -63,7 +66,7 @@ const answer = (() => {
       ["ssid", "Network name (SSID)", { required: true, when: () => value("wifi-mode") === "personal" }],
       ["wifi-auth", "Security", choice(["WPA2PSK", "WPA3SAE", "open"], { value: "WPA2PSK", when: () => value("wifi-mode") === "personal" })],
       ["wifi-password", "Wi-Fi password", { type: "password", required: true, when: () => value("wifi-mode") === "personal" && value("wifi-auth") !== "open" }],
-      ["wifi-hidden", "Hidden network", { type: "checkbox", when: () => value("wifi-mode") === "personal" }],
+      ["wifi-hidden", "Hidden network", choice(yesNo, { value: "false", when: () => value("wifi-mode") === "personal" })],
       ["wifi-xml", "WLAN profile XML", { type: "textarea", required: true, wide: true, when: () => value("wifi-mode") === "xml", help: "Enterprise profiles may require certificates supplied separately." }]
     ]],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
@@ -83,15 +86,16 @@ const answer = (() => {
     commands: [["pass", "Run during", choice(["specialize", "windowsPE", "auditUser"], { value: "specialize" })], ["description", "Description", { maxLength: 259 }], ["path", "Command line", { required: true, wide: true }], ["reboot", "Restart after command", choice([["", "Windows default"], ["Never", "Never"], ["OnRequest", "If requested"], ["Always", "Always"]])]],
     scripts: [["type", "Script type", choice(["ps1", "cmd", "reg"], { value: "ps1" })], ["label", "Description", {}], ["content", "Installation script", { type: "textarea", required: true, wide: true, help: "Runs as SYSTEM during device setup. Supply any external programs separately. Do not restart Windows from the script." }]]
   };
-  const controls = new Map(), sections = new Map(), lists = new Map();
+  const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
   let rowId = 0, initialized = false;
   const element = (tag, className = "", text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
-  const read = control => control.type === "checkbox" ? String(control.checked) : control.type === "password" || control.dataset.key === "ssid" ? control.value : control.value.trim();
+  const read = control => control.type === "password" || control.dataset.key === "ssid" ? control.value : control.value.trim();
   const value = id => controls.get(id)?.disabled ? "" : read(controls.get(id));
   const rows = kind => [...lists.get(kind).children];
   const rowValue = (row, key) => read(row.querySelector(`[data-key="${key}"]`));
+  const focusControl = control => control.hidden ? control.closest(".answer-field").querySelector(".answer-dropdown") || control : control;
   function field(parent, id, label, config) {
-    const wrapper = element(config.toggle ? "div" : "label", `answer-field${config.wide ? " answer-wide" : ""}`), title = element("span", "", label);
+    const wrapper = element(config.choices || config.suggestions ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "", label);
     if (config.help) {
       const help = element("span", "answer-info");
       help.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M5 2h2v2H5zM5 5h2v5H5z"/></svg>';
@@ -105,19 +109,35 @@ const answer = (() => {
     input.id = `answer-${id}`; input.dataset.key = id; input.dataset.label = label;
     for (const key of ["placeholder", "min", "max", "maxLength", "pattern", "required"]) if (config[key] != null) input[key] = config[key];
     if (input.type === "number") input.step = "1";
-    if (config.type === "checkbox") input.defaultChecked = config.value === "true";
-    else if (!config.choices || config.toggle) input.defaultValue = config.value || "";
+    if (!config.choices || config.toggle) input.defaultValue = config.value || "";
     input.autocomplete = input.type === "password" ? "new-password" : "off";
     wrapper.append(title, input);
+    if (config.suggestions) {
+      const picker = element("select"); picker.id = `${input.id}-picker`; input.setAttribute("aria-label", `${label} (custom)`);
+      for (const [key, text] of [...config.suggestions, ["@custom", "Custom…"]]) picker.add(new Option(text, key));
+      picker.addEventListener("input", () => { input.value = picker.value === "@custom" ? "" : picker.value; input.hidden = picker.value !== "@custom"; if (!input.hidden) input.focus(); });
+      input.before(picker);
+    }
     if (config.toggle) {
       const buttons = element("div", "answer-toggle"); buttons.setAttribute("role", "group"); buttons.setAttribute("aria-label", label);
       for (const [key, text] of config.choices.slice(1)) {
-        const button = element("button", "", text); button.type = "button"; button.dataset.value = key;
-        button.title = `${text === "Y" ? "Yes" : "No"}. Click again for Windows default.`;
-        button.addEventListener("click", () => { input.value = input.value === key ? "" : key; update(); });
+        const button = element("button", text === "N" ? "answer-no" : "", text); button.type = "button"; button.dataset.value = key;
+        button.title = text === "Y" ? "Yes" : "No";
+        button.addEventListener("click", () => { input.value = key; update(); });
         buttons.append(button);
       }
-      wrapper.append(buttons);
+      const forget = element("button", "answer-forget"); forget.type = "button"; forget.title = "Forget change (Windows default)"; forget.setAttribute("aria-label", `Forget change: ${label}`);
+      forget.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M2 4h12M6 4V2h4v2M4 4l1 10h6l1-10M7 6v6m2-6v6"/></svg>';
+      forget.addEventListener("click", () => { input.value = ""; update(); }); buttons.append(forget); wrapper.append(buttons);
+    }
+    for (const picker of wrapper.querySelectorAll("select")) {
+      const button = element("button", "folder-view-picker answer-dropdown"), text = element("span"), arrow = element("span", "picker-arrow"), menu = element("div", "folder-view-options");
+      button.type = "button"; button.id = `${picker.id}-button`; button.setAttribute("role", "combobox"); button.setAttribute("aria-label", label); button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false");
+      menu.id = `${picker.id}-options`; menu.hidden = true; menu.tabIndex = -1; menu.setAttribute("role", "listbox"); menu.setAttribute("aria-label", label); button.setAttribute("aria-controls", menu.id); arrow.setAttribute("aria-hidden", "true");
+      button.append(text, arrow); picker.hidden = true; picker.after(button, menu);
+      pickers.set(picker, createChoicePicker(button, menu, text, () => [...picker.options].filter(option => !option.hidden && !option.disabled).map(option => ({ value: option.value, label: option.textContent })), label, selected => {
+        picker.value = selected.value; picker.dispatchEvent(new Event("input", { bubbles: true })); picker.dispatchEvent(new Event("change", { bubbles: true }));
+      }));
     }
     parent.append(wrapper);
     return input;
@@ -143,20 +163,21 @@ const answer = (() => {
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
       if (rowFields[id]) {
-        const list = element("div"), add = element("button", "answer-add", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : "installation script"}`);
-        add.type = "button"; add.addEventListener("click", () => addRow(id)); lists.set(id, list); section.append(list, add);
+        const list = element("div", "answer-wide answer-list"), add = element("button", "answer-add answer-wide", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : "installation script"}`);
+        add.type = "button"; add.addEventListener("click", () => addRow(id)); lists.set(id, list); grid.append(list, add);
       }
       section.append(grid); sections.set(id, section); byId("answer-groups").append(section);
     }
     const copy = element("button", "answer-add", "Copy settings to XML"); copy.type = "button";
     copy.addEventListener("click", () => attempt(() => { const xml = build(); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); }));
-    sections.get("advanced").append(copy);
+    sections.get("advanced").querySelector(".answer-grid").append(copy);
     byId("answer-form").addEventListener("input", update);
     byId("answer-form").addEventListener("change", update);
     byId("answer-form").addEventListener("reset", () => { for (const list of lists.values()) list.replaceChildren(); byId("answer-search").value = ""; requestAnimationFrame(update); });
     update();
   }
   function update() {
+    closeChoicePicker();
     const windows10 = value("edition").startsWith("Windows 10 "), home = / Home(?: N)?$/.test(value("edition"));
     for (const [id, blocked] of [["architecture", windows10 ? "" : "x86"], ["layout", windows10 ? "" : "mbr"], ["join-mode", home ? "domain" : ""]]) {
       const control = controls.get(id);
@@ -170,11 +191,20 @@ const answer = (() => {
     for (const [, , fields] of groups) for (const [id, , config] of fields) {
       const control = controls.get(id), visible = !config.when || config.when();
       control.closest(".answer-field").hidden = control.disabled = !visible;
-      if (config.toggle) for (const button of control.parentElement.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.value === control.value));
+      if (config.suggestions) {
+        const picker = control.closest(".answer-field").querySelector("select"), custom = picker.value === "@custom" && !control.hidden;
+        picker.value = custom || !config.suggestions.some(([key]) => key === control.value) ? "@custom" : control.value;
+        control.hidden = picker.value !== "@custom";
+      }
+      if (config.toggle) {
+        for (const button of control.parentElement.querySelectorAll("[data-value]")) button.setAttribute("aria-pressed", String(button.dataset.value === control.value));
+        control.parentElement.querySelector(".answer-forget").disabled = !control.value;
+      }
     }
     for (const row of rows("accounts")) for (const [key, visible] of [["groups", rowValue(row, "group") === "Custom"], ["password", rowValue(row, "password-mode") === "custom"]]) {
       const control = row.querySelector(`[data-key="${key}"]`); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
     }
+    for (const picker of byId("answer-form").querySelectorAll("select")) { pickers.get(picker).load(picker.value); pickers.get(picker).setDisabled(picker.disabled); }
     const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
     for (const [id, section] of sections) { section.hidden = xmlMode && id !== "advanced" || Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
     renderIssues(validate());
@@ -233,19 +263,21 @@ const answer = (() => {
     return issues;
   }
   function renderIssues(issues, scroll = false) {
-    for (const field of byId("answer-form").querySelectorAll(".answer-invalid")) { field.classList.remove("answer-invalid"); field.querySelector(".answer-field-error")?.remove(); const control = field.querySelector("[aria-invalid]"); control?.removeAttribute("aria-invalid"); control?.removeAttribute("aria-describedby"); }
+    for (const field of byId("answer-form").querySelectorAll(".answer-invalid")) { field.classList.remove("answer-invalid"); field.querySelector(".answer-field-error")?.remove(); for (const control of field.querySelectorAll("[aria-invalid]")) { control.removeAttribute("aria-invalid"); control.removeAttribute("aria-describedby"); } }
     const counts = new Map(), summary = byId("answer-errors"), list = element("ul");
     summary.replaceChildren(element("h2", "", `${issues.length} ${issues.length === 1 ? "issue prevents" : "issues prevent"} creating this answer file`), list); summary.hidden = !issues.length;
     for (const issue of issues) {
       const item = element("li"), button = element("button", "", issue.message); button.type = "button";
-      button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = issue.controls[0]; control.closest("details").open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
+      button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = focusControl(issue.controls[0]); control.closest("details").open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
       item.append(button); list.append(item);
       const affected = new Set();
       for (const control of issue.controls) {
         const field = control.closest(".answer-field"); field.classList.add("answer-invalid"); control.setAttribute("aria-invalid", "true");
         let message = field.querySelector(".answer-field-error");
         if (!message) { message = element("span", "answer-field-error"); message.id = `${control.id}-error`; field.append(message); }
-        message.textContent += (message.textContent ? " " : "") + issue.message; control.setAttribute("aria-describedby", message.id); affected.add(control.closest("details"));
+        message.textContent += (message.textContent ? " " : "") + issue.message;
+        for (const target of new Set([control, focusControl(control)])) { target.setAttribute("aria-invalid", "true"); target.setAttribute("aria-describedby", message.id); }
+        affected.add(control.closest("details"));
       }
       for (const section of affected) counts.set(section, (counts.get(section) || 0) + 1);
     }
@@ -263,7 +295,7 @@ const answer = (() => {
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid settings entry.");
       for (const [key, text] of Object.entries(data)) {
         const config = fields.find(([id]) => id === key)?.[2];
-        if (!config || typeof text !== "string" || config.choices && !config.choices.some(([value]) => value === text) && key !== "autologon" || config.type === "checkbox" && !["true", "false"].includes(text)) throw new Error(`Unsupported setting or value: ${key}.`);
+        if (!config || typeof text !== "string" || config.choices && !config.choices.some(([value]) => value === text) && key !== "autologon") throw new Error(`Unsupported setting or value: ${key}.`);
       }
     };
     check(profile.values, groups.flatMap(([, , fields]) => fields));
@@ -274,7 +306,7 @@ const answer = (() => {
     const logon = profile.values.autologon;
     if (logon && !(logon === "@Administrator" && profile.values["builtin-admin"] === "true") && !profile.accounts.some(row => row.name === logon)) throw new Error("Automatic sign-in must refer to an enabled account in these settings.");
     byId("answer-form").reset();
-    for (const [key, text] of Object.entries(profile.values)) { if (key === "autologon") continue; const control = controls.get(key); if (control.type === "checkbox") control.checked = text === "true"; else control.value = text; }
+    for (const [key, text] of Object.entries(profile.values)) if (key !== "autologon") controls.get(key).value = text;
     for (const kind of Object.keys(rowFields)) for (const row of profile[kind]) addRow(kind, row);
     update(); controls.get("autologon").value = logon || ""; controls.get("disk-confirm").value = ""; update();
   }
@@ -405,7 +437,7 @@ const answer = (() => {
     return serialize(xml);
   }
   function show(open) {
-    initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open; document.querySelector(".top-bar").hidden = open;
+    closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open; document.querySelector(".top-bar").hidden = open;
     if (typeof stopScrolling === "function") stopScrolling(); window.scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
   }
   function importText(source) {

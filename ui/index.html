@@ -273,10 +273,10 @@
         </div>
       </section>
     </div>
-    <div id="answer-page" hidden>
+    <section id="answer-page" aria-labelledby="answer-title" hidden>
       <header class="answer-actions"><button id="answer-back" type="button">← Back</button><button type="reset" form="answer-form">Reset all changes</button></header>
-      <h1>Configure your installation.</h1>
-      <p class="note">Installation and initial setup only. Y = yes, N = no; click again for Windows defaults. Files may contain passwords.</p>
+      <h1 id="answer-title">Configure your installation.</h1>
+      <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords.</p>
       <div class="answer-actions answer-files">
         <button id="answer-import" type="button">Import settings / XML</button>
         <button type="button" data-answer-save="json">Save settings</button>
@@ -288,7 +288,7 @@
         <div id="answer-groups"></div>
         <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
       </form>
-    </div>
+    </section>
   </main>
   <dialog id="answer-source" aria-labelledby="answer-source-title">
     <h2 id="answer-source-title">Choose your answer file</h2>

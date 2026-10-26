@@ -1,29 +1,39 @@
 "use strict";
 
-function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
-  const picker = byId(`${id}-picker`);
-  const menu = byId(`${id}-options`);
-  const selection = byId(`${id}-selection`);
-  const apply = byId(`${id}-apply`);
-  const value = byId(`${id}-value`);
+let activeChoicePicker = null;
+function closeChoicePicker() { activeChoicePicker?.close(); }
+document.addEventListener("pointerdown", event => {
+  if (activeChoicePicker && !activeChoicePicker.picker.contains(event.target) && !activeChoicePicker.menu.contains(event.target)) closeChoicePicker();
+});
+window.addEventListener("resize", closeChoicePicker);
+window.addEventListener("scroll", event => {
+  if (activeChoicePicker && !activeChoicePicker.menu.contains(event.target)) closeChoicePicker();
+}, true);
+
+function createChoicePicker(picker, menu, selection, getChoices, placeholder, changed, matches = (a, b) => a === b) {
+  let choices = [], options = [];
   let selected = -1;
   let active = 0;
 
-  const options = choices.map((choice, index) => {
-    const option = document.createElement("div");
-    option.id = `${id}-option-${index}`;
-    option.setAttribute("role", "option");
-    option.setAttribute("aria-selected", "false");
-    option.textContent = choice.label;
-    option.addEventListener("click", () => choose(index));
-    menu.append(option);
-    return option;
-  });
+  function refresh() {
+    choices = typeof getChoices === "function" ? getChoices() : getChoices;
+    options = choices.map((choice, index) => {
+      const option = document.createElement("div");
+      option.id = `${menu.id}-option-${index}`;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = choice.label;
+      option.addEventListener("click", () => choose(index));
+      return option;
+    });
+    menu.replaceChildren(...options);
+  }
 
   function close(focus = false) {
     menu.hidden = true;
     picker.setAttribute("aria-expanded", "false");
     menu.removeAttribute("aria-activedescendant");
+    if (activeChoicePicker?.picker === picker) activeChoicePicker = null;
     if (focus) picker.focus();
   }
 
@@ -37,30 +47,31 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
   function select(index) {
     selected = index;
     selection.textContent = choices[index]?.label || placeholder;
+    picker.title = selection.textContent;
     options.forEach((option, index) => option.setAttribute("aria-selected", String(index === selected)));
-    apply.disabled = picker.disabled || selected < 0;
   }
 
   function choose(index) {
     select(index);
     close(true);
+    changed?.(choices[index]);
   }
 
   function open(index = selected < 0 ? 0 : selected) {
-    if (picker.disabled) return;
+    if (picker.disabled || !choices.length) return;
+    closeChoicePicker();
     const bounds = picker.getBoundingClientRect();
     const available = Math.max(80, Math.max(bounds.top, window.innerHeight - bounds.bottom) - 16);
     menu.style.width = `${Math.min(bounds.width, window.innerWidth - 32)}px`;
     menu.style.maxHeight = `${Math.min(260, available)}px`;
     menu.hidden = false;
-    const style = getComputedStyle(menu);
-    const scrollbarWidth = menu.offsetWidth - menu.clientWidth
-      - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
+    const scrollbarWidth = menu.offsetWidth - menu.clientWidth - menu.clientLeft * 2;
     menu.style.width = `${Math.min(bounds.width + scrollbarWidth, window.innerWidth - 32)}px`;
     menu.style.left = `${Math.max(16, Math.min(bounds.left, window.innerWidth - menu.offsetWidth - 16))}px`;
     menu.style.top = `${bounds.bottom + menu.offsetHeight + 8 <= window.innerHeight
       ? bounds.bottom + 6 : Math.max(8, bounds.top - menu.offsetHeight - 6)}px`;
     picker.setAttribute("aria-expanded", "true");
+    activeChoicePicker = { picker, menu, close };
     menu.focus({ preventScroll: true });
     activate(index);
   }
@@ -90,27 +101,14 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
       if (index >= 0 || fallback >= 0) activate(index >= 0 ? index : fallback);
     }
   });
-  document.addEventListener("pointerdown", (event) => {
-    if (!picker.contains(event.target) && !menu.contains(event.target)) close();
-  });
-  window.addEventListener("resize", () => close());
-  window.addEventListener("scroll", (event) => {
-    if (!menu.contains(event.target)) close();
-  }, true);
-
   return {
-    matches,
-    labelFor(value) {
-      return choices.find(choice => matches(choice.value, value))?.label || fallback;
-    },
-    load(current, available = true) {
+    load(current) {
+      refresh();
       select(choices.findIndex(choice => matches(choice.value, current)));
-      value.textContent = !available ? "Unavailable" : selected < 0 ? fallback : choices[selected].label;
       close();
     },
     setDisabled(disabled) {
       picker.disabled = disabled;
-      apply.disabled = disabled || selected < 0;
       if (disabled) close();
     },
     get selected() {
@@ -119,6 +117,23 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
     get label() {
       return choices[selected]?.label;
     },
+  };
+}
+
+function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
+  const picker = byId(`${id}-picker`), apply = byId(`${id}-apply`);
+  const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder, () => { apply.disabled = picker.disabled || control.selected === null; }, matches);
+  return {
+    matches,
+    labelFor: value => choices.find(choice => matches(choice.value, value))?.label || fallback,
+    load(current, available = true) {
+      control.load(current);
+      byId(`${id}-value`).textContent = !available ? "Unavailable" : control.label || fallback;
+      apply.disabled = picker.disabled || control.selected === null;
+    },
+    setDisabled(disabled) { control.setDisabled(disabled); apply.disabled = disabled || control.selected === null; },
+    get selected() { return control.selected; },
+    get label() { return control.label; }
   };
 }
 

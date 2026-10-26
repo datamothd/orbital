@@ -116,6 +116,13 @@ summary,
   gap: 14px;
 }
 
+.folder-view-picker > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .section-header {
   margin-bottom: 18px;
 }
@@ -432,6 +439,8 @@ button:disabled {
   position: fixed;
   z-index: 10;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #555555 #171717;
   padding: 4px;
   background: #171717;
   border: 1px solid #555555;
@@ -865,6 +874,21 @@ button.primary:hover:not(:disabled) {
   height: 6px;
   margin: 0;
   accent-color: #4ade80;
+}
+
+#inject-progress[value] {
+  appearance: none;
+  border: 0;
+}
+
+#inject-progress[value]::-webkit-progress-bar {
+  background: #333333;
+  border-radius: 3px;
+}
+
+#inject-progress[value]::-webkit-progress-value {
+  background: #4ade80;
+  border-radius: 3px;
 }
 
 #inject-progress[hidden] {
