@@ -268,8 +268,17 @@ function confirmChange(description, title = "Change preference?", recommendation
   const list = byId("recommendation-list");
   list.replaceChildren(...recommendations.map((id) => {
     const preference = explorerPreferences.find(preference => preference.field === id);
-    const { row, text } = createChangeRow(id, preference?.label
+    const { row, checkbox, text } = createChangeRow(id, preference?.label
       || (id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None"));
+    const view = folderViews.find(view => view.field === id);
+    const source = preference
+      ? document.querySelector(`[data-preference="${preference.id}"]`)
+      : view && byId(`${view.id}-label`).closest(".preference");
+    const note = source?.querySelector(".preference-description")?.textContent.trim();
+    if (note) {
+      row.title = note;
+      checkbox.setAttribute("aria-description", note);
+    }
     if (preference?.requiresAdmin) text.append(adminWarning());
     if (preference?.visual || folderViews.some(view => view.field === id)) {
       row.className = "visual-preference";

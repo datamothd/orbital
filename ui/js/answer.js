@@ -71,7 +71,7 @@ const answer = (() => {
     ]],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
     ["virtual-machine", "Virtual machine", [
-      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Supply the matching Guest Additions ISO through VirtualBox: attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO. Installation runs automatically at sign-in; restart Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
+      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Add the Guest Additions ISO through VirtualBox.: attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO, and can typically be found included in your VirtualBox installation. Installation runs automatically at sign-in and restarts Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
     ]],
     ["commands", "Setup commands", []],
     ["scripts", "Embedded installation scripts", [
@@ -85,7 +85,7 @@ const answer = (() => {
     ]]
   ];
   const rowFields = {
-    accounts: [["name", "User name", { required: true }], ["display", "Display name", {}], ["group", "Account group", choice(["Administrators", "Users", "Custom"], { value: "Administrators" })], ["groups", "Custom groups", { help: "Separate existing Windows group names with semicolons." }], ["password-mode", "Password", choice([["", "Do not set"], ["custom", "Set password"], ["blank", "Explicitly empty"]])], ["password", "Account password", { type: "password" }], ["description", "Description", {}]],
+    accounts: [["name", "User name", { required: true }], ["display", "Display name", {}], ["group", "Account group", choice(["Administrators", "Users", "Custom"], { value: "Administrators" })], ["groups", "Custom groups", { help: "Separate existing Windows group names with semicolons." }], ["password-mode", "Password", choice([["", "Do not set"], ["custom", "Set password"], ["blank", "Explicitly empty"]])], ["password", "Account password", { type: "password" }], ["description", "Description", { wide: true }]],
     commands: [["pass", "Run during", choice(["specialize", "windowsPE", "auditUser"], { value: "specialize" })], ["description", "Description", { maxLength: 259 }], ["path", "Command line", { required: true, wide: true }], ["reboot", "Restart after command", choice([["", "Windows default"], ["Never", "Never"], ["OnRequest", "If requested"], ["Always", "Always"]])]],
     scripts: [["type", "Script type", choice(["ps1", "cmd", "reg"], { value: "ps1" })], ["label", "Description", {}], ["content", "Installation script", { type: "textarea", required: true, wide: true, help: "Runs as SYSTEM during device setup. Supply any external programs separately. Do not restart Windows from the script." }]]
   };
@@ -147,15 +147,19 @@ const answer = (() => {
     return input;
   }
   function addRow(kind, values = {}) {
-    const row = element("div", "answer-row");
+    const row = element("details", "answer-row"), summary = element("summary"), title = element("span", "answer-row-title"), count = element("span", "answer-count"), grid = element("div", "answer-grid");
+    row.open = !Object.keys(values).length;
+    if (row.open) for (const entry of rows(kind)) entry.open = false;
+    count.append(element("span")); count.hidden = true;
     for (const [key, label, config] of rowFields[kind]) {
-      const input = field(row, `row-${++rowId}`, label, config);
+      const input = field(grid, `row-${++rowId}`, label, config);
       input.dataset.key = key;
       if (values[key] != null) input.value = values[key];
     }
-    const remove = element("button", "", "Remove entry"); remove.type = "button";
-    remove.addEventListener("click", () => { row.remove(); update(); });
-    row.append(remove); lists.get(kind).append(row); update(); return row;
+    const remove = element("button", "answer-row-remove"); remove.type = "button"; remove.title = "Remove entry"; remove.setAttribute("aria-label", "Remove entry");
+    remove.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8"/></svg>';
+    remove.addEventListener("click", event => { event.preventDefault(); const focus = (row.nextElementSibling || row.previousElementSibling)?.querySelector("summary") || lists.get(kind).nextElementSibling; row.remove(); update(); focus.focus(); });
+    summary.append(title, count, remove); row.append(summary, grid); lists.get(kind).append(row); update(); return row;
   }
   function initialize() {
     if (initialized) return;
@@ -210,9 +214,15 @@ const answer = (() => {
       const control = row.querySelector(`[data-key="${key}"]`); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
       control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", visible);
     }
+    for (const [kind, key, label] of [["accounts", "name", "Local account"], ["commands", "description", "Setup command"], ["scripts", "label", "Installation script"]]) rows(kind).forEach((row, index) => {
+      const title = rowValue(row, key) || `${label} ${index + 1}`;
+      row.querySelector(".answer-row-title").textContent = title;
+      row.querySelector(".answer-row-remove").setAttribute("aria-label", `Remove ${title}`);
+    });
     for (const picker of byId("answer-form").querySelectorAll("select")) { pickers.get(picker).load(picker.value); pickers.get(picker).setDisabled(picker.disabled); }
     const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
     for (const [id, section] of sections) { section.hidden = Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
+    if (term) for (const kind of Object.keys(rowFields)) for (const row of rows(kind)) if (row.textContent.toLowerCase().includes(term)) row.open = true;
     renderIssues(validate());
   }
   function parse(source, root = "unattend", namespace = ns) {
@@ -274,7 +284,7 @@ const answer = (() => {
     summary.replaceChildren(element("h2", "", `${issues.length} ${issues.length === 1 ? "issue prevents" : "issues prevent"} creating this answer file`), list); summary.hidden = !issues.length;
     for (const issue of issues) {
       const item = element("li"), button = element("button", "", issue.message); button.type = "button";
-      button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = focusControl(issue.controls[0]); control.closest("details").open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
+      button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = focusControl(issue.controls[0]); for (let section = control.closest("details"); section; section = section.parentElement.closest("details")) section.open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
       item.append(button); list.append(item);
       const affected = new Set();
       for (const control of issue.controls) {
@@ -283,11 +293,11 @@ const answer = (() => {
         if (!message) { message = element("span", "answer-field-error"); message.id = `${control.id}-error`; field.append(message); }
         message.textContent += (message.textContent ? " " : "") + issue.message;
         for (const target of new Set([control, focusControl(control)])) { target.setAttribute("aria-invalid", "true"); target.setAttribute("aria-describedby", message.id); }
-        affected.add(control.closest("details"));
+        for (let section = control.closest("details"); section; section = section.parentElement.closest("details")) affected.add(section);
       }
       for (const section of affected) counts.set(section, (counts.get(section) || 0) + 1);
     }
-    for (const section of sections.values()) { const badge = section.querySelector(".answer-count"), count = counts.get(section) || 0; badge.hidden = !count; badge.firstChild.textContent = count; badge.setAttribute("aria-label", `${count} blocking issues`); }
+    for (const section of [...sections.values(), ...Object.keys(rowFields).flatMap(rows)]) { const badge = section.querySelector(".answer-count"), count = counts.get(section) || 0; badge.hidden = !count; badge.firstChild.textContent = count; badge.setAttribute("aria-label", `${count} blocking issues`); }
     if (scroll && issues.length) { window.scrollTo(0, window.scrollY + byId("answer-search").getBoundingClientRect().bottom); summary.focus({ preventScroll: true }); }
   }
   function status(text, error = false) { byId("answer-status").textContent = text; byId("answer-status").classList.toggle("error", error); }
@@ -531,7 +541,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
   }
   byId("answer-back").addEventListener("click", () => { show(false); if (!injectFiles.xml) choose(); });
   byId("answer-search").addEventListener("input", update);
-  byId("answer-collapse").addEventListener("click", () => { for (const section of sections.values()) section.open = false; });
+  byId("answer-collapse").addEventListener("click", () => { for (const section of byId("answer-groups").querySelectorAll("details")) section.open = false; });
   byId("answer-import").addEventListener("click", () => attempt(async () => {
     if (invoke) { const text = await invoke("answer_document", { content: null, kind: "open" }); if (text !== null) importText(text); }
     else await upload(true);

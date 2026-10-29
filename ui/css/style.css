@@ -203,7 +203,7 @@ summary::after {
   margin: 0 3px;
 }
 
-details[open] summary {
+details[open] > summary {
   margin-bottom: 0;
 }
 
@@ -213,7 +213,7 @@ details[open] summary {
   border-top: 1px solid #333333;
 }
 
-details[open] summary::after {
+details[open] > summary::after {
   transform: translateY(2px) rotate(225deg);
 }
 
