@@ -11,6 +11,7 @@ function stopScrolling() {
 window.addEventListener("pointerdown", stopScrolling);
 window.addEventListener("keydown", stopScrolling);
 window.addEventListener("wheel", (event) => {
+  if (event.target.closest("textarea")) { stopScrolling(); return; }
   if (!smoothScrolling.enabled || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
     || document.querySelector("dialog:modal") || event.target.closest(".folder-view-options, dialog")) return;
   event.preventDefault();

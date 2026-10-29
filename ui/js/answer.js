@@ -70,6 +70,9 @@ const answer = (() => {
       ["wifi-xml", "WLAN profile XML", { type: "textarea", required: true, wide: true, when: () => value("wifi-mode") === "xml", help: "Enterprise profiles may require certificates supplied separately." }]
     ]],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
+    ["virtual-machine", "Virtual machine", [
+      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Attach the matching VirtualBox Guest Additions ISO in a second virtual optical drive before starting Windows Setup. The installer runs during setup; a restart may be needed." })]
+    ]],
     ["commands", "Setup commands", []],
     ["scripts", "Embedded installation scripts", [
       ["payload", "Setup files folder", { value: "C:\\ProgramData\\Orbital\\Setup", maxLength: 110, help: "Dedicated folder ending in \\Orbital\\Setup. Files are restricted to administrators and SYSTEM." }],
@@ -78,7 +81,7 @@ const answer = (() => {
     ]],
     ["advanced", "Advanced XML", [
       ["mode", "Answer file source", choice([["guided", "Installation settings"], ["xml", "Complete XML"]], { value: "guided" })],
-      ["xml", "Complete answer file", { type: "textarea", wide: true, required: true, when: () => value("mode") === "xml", help: "Replaces the installation settings. Supplied commands are preserved; validate them against your Windows image." }]
+      ["xml", "Complete answer file", { type: "textarea", wide: true, required: true, when: () => value("mode") === "xml", help: "This XML is used as the answer file. Copy settings to XML replaces it with the current installation settings." }]
     ]]
   ];
   const rowFields = {
@@ -170,8 +173,9 @@ const answer = (() => {
       section.append(grid); sections.set(id, section); byId("answer-groups").append(section);
     }
     const copy = element("button", "answer-add", "Copy settings to XML"); copy.type = "button";
-    copy.addEventListener("click", () => attempt(() => { const xml = build(); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); }));
-    sections.get("advanced").querySelector(".answer-grid").append(copy);
+    copy.addEventListener("click", () => attempt(() => { const xml = build("guided"); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); status("Installation settings copied to XML."); }));
+    const copyNote = element("p", "note answer-wide", "Copying settings replaces any XML in the complete answer file field.");
+    sections.get("advanced").querySelector(".answer-grid").append(copy, copyNote);
     byId("answer-form").addEventListener("input", update);
     byId("answer-form").addEventListener("change", update);
     byId("answer-form").addEventListener("reset", () => { for (const list of lists.values()) list.replaceChildren(); byId("answer-search").value = ""; requestAnimationFrame(update); });
@@ -208,7 +212,7 @@ const answer = (() => {
     }
     for (const picker of byId("answer-form").querySelectorAll("select")) { pickers.get(picker).load(picker.value); pickers.get(picker).setDisabled(picker.disabled); }
     const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
-    for (const [id, section] of sections) { section.hidden = xmlMode && id !== "advanced" || Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
+    for (const [id, section] of sections) { section.hidden = Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
     renderIssues(validate());
   }
   function parse(source, root = "unattend", namespace = ns) {
@@ -216,9 +220,9 @@ const answer = (() => {
     if (xml.doctype || xml.querySelector("parsererror") || xml.documentElement.localName !== root || xml.documentElement.namespaceURI !== namespace) throw new Error(`Provide valid ${root} XML with the ${namespace} namespace and no document type.`);
     return xml;
   }
-  function validate() {
+  function validate(mode = value("mode")) {
     const issues = [], add = (targets, message) => issues.push({ controls: [targets].flat().map(target => typeof target === "string" ? controls.get(target) : target), message });
-    if (value("mode") === "xml") {
+    if (mode === "xml") {
       try {
         const xml = parse(value("xml"));
         if (new TextEncoder().encode(value("xml")).length > 1048576) add("xml", "Answer files must be under 1 MiB.");
@@ -230,7 +234,7 @@ const answer = (() => {
       return issues;
     }
     for (const control of byId("answer-form").querySelectorAll("input, select, textarea")) {
-      if (control.disabled || control.closest("[hidden]")) continue;
+      if (control === controls.get("xml") || control.disabled || control.closest(".answer-field[hidden]")) continue;
       if (!control.validity.valid) add(control, `${control.dataset.label}: ${control.validationMessage}`);
       else if (control.required && !read(control)) add(control, `Enter ${control.dataset.label.toLowerCase()}.`);
       if (control.maxLength >= 0 && read(control).length > control.maxLength) add(control, `${control.dataset.label} must be at most ${control.maxLength} characters.`);
@@ -260,7 +264,7 @@ const answer = (() => {
     if (value("drivers").split(/\r?\n/).filter(line => line.trim()).some(path => path.trim().length > 259 || !/^(?:[a-z]:\\|\\\\|%[a-z_]+%\\)/i.test(path.trim()))) add("drivers", "Use one full driver-folder path per line, at most 259 characters each.");
     if (!/^[a-z]:\\(?:[^\\]+\\)*Orbital\\Setup$/i.test(value("payload")) || /["<>|?*]/.test(value("payload")) || value("payload").split("\\").some(part => [".", ".."].includes(part))) add("payload", "Use a dedicated full path ending in \\Orbital\\Setup.");
     for (const row of rows("commands")) if (rowValue(row, "path").length > (rowValue(row, "pass") === "windowsPE" ? 1024 : 259)) add(row.querySelector('[data-key="path"]'), "This command is too long for its configuration pass. Use an embedded script.");
-    const setupScripts = Boolean(value("wifi-mode") || value("builtin-admin") || rows("scripts").length || value("disk-mode") === "erase" && value("recovery") === "false");
+    const setupScripts = Boolean(value("wifi-mode") || value("builtin-admin") || value("guest-tools") || rows("scripts").length || value("disk-mode") === "erase" && value("recovery") === "false");
     for (const pass of ["windowsPE", "specialize", "auditUser"]) if (rows("commands").filter(row => rowValue(row, "pass") === pass).length + (pass === "specialize" && setupScripts ? 2 : pass === "windowsPE" && value("disk-mode") === "erase" ? 1 : 0) > 500) add(rows("commands").find(row => rowValue(row, "pass") === pass).querySelector('[data-key="pass"]'), `${pass} supports up to 500 commands, including generated setup steps.`);
     return issues;
   }
@@ -328,10 +332,10 @@ const answer = (() => {
     if (new TextEncoder().encode(text).length > 1048576) throw new Error("The generated answer file exceeds 1 MiB. Reduce embedded content.");
     return text;
   }
-  function build() {
-    const issues = validate(); renderIssues(issues);
+  function build(mode = value("mode")) {
+    const issues = validate(mode); renderIssues(issues);
     if (issues.length) throw Object.assign(new Error(`Fix ${issues.length} ${issues.length === 1 ? "issue" : "issues"} listed above.`), { issues });
-    if (value("mode") === "xml") return serialize(parse(value("xml")));
+    if (mode === "xml") return serialize(parse(value("xml")));
     const xml = document.implementation.createDocument(ns, "unattend"), root = xml.documentElement;
     const wcm = "http://schemas.microsoft.com/WMIConfig/2002/State"; root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:wcm", wcm);
     const names = { setup: "Microsoft-Windows-Setup", shell: "Microsoft-Windows-Shell-Setup", locale: "Microsoft-Windows-International-Core", winpe: "Microsoft-Windows-International-Core-WinPE", join: "Microsoft-Windows-UnattendedJoin", deployment: "Microsoft-Windows-Deployment" };
@@ -394,6 +398,7 @@ const answer = (() => {
       if (!recovery) script("Disable Windows RE", "& reagentc.exe /disable\nif ($LASTEXITCODE -ne 0) { throw 'Could not disable Windows RE.' }");
     }
     if (value("builtin-admin")) script("Configure built-in Administrator", `$admin = Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | Where-Object { $_.SID -match '-500$' }\nif (!$admin) { throw 'Built-in Administrator was not found.' }\n& net.exe user $admin.Name /active:${value("builtin-admin") === "true" ? "yes" : "no"}\nif ($LASTEXITCODE -ne 0) { throw 'Could not configure built-in Administrator.' }`);
+    if (value("guest-tools") === "virtualbox") script("Install VirtualBox Guest Additions", `$installers = @(Get-CimInstance Win32_CDROMDrive | Where-Object { $_.Drive } | ForEach-Object { Join-Path ($_.Drive + '\\') 'VBoxWindowsAdditions.exe' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })\nif ($installers.Count -ne 1) { throw 'Attach exactly one VirtualBox Guest Additions ISO before Windows Setup.' }\n$result = Start-Process -FilePath $installers[0] -ArgumentList '/S' -Wait -PassThru\nif ($result.ExitCode -ne 0) { throw "VirtualBox Guest Additions installer failed with exit code $($result.ExitCode)." }`);
     if (value("wifi-mode")) {
       let profile = value("wifi-xml");
       if (value("wifi-mode") === "personal") {
@@ -435,7 +440,7 @@ const answer = (() => {
     for (const pass of ["windowsPE", "offlineServicing", "generalize", "specialize", "auditSystem", "auditUser", "oobeSystem"]) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
     if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of value("edition").startsWith("Windows 10 ") ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
     for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
-    const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); delete profile.values.xml; metadata.setAttribute("hash", fingerprint(root)); metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
+    const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.setAttribute("hash", fingerprint(root)); metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
     return serialize(xml);
   }
   function show(open) {
