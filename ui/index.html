@@ -48,9 +48,9 @@
         </header>
         <div class="system-content">
           <dl id="system"><dt>System information</dt><dd>Loading…</dd></dl>
-          <svg id="bohr" viewBox="0 0 31 31" width="62" height="62" role="img" aria-label="Reading preferences" shape-rendering="crispEdges">
-            <g class="bohr-shell"><circle class="bohr-ring" cx="15.5" cy="15.5" r="13"/></g>
-            <circle class="bohr-nucleus" cx="15.5" cy="15.5" r="6"/>
+          <svg id="bohr" viewBox="0 0 60 60" width="120" height="120" role="img" aria-label="Reading preferences">
+            <g class="bohr-shell"><circle class="bohr-ring" cx="30" cy="30" r="26"/></g>
+            <circle class="bohr-nucleus" cx="30" cy="30" r="6.5"/>
           </svg>
         </div>
       </section>
@@ -257,6 +257,14 @@
         <h2 id="settings-title">Settings</h2>
         <div class="preference">
           <div>
+            <h3 id="desktop-layout-safe-mode-label">Desktop icon layout safe mode</h3>
+            <p id="desktop-layout-safe-mode-description" class="preference-description">Back up and restore desktop icon positions whenever Orbital restarts Explorer. Unnecessary for most configurations. Folder view changes always include this protection, even when safe mode is off.</p>
+            <p id="desktop-layout-safe-mode-value" class="preference-value" data-state="disabled">Disabled</p>
+          </div>
+          <button id="desktop-layout-safe-mode-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="desktop-layout-safe-mode-label" aria-describedby="desktop-layout-safe-mode-description" disabled>Toggle</button>
+        </div>
+        <div class="preference">
+          <div>
             <h3 id="skip-prompts-label">Skip confirmation prompts</h3>
             <p id="skip-prompts-description" class="preference-description">Apply changes immediately without holding Shift. Windows Explorer will still restart.</p>
             <p id="skip-prompts-value" class="preference-value" data-state="disabled">Disabled</p>
@@ -307,8 +315,8 @@
   <input id="answer-upload" type="file" accept=".xml,.json" hidden>
   <template id="changes-count">
     <span id="preferences-made">…</span>
-    <svg viewBox="0 0 6 6" width="12" height="12" fill="none" stroke="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
-      <circle cx="3" cy="3" r="2"/>
+    <svg viewBox="0 0 6 6" width="12" height="12" aria-hidden="true" focusable="false">
+      <circle class="bohr-electron" cx="3" cy="3" r="2"/>
     </svg>
   </template>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>

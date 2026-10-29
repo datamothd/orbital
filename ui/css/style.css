@@ -240,6 +240,10 @@ dl {
 #bohr {
   display: block;
   justify-self: end;
+  width: 120px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .changes-count,
@@ -258,6 +262,13 @@ dl {
   animation-direction: reverse;
 }
 
+.bohr-ring,
+.bohr-electron,
+.bohr-electron-pixel,
+.bohr-nucleus {
+  shape-rendering: crispEdges;
+}
+
 .bohr-ring {
   fill: none;
   stroke: #777777;
@@ -266,6 +277,23 @@ dl {
 .bohr-electron {
   fill: #0a0a0a;
   stroke: #ffffff;
+}
+
+.bohr-electron-pixel {
+  transform-origin: 0 0;
+  animation: bohr-spin 60s linear infinite reverse;
+}
+
+.bohr-shell:nth-child(even) .bohr-electron-pixel {
+  animation-direction: normal;
+}
+
+.bohr-electron-outline {
+  fill: #ffffff;
+}
+
+.bohr-electron-core {
+  fill: #0a0a0a;
 }
 
 .bohr-nucleus {

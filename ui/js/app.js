@@ -75,6 +75,7 @@ function setStatus(message, error = false) {
 function setBusy(value) {
   busy = value;
   byId("refresh").disabled = busy || !invoke;
+  byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
   for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
@@ -90,6 +91,17 @@ function setPreferenceValue(id, value, visual = false) {
   element.dataset.state = visual ? "visual" : value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
 }
 
+function bohrPixelCircle(radius) {
+  const step = 0.5;
+  const pixels = Math.max(1, Math.round(radius / step));
+  const rows = [];
+  for (let y = -pixels; y < pixels; y++) {
+    const halfWidth = Math.floor(Math.sqrt(pixels ** 2 - (y + 0.5) ** 2) + 0.5);
+    rows.push(`M${-halfWidth * step} ${y * step}h${halfWidth * step * 2}v${step}h${-halfWidth * step * 2}Z`);
+  }
+  return rows.join("");
+}
+
 function renderBohr() {
   if (!settings) return;
   const available = explorerPreferences.filter(preference => !preference.visual && preferenceAvailable(preference));
@@ -103,11 +115,11 @@ function renderBohr() {
   if (diagram.dataset.changes === changes.join("|")) return;
   diagram.dataset.changes = changes.join("|");
   const shellCount = 1 + Math.ceil(Math.max(0, changes.length - 2) / 8);
-  const center = 15.5 + (shellCount - 1) * 8;
-  const size = center * 2;
-  diagram.setAttribute("viewBox", `0 0 ${size} ${size}`);
-  diagram.setAttribute("width", size * 2);
-  diagram.setAttribute("height", size * 2);
+  const center = 30;
+  const orbitScale = 29 / (13 + (shellCount - 1) * 8 + 2.5);
+  const electronRadius = Math.max(1, Math.round(2.5 * orbitScale * 2) / 2);
+  const electronOutline = bohrPixelCircle(electronRadius);
+  const electronCore = bohrPixelCircle(Math.min(1.7 * orbitScale, electronRadius - 0.5));
   const circle = (radius, className, x = center, y = center) => {
     const element = document.createElementNS(diagram.namespaceURI, "circle");
     for (const [name, value] of Object.entries({ cx: x, cy: y, r: radius, class: className })) {
@@ -118,25 +130,46 @@ function renderBohr() {
   const shells = [];
   for (let index = 0, offset = 0; index === 0 || offset < changes.length; index++) {
     const electrons = changes.slice(offset, offset + (index === 0 ? 2 : 8));
-    const radius = 13 + index * 8;
+    const radius = (13 + index * 8) * orbitScale;
     const shell = document.createElementNS(diagram.namespaceURI, "g");
     shell.classList.add("bohr-shell");
     shell.append(circle(radius, "bohr-ring"));
     electrons.forEach((label, position) => {
       const angle = position * Math.PI * 2 / electrons.length - Math.PI / 2;
-      const electron = circle(2, "bohr-electron", center + Math.cos(angle) * radius, center + Math.sin(angle) * radius);
+      const placement = document.createElementNS(diagram.namespaceURI, "g");
+      placement.setAttribute("transform", `translate(${center + Math.cos(angle) * radius} ${center + Math.sin(angle) * radius})`);
+      const electron = document.createElementNS(diagram.namespaceURI, "g");
+      electron.classList.add("bohr-electron-pixel");
+      for (const [className, outline] of [
+        ["bohr-electron-outline", electronOutline],
+        ["bohr-electron-core", electronCore],
+      ]) {
+        const path = document.createElementNS(diagram.namespaceURI, "path");
+        path.setAttribute("class", className);
+        path.setAttribute("d", outline);
+        electron.append(path);
+      }
       const title = document.createElementNS(diagram.namespaceURI, "title");
       title.textContent = label;
       electron.append(title);
-      shell.append(electron);
+      placement.append(electron);
+      shell.append(placement);
     });
     shells.push(shell);
     offset += electrons.length;
   }
-  diagram.replaceChildren(...shells, circle(6, "bohr-nucleus"));
+  const nucleus = document.createElementNS(diagram.namespaceURI, "path");
+  nucleus.setAttribute("class", "bohr-nucleus");
+  nucleus.setAttribute("d", bohrPixelCircle(5.5 * orbitScale));
+  nucleus.setAttribute("transform", `translate(${center} ${center})`);
+  diagram.replaceChildren(...shells, nucleus);
 }
 
 function renderSettings() {
+  const safeMode = Boolean(settings?.desktop_layout_safe_mode);
+  byId("desktop-layout-safe-mode-toggle").setAttribute("aria-checked", String(safeMode));
+  byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
+  setPreferenceValue("desktop-layout-safe-mode-value", settings ? safeMode ? "Enabled" : "Disabled" : "Loading…");
   document.querySelectorAll(".admin-warning").forEach(adminWarning);
   for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
   for (const preference of explorerPreferences) {
@@ -153,6 +186,22 @@ async function loadSettings() {
   settings = await invoke("explorer_settings");
   renderSettings();
 }
+
+byId("desktop-layout-safe-mode-toggle").addEventListener("click", async () => {
+  if (busy || !settings) return;
+  const enabled = !settings.desktop_layout_safe_mode;
+  setBusy(true);
+  try {
+    await invoke("set_desktop_layout_safe_mode", { enabled });
+    settings.desktop_layout_safe_mode = enabled;
+    renderSettings();
+    setStatus(`Desktop icon layout safe mode ${enabled ? "enabled" : "disabled"}.`);
+  } catch (error) {
+    setStatus(String(error), true);
+  } finally {
+    setBusy(false);
+  }
+});
 
 async function loadAppVersion() {
   try {

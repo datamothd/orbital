@@ -195,7 +195,7 @@ mod tests {
             !layout.items.is_empty(),
             "Place an icon on the desktop before running this test"
         );
-        super::super::restart_explorer("Desktop layout verification", false).unwrap();
+        super::super::restart_explorer("Desktop layout verification", false, true).unwrap();
         std::thread::sleep(Duration::from_secs(1));
         let shell = desktop_view().unwrap();
         layout.verify(&shell.cast().unwrap()).unwrap();

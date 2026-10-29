@@ -41,6 +41,11 @@ async fn explorer_settings() -> Result<explorer::ExplorerSettings, String> {
 }
 
 #[tauri::command]
+async fn set_desktop_layout_safe_mode(enabled: bool) -> Result<(), String> {
+    explorer::set_desktop_layout_safe_mode(enabled).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn set_folder_sort(sort: explorer::FolderSort) -> Result<(), String> {
     explorer::set_folder_sort(sort).map_err(|error| error.to_string())
 }
@@ -102,6 +107,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
+            set_desktop_layout_safe_mode,
             set_folder_sort,
             set_folder_grouping,
             apply_recommended_settings,

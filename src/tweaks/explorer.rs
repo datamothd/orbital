@@ -23,14 +23,30 @@ use winreg::{
     types::ToRegValue,
 };
 
-const CLASSIC_CONTEXT_MENU_KEY: &str = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
+const CLASSIC_CONTEXT_MENU_KEY: &str =
+    r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
+const APP_SETTINGS_KEY: &str = r"Software\Orbital\Settings";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
-const TASKBAR_DEVELOPER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
+const TASKBAR_DEVELOPER_KEY: &str =
+    r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
 const WIDGETS_KEY: &str = r"SOFTWARE\Policies\Microsoft\Dsh";
 const SHELL_ICONS_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Icons";
 const HOME_CLSID: &str = "{f874310e-b6b7-47dc-bc84-b9e6b38f5903}";
 const GALLERY_CLSID: &str = "{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}";
+
+fn desktop_layout_safe_mode_in(user: &RegKey) -> io::Result<bool> {
+    read_toggle(user, APP_SETTINGS_KEY, "DesktopLayoutSafeMode", false)
+}
+
+fn protect_desktop_layout_in(user: &RegKey, folder_views_changed: bool) -> io::Result<bool> {
+    Ok(folder_views_changed || desktop_layout_safe_mode_in(user)?)
+}
+
+pub fn set_desktop_layout_safe_mode(enabled: bool) -> io::Result<()> {
+    let (key, _) = HKCU.create_subkey(APP_SETTINGS_KEY)?;
+    key.set_value("DesktopLayoutSafeMode", &u32::from(enabled))
+}
 
 fn is_administrator() -> io::Result<bool> {
     use std::ffi::c_void;
@@ -109,6 +125,7 @@ fn classic_context_menu_enabled() -> io::Result<bool> {
 #[derive(Default, serde::Serialize)]
 pub struct ExplorerSettings {
     pub is_administrator: bool,
+    pub desktop_layout_safe_mode: bool,
     pub folder_sort: Option<FolderSort>,
     pub folder_grouping: Option<FolderGrouping>,
     pub disable_taskbar_centering: bool,
@@ -138,6 +155,7 @@ pub fn settings() -> io::Result<ExplorerSettings> {
     let taskbar_end_task_supported = supports_taskbar_end_task(build)?;
     Ok(ExplorerSettings {
         is_administrator: is_administrator()?,
+        desktop_layout_safe_mode: desktop_layout_safe_mode_in(HKCU)?,
         folder_sort: folder_views::current()?,
         folder_grouping: folder_views::current_grouping()?,
         disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
@@ -423,7 +441,7 @@ fn apply_toggle(
         "{name} saved: {}",
         if current { "disabled" } else { "enabled" }
     );
-    restart_explorer(name, false)
+    restart_explorer(name, false, false)
 }
 
 struct DwordPreference {
@@ -752,6 +770,7 @@ pub fn apply_recommended_settings(
     restart_explorer(
         "Recommended settings",
         preferences.contains(&Recommendation::HideShortcutArrow),
+        !view_changes.is_empty(),
     )?;
     Ok(preferences)
 }
@@ -827,18 +846,19 @@ pub fn restore_original_settings() -> io::Result<bool> {
         changes
             .iter()
             .any(|change| recommendation(change) == Some(Recommendation::HideShortcutArrow)),
+        views_restored,
     )?;
     Ok(true)
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
     folder_views::apply(sort)?;
-    restart_explorer("Folder sorting", false)
+    restart_explorer("Folder sorting", false, true)
 }
 
 pub fn set_folder_grouping(grouping: FolderGrouping) -> io::Result<()> {
     folder_views::apply_grouping(grouping)?;
-    restart_explorer("Folder grouping", false)
+    restart_explorer("Folder grouping", false, true)
 }
 
 fn transparent_icon() -> Vec<u8> {
@@ -942,7 +962,7 @@ fn toggle_shortcut_arrow(yes: bool, replace_blank_icon: bool) -> io::Result<()> 
         "{name} saved: {}",
         if current { "disabled" } else { "enabled" }
     );
-    restart_explorer(name, true)
+    restart_explorer(name, true, false)
 }
 
 fn clear_icon_cache(local: &Path) -> io::Result<()> {
@@ -960,13 +980,21 @@ fn clear_icon_cache(local: &Path) -> io::Result<()> {
     optional(std::fs::remove_file(local.join("IconCache.db"))).map(|_| ())
 }
 
-fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
+fn restart_explorer(
+    setting: &str,
+    rebuild_icons: bool,
+    folder_views_changed: bool,
+) -> io::Result<()> {
     #[link(name = "user32")]
     unsafe extern "system" {
         fn GetShellWindow() -> *mut std::ffi::c_void;
         fn GetWindowThreadProcessId(window: *mut std::ffi::c_void, process: *mut u32) -> u32;
     }
-    let desktop = desktop_layout::DesktopLayout::capture()?;
+    let desktop = if protect_desktop_layout_in(HKCU, folder_views_changed)? {
+        Some(desktop_layout::DesktopLayout::capture()?)
+    } else {
+        None
+    };
     let mut process = 0;
     unsafe { GetWindowThreadProcessId(GetShellWindow(), &mut process) };
     if process == 0 {
@@ -1003,7 +1031,9 @@ fn restart_explorer(setting: &str, rebuild_icons: bool) -> io::Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    desktop.restore()?;
+    if let Some(desktop) = desktop {
+        desktop.restore()?;
+    }
     cache_result.map_err(|error| {
         io::Error::other(format!(
             "{setting} saved, but the icon cache could not be rebuilt: {error}"
@@ -1051,6 +1081,26 @@ mod tests {
     impl Drop for TestRegistry {
         fn drop(&mut self) {
             HKCU.delete_subkey_all(&self.path).unwrap();
+        }
+    }
+
+    #[test]
+    fn desktop_layout_protection_is_automatic_for_folder_views_and_opt_in_for_other_changes() {
+        let user = TestRegistry::new();
+        assert!(!desktop_layout_safe_mode_in(&user.key).unwrap());
+        assert!(!protect_desktop_layout_in(&user.key, false).unwrap());
+        assert!(protect_desktop_layout_in(&user.key, true).unwrap());
+
+        let (key, _) = user.key.create_subkey(APP_SETTINGS_KEY).unwrap();
+        for enabled in [true, false] {
+            key.set_value("DesktopLayoutSafeMode", &u32::from(enabled))
+                .unwrap();
+            assert_eq!(desktop_layout_safe_mode_in(&user.key).unwrap(), enabled);
+            assert_eq!(
+                protect_desktop_layout_in(&user.key, false).unwrap(),
+                enabled
+            );
+            assert!(protect_desktop_layout_in(&user.key, true).unwrap());
         }
     }
 

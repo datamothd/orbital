@@ -342,6 +342,7 @@ pub fn apply_imported_tweaks(
     restart_explorer(
         "Settings",
         selected().any(|tweak| *tweak == Preference::HideShortcutArrow),
+        !views.is_empty(),
     )?;
     Ok(count)
 }
@@ -517,6 +518,7 @@ mod tests {
     fn export_preserves_enabled_and_disabled_supported_tweaks_and_known_folder_values() {
         let mut current = ExplorerSettings {
             is_administrator: false,
+            desktop_layout_safe_mode: false,
             windows11_supported: true,
             folder_sort: Some(FolderSort {
                 column: SortColumn::Size,
