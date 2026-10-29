@@ -171,6 +171,9 @@ function renderSettings() {
   byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
   setPreferenceValue("desktop-layout-safe-mode-value", settings ? safeMode ? "Enabled" : "Disabled" : "Loading…");
   document.querySelectorAll(".admin-warning").forEach(adminWarning);
+  document.querySelectorAll(".admin-requirement").forEach(note => {
+    note.dataset.state = settings?.is_administrator === true ? "granted" : settings?.is_administrator === false ? "missing" : "unknown";
+  });
   for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, preferenceAvailable(preference)
@@ -282,7 +285,28 @@ function adminWarning(warning = document.createElement("span")) {
   const administrator = settings?.is_administrator;
   warning.className = "admin-warning";
   warning.dataset.state = administrator === true ? "granted" : administrator === false ? "missing" : "unknown";
-  warning.textContent = `⚠${administrator === true ? " ✓" : administrator === false ? " ✕" : ""}`;
+  const icon = (pathData, detail) => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    for (const [name, value] of Object.entries({ viewBox: "0 0 24 24", width: 16, height: 16, fill: "none", stroke: "currentColor", "stroke-width": 1.75, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false" })) {
+      svg.setAttribute(name, value);
+    }
+    const path = document.createElementNS(svg.namespaceURI, "path");
+    path.setAttribute("d", pathData);
+    svg.append(path);
+    if (detail) {
+      const mark = document.createElementNS(svg.namespaceURI, "path");
+      mark.setAttribute("d", detail);
+      mark.setAttribute("fill", "currentColor");
+      mark.setAttribute("stroke", "none");
+      svg.append(mark);
+    }
+    return svg;
+  };
+  const icons = [icon("M12 3 22 21H2Z", "M10.5 8h3v6h-3Z M10.5 16.5h3v3h-3Z")];
+  if (administrator !== undefined && administrator !== null) {
+    icons.push(icon(administrator ? "M3 12l6 9L21 3" : "M3 3l18 18 M21 3 3 21"));
+  }
+  warning.replaceChildren(...icons);
   warning.title = `Requires administrator access${administrator === true ? " · Access found" : administrator === false ? " · Access not found" : ""}`;
   warning.setAttribute("role", "img");
   warning.setAttribute("aria-label", warning.title);

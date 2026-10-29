@@ -432,6 +432,11 @@ button:disabled {
   color: #b97575;
 }
 
+.admin-warning[data-state="granted"],
+.admin-requirement[data-state="granted"] {
+  color: #75b975;
+}
+
 .preference + .preference {
   border-top: 1px solid #333333;
 }
@@ -570,9 +575,20 @@ dialog > :last-child {
 }
 
 .admin-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   margin-left: 6px;
-  font-family: "Segoe UI Symbol", sans-serif;
-  font-size: 12px;
+  vertical-align: -3px;
+  cursor: help;
+}
+
+.admin-warning svg {
+  display: block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
 }
 
 .changes-options {
