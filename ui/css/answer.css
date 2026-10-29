@@ -9,6 +9,12 @@
 
 .answer-source-form {
   display: grid;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.answer-source-form > .answer-actions {
+  margin-top: 8px;
 }
 
 .answer-source-form > label {

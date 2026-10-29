@@ -54,7 +54,7 @@ const answer = (() => {
       ["hide-license", "Skip license terms page", choice(yesNo)], ["hide-oem", "Skip manufacturer registration", choice(yesNo)],
       ["hide-online", "Skip Microsoft account screens", choice(yesNo, { help: "Configure a local account. Support depends on the Windows image." })],
       ["hide-wireless", "Skip Wi-Fi setup screen", choice(yesNo)],
-      ["protection", "Use Express settings", choice([["", "Windows default"], ["1", "Y"], ["3", "N"]], { toggle: true, help: "Controls the initial Express privacy and protection choices." })]
+      ["protection", "Use Express settings", choice([["", "Windows default"], ["1", "Y"], ["3", "N"]], { toggle: true, help: "Y enables Express settings, including data sharing, location and advertising personalization, and some web protections. N turns Express settings off; it does not disable all Windows telemetry. Available settings depend on the Windows version." })]
     ]],
     ["network", "Workgroup & domain", [
       ["join-mode", "Membership", choice([["", "Windows default"], ["workgroup", "Workgroup"], ["domain", "Active Directory domain"]])],
@@ -71,7 +71,7 @@ const answer = (() => {
     ]],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
     ["virtual-machine", "Virtual machine", [
-      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Attach the matching VirtualBox Guest Additions ISO in a second virtual optical drive before starting Windows Setup. The installer runs during setup; a restart may be needed." })]
+      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Supply the matching Guest Additions ISO through VirtualBox: attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO. Installation runs automatically at sign-in; restart Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
     ]],
     ["commands", "Setup commands", []],
     ["scripts", "Embedded installation scripts", [
@@ -172,10 +172,10 @@ const answer = (() => {
       }
       section.append(grid); sections.set(id, section); byId("answer-groups").append(section);
     }
-    const copy = element("button", "answer-add", "Copy settings to XML"); copy.type = "button";
+    const copy = element("button", "answer-add answer-wide", "Copy settings to XML"); copy.type = "button";
     copy.addEventListener("click", () => attempt(() => { const xml = build("guided"); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); status("Installation settings copied to XML."); }));
     const copyNote = element("p", "note answer-wide", "Copying settings replaces any XML in the complete answer file field.");
-    sections.get("advanced").querySelector(".answer-grid").append(copy, copyNote);
+    controls.get("xml").closest(".answer-field").before(copy, copyNote);
     byId("answer-form").addEventListener("input", update);
     byId("answer-form").addEventListener("change", update);
     byId("answer-form").addEventListener("reset", () => { for (const list of lists.values()) list.replaceChildren(); byId("answer-search").value = ""; requestAnimationFrame(update); });
@@ -332,6 +332,50 @@ const answer = (() => {
     if (new TextEncoder().encode(text).length > 1048576) throw new Error("The generated answer file exceeds 1 MiB. Reduce embedded content.");
     return text;
   }
+  function virtualBoxScripts(folder, hidden, logging) {
+    const quote = text => "'" + text.replaceAll("'", "''") + "'";
+    const task = "Orbital Install VirtualBox Guest Additions";
+    return {
+      install: `$ErrorActionPreference = 'Stop'
+${logging ? `New-Item -ItemType Directory -Path "$env:ProgramData\\Orbital\\Logs" -Force | Out-Null
+Start-Transcript -Path "$env:ProgramData\\Orbital\\Logs\\virtualbox.log" -Append | Out-Null` : ""}
+try {
+  for ($attempt = 0; (Get-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\Setup').SystemSetupInProgress; $attempt++) {
+    if ($attempt -eq 60) { throw 'Windows Setup is still running. Installation will retry at the next sign-in.' }
+    Start-Sleep -Seconds 5
+  }
+  for ($attempt = 0; $attempt -lt 12; $attempt++) {
+    $installers = @(Get-CimInstance Win32_CDROMDrive | Where-Object { $_.Drive } | ForEach-Object { Join-Path ($_.Drive + '\\') 'VBoxWindowsAdditions.exe' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    if ($installers.Count -gt 0) { break }
+    if ($attempt -lt 11) { Start-Sleep -Seconds 5 }
+  }
+  if ($installers.Count -ne 1) { throw 'Attach exactly one VirtualBox Guest Additions ISO. Installation will retry at the next sign-in.' }
+  $media = Split-Path -Parent $installers[0]
+  $certTool = Join-Path $media 'cert\\VBoxCertUtil.exe'
+  $certificates = Join-Path $media 'cert\\vbox*.cer'
+  if (!(Test-Path -LiteralPath $certTool -PathType Leaf) -or !(Test-Path -Path $certificates -PathType Leaf)) { throw 'Guest Additions signing certificates were not found on the ISO.' }
+  & $certTool add-trusted-publisher $certificates --root $certificates
+  if ($LASTEXITCODE -ne 0) { throw "Guest Additions certificate setup failed with exit code $LASTEXITCODE." }
+  Write-Output "Installer: $($installers[0])"
+  $result = Start-Process -FilePath $installers[0] -WorkingDirectory $media -ArgumentList '/S' -Wait -PassThru
+  Write-Output "Installer exit code: $($result.ExitCode)"
+  if ($result.ExitCode -notin @(0, 3010)) { throw "VirtualBox Guest Additions installer failed with exit code $($result.ExitCode)." }
+  if (!(Get-Service -Name VBoxService -ErrorAction SilentlyContinue)) { throw 'The installer returned success, but the VirtualBox Guest Additions service was not found.' }
+  Write-Output 'VirtualBox Guest Additions is installed. Restart Windows to finish installation.'
+  Unregister-ScheduledTask -TaskName ${quote(task)} -Confirm:$false
+} catch {
+  Write-Warning $_.Exception.Message
+  exit 1
+} finally {
+${logging ? "  Stop-Transcript -ErrorAction SilentlyContinue | Out-Null" : ""}
+}`,
+      register: `$action = New-ScheduledTaskAction -Execute "$env:WINDIR\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Argument ${quote(`-NoProfile -ExecutionPolicy Bypass${hidden} -File "${folder}\\virtualbox.ps1"`)}
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$principal = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null`
+    };
+  }
   function build(mode = value("mode")) {
     const issues = validate(mode); renderIssues(issues);
     if (issues.length) throw Object.assign(new Error(`Fix ${issues.length} ${issues.length === 1 ? "issue" : "issues"} listed above.`), { issues });
@@ -398,7 +442,11 @@ const answer = (() => {
       if (!recovery) script("Disable Windows RE", "& reagentc.exe /disable\nif ($LASTEXITCODE -ne 0) { throw 'Could not disable Windows RE.' }");
     }
     if (value("builtin-admin")) script("Configure built-in Administrator", `$admin = Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | Where-Object { $_.SID -match '-500$' }\nif (!$admin) { throw 'Built-in Administrator was not found.' }\n& net.exe user $admin.Name /active:${value("builtin-admin") === "true" ? "yes" : "no"}\nif ($LASTEXITCODE -ne 0) { throw 'Could not configure built-in Administrator.' }`);
-    if (value("guest-tools") === "virtualbox") script("Install VirtualBox Guest Additions", `$installers = @(Get-CimInstance Win32_CDROMDrive | Where-Object { $_.Drive } | ForEach-Object { Join-Path ($_.Drive + '\\') 'VBoxWindowsAdditions.exe' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })\nif ($installers.Count -ne 1) { throw 'Attach exactly one VirtualBox Guest Additions ISO before Windows Setup.' }\n$result = Start-Process -FilePath $installers[0] -ArgumentList '/S' -Wait -PassThru\nif ($result.ExitCode -ne 0) { throw "VirtualBox Guest Additions installer failed with exit code $($result.ExitCode)." }`);
+    if (value("guest-tools") === "virtualbox") {
+      const guest = virtualBoxScripts(folder, hidden, value("logging") !== "false");
+      embed("virtualbox.ps1", guest.install);
+      script("Schedule VirtualBox Guest Additions installation", guest.register);
+    }
     if (value("wifi-mode")) {
       let profile = value("wifi-xml");
       if (value("wifi-mode") === "personal") {

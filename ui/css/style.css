@@ -903,7 +903,13 @@ button.primary:hover:not(:disabled) {
 
 .inject-choices {
   display: grid;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.inject-choices > .note,
+.inject-choices > .inject-dismiss {
+  margin-top: 8px;
 }
 
 .inject-choices button {
