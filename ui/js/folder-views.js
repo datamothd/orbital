@@ -15,20 +15,6 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
   let selected = -1;
   let active = 0;
 
-  function refresh() {
-    choices = typeof getChoices === "function" ? getChoices() : getChoices;
-    options = choices.map((choice, index) => {
-      const option = document.createElement("div");
-      option.id = `${menu.id}-option-${index}`;
-      option.setAttribute("role", "option");
-      option.setAttribute("aria-selected", "false");
-      option.textContent = choice.label;
-      option.addEventListener("click", () => choose(index));
-      return option;
-    });
-    menu.replaceChildren(...options);
-  }
-
   function close(focus = false) {
     menu.hidden = true;
     picker.setAttribute("aria-expanded", "false");
@@ -62,11 +48,12 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
     closeChoicePicker();
     const bounds = picker.getBoundingClientRect();
     const available = Math.max(80, Math.max(bounds.top, window.innerHeight - bounds.bottom) - 16);
-    menu.style.width = `${Math.min(bounds.width, window.innerWidth - 32)}px`;
+    const maxWidth = window.innerWidth - 32;
+    menu.style.width = `${Math.min(bounds.width, maxWidth)}px`;
     menu.style.maxHeight = `${Math.min(260, available)}px`;
     menu.hidden = false;
     const scrollbarWidth = menu.offsetWidth - menu.clientWidth - menu.clientLeft * 2;
-    menu.style.width = `${Math.min(bounds.width + scrollbarWidth, window.innerWidth - 32)}px`;
+    menu.style.width = `${Math.min(bounds.width + scrollbarWidth, maxWidth)}px`;
     menu.style.left = `${Math.max(16, Math.min(bounds.left, window.innerWidth - menu.offsetWidth - 16))}px`;
     menu.style.top = `${bounds.bottom + menu.offsetHeight + 8 <= window.innerHeight
       ? bounds.bottom + 6 : Math.max(8, bounds.top - menu.offsetHeight - 6)}px`;
@@ -95,15 +82,27 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
       else activate(event.key === "Home" ? 0 : event.key === "End" ? choices.length - 1
         : active + (event.key === "ArrowDown" ? 1 : -1));
     } else if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      const index = choices.findIndex((choice, index) => index > active
-        && choice.label.toLowerCase().startsWith(event.key.toLowerCase()));
-      const fallback = choices.findIndex(choice => choice.label.toLowerCase().startsWith(event.key.toLowerCase()));
-      if (index >= 0 || fallback >= 0) activate(index >= 0 ? index : fallback);
+      for (let offset = 1; offset <= choices.length; offset++) {
+        const index = (active + offset) % choices.length;
+        if (choices[index].label.toLowerCase().startsWith(event.key.toLowerCase())) {
+          activate(index);
+          break;
+        }
+      }
     }
   });
   return {
     load(current) {
-      refresh();
+      choices = typeof getChoices === "function" ? getChoices() : getChoices;
+      options = choices.map((choice, index) => {
+        const option = element("div", "", choice.label);
+        option.id = `${menu.id}-option-${index}`;
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        option.addEventListener("click", () => choose(index));
+        return option;
+      });
+      menu.replaceChildren(...options);
       select(choices.findIndex(choice => matches(choice.value, current)));
       close();
     },
@@ -125,6 +124,7 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
   const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder, () => { apply.disabled = picker.disabled || control.selected === null; }, matches);
   return {
     matches,
+    choices,
     labelFor: value => choices.find(choice => matches(choice.value, value))?.label || fallback,
     load(current, available = true) {
       control.load(current);

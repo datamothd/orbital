@@ -6,9 +6,7 @@ function importedRows(profile) {
   const rows = importedTweaks.map(([field, enabled]) => {
     const preference = explorerPreferences.find(preference => preference.field === field);
     const matching = settings[field] === enabled;
-    const blocked = !matching && (!preferenceAvailable(preference)
-      ? "Unavailable" : preference.requiresAdmin && !settings.is_administrator
-      ? "Requires administrator access" : "");
+    const blocked = !matching && preferenceRestriction(preference, "Unavailable");
     return {
       field,
       label: preference.label,
@@ -58,17 +56,12 @@ function previewImport(profile) {
     checkbox.disabled = row.matching || Boolean(row.blocked);
     checkbox.checked = !checkbox.disabled;
     if (!row.matching) {
-      const comparison = document.createElement("span");
-      comparison.className = "import-comparison";
-      comparison.textContent = `Current: ${row.current} → Imported: ${row.imported}`;
-      text.append(comparison);
+      text.append(element("span", "import-comparison", `Current: ${row.current} → Imported: ${row.imported}`));
     }
-    const state = document.createElement("span");
-    state.className = "import-state";
-    state.textContent = row.matching
+    const state = row.matching
       ? row.imported === "Enabled" ? "Already enabled" : row.imported === "Disabled" ? "Already disabled" : "Already matches"
       : row.blocked || "Will change";
-    text.append(state);
+    text.append(element("span", "import-state", state));
     return label;
   }));
   updateImportSelection();

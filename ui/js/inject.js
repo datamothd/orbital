@@ -19,8 +19,7 @@ function drawIsoDisc() {
   const canvas = document.querySelector(".inject-disc");
   const context = canvas.getContext("2d");
   const center = canvas.width / 2;
-  context.strokeStyle = getComputedStyle(canvas).color;
-  context.fillStyle = context.strokeStyle;
+  context.fillStyle = context.strokeStyle = getComputedStyle(canvas).color;
   drawPixelCircle(context, center, 18);
   for (const radius of [6, 2]) {
     context.beginPath();
@@ -77,7 +76,7 @@ async function changeInjectFile(kind, clear = false) {
   try {
     const file = invoke ? await invoke(clear ? "clear_injection_file" : "select_injection_file", { kind }) : null;
     if (clear || file) setInjectFile(kind, file || null);
-    return clear || Boolean(file);
+  return clear || Boolean(file);
   } catch (error) {
     setInjectStatus(String(error), true);
   } finally {
@@ -114,19 +113,12 @@ for (const kind of Object.keys(injectFiles)) {
     event.preventDefault();
     changeInjectFile(kind);
   });
-  input.addEventListener("change", async () => {
+  input.addEventListener("change", () => {
     if (invoke || kind === "xml") return;
     const file = input.files[0];
     if (!file) return;
-    let message = "";
-    try {
-      if (!file.name.toLowerCase().endsWith(`.${kind}`) || !file.size) {
-        throw new Error(`Choose a non-empty .${kind} file.`);
-      }
-    } catch (error) {
-      message = error.message || String(error);
-    }
-    if (input.files[0] !== file) return;
+    const message = !file.name.toLowerCase().endsWith(`.${kind}`) || !file.size
+      ? `Choose a non-empty .${kind} file.` : "";
     setInjectFile(kind, message ? null : file);
     if (message) {
       input.setAttribute("aria-invalid", "true");

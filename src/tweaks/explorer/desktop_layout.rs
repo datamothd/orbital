@@ -143,14 +143,21 @@ impl DesktopLayout {
             view.SetGroupBy(&self.group, self.group_ascending.as_bool())?;
             view.SetSortColumns(&self.sort)?;
             view.SetCurrentFolderFlags(ARRANGEMENT_FLAGS, 0)?;
-            let positioned = self.items.iter().try_for_each(|(item, position)| {
+            let (items, positions): (Vec<_>, Vec<_>) = self
+                .items
+                .iter()
+                .map(|(item, position)| (item.0.cast_const(), *position))
+                .unzip();
+            let positioned = if items.is_empty() {
+                Ok(())
+            } else {
                 view.SelectAndPositionItems(
-                    1,
-                    &item.0.cast_const(),
-                    Some(position),
+                    items.len() as u32,
+                    items.as_ptr(),
+                    Some(positions.as_ptr()),
                     SVSI_POSITIONITEM.0 as u32,
                 )
-            });
+            };
             let flags = view.SetCurrentFolderFlags(ARRANGEMENT_FLAGS, self.flags);
             positioned?;
             flags?;

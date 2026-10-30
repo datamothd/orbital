@@ -15,10 +15,16 @@
 }
 
 :root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
   --panel-padding: 20px;
   font-family: "Anonymous Pro", monospace;
-  color: #ffffff;
-  background: #000000;
+  color: #fff;
+  background: #000;
   color-scheme: dark;
   font-size: 14px;
 }
@@ -51,7 +57,7 @@ body {
 
 main {
   max-width: 640px;
-  padding: 16px;
+  padding: var(--space-4);
   margin: 0;
 }
 
@@ -59,7 +65,7 @@ html:has(#tweaks-tab[aria-selected="true"]) main {
   width: min(640px, 100vw);
 }
 
-[role="tabpanel"] > section:last-child {
+[role="tabpanel"] > :is(section, details):last-child {
   margin-bottom: 0;
 }
 
@@ -87,7 +93,7 @@ html:has(#tweaks-tab[aria-selected="true"]) main {
   min-height: 30px;
   color: #b3b3b3;
   background: #0a0a0a;
-  border-color: #333333;
+  border-color: #333;
 }
 
 .navigation-tabs button {
@@ -101,9 +107,9 @@ html:has(#tweaks-tab[aria-selected="true"]) main {
 }
 
 .navigation-tabs button[aria-selected="true"] {
-  color: #ffffff;
+  color: #fff;
   background: #171717;
-  border-color: #777777;
+  border-color: #777;
 }
 
 .section-header,
@@ -124,7 +130,7 @@ summary,
 }
 
 .section-header {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 
 .section-header button,
@@ -136,22 +142,22 @@ summary,
 h2 {
   font-size: 15px;
   font-weight: 700;
-  margin: 0 0 18px;
+  margin: 0 0 var(--space-4);
 }
 
 h3 {
   font-size: 14px;
   font-weight: 400;
-  margin: 0 0 5px;
+  margin: 0 0 var(--space-1);
 }
 
 section,
 details {
   background: #0a0a0a;
-  border: 1px solid #333333;
+  border: 1px solid #333;
   border-radius: 12px;
   padding: var(--panel-padding);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 summary {
@@ -196,8 +202,8 @@ summary::after {
   content: "";
   width: 8px;
   height: 8px;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
   transform: translateY(-2px) rotate(45deg);
   flex-shrink: 0;
   margin: 0 3px;
@@ -210,7 +216,7 @@ details[open] > summary {
 .preferences-divider {
   margin: 0;
   border: 0;
-  border-top: 1px solid #333333;
+  border-top: 1px solid #333;
 }
 
 details[open] > summary::after {
@@ -218,7 +224,7 @@ details[open] > summary::after {
 }
 
 summary:focus-visible {
-  outline: 2px solid #ffffff;
+  outline: 2px solid #fff;
   outline-offset: 5px;
 }
 
@@ -271,12 +277,12 @@ dl {
 
 .bohr-ring {
   fill: none;
-  stroke: #777777;
+  stroke: #777;
 }
 
 .bohr-electron {
   fill: #0a0a0a;
-  stroke: #ffffff;
+  stroke: #fff;
 }
 
 .bohr-electron-pixel {
@@ -288,20 +294,17 @@ dl {
   animation-direction: normal;
 }
 
-.bohr-electron-outline {
-  fill: #ffffff;
+.bohr-electron-outline,
+.bohr-nucleus {
+  fill: #fff;
 }
 
 .bohr-electron-core {
   fill: #0a0a0a;
 }
 
-.bohr-nucleus {
-  fill: #ffffff;
-}
-
 @keyframes bohr-spin {
-  to { transform: rotate(1turn); }
+  to { transform: rotate(360deg); }
 }
 
 dt,
@@ -314,7 +317,7 @@ dt,
 #apply-recommended,
 .tested-system-check,
 .recommended-color,
-#recommendation-list,
+.recommendation-list,
 .preference .preference-value[data-state="enabled"],
 .import-state,
 .inject-tree .ready,
@@ -357,9 +360,9 @@ button {
   font: inherit;
   font-size: 12px;
   padding: 9px 14px;
-  color: #ffffff;
+  color: #fff;
   background: #171717;
-  border: 1px solid #555555;
+  border: 1px solid #555;
   border-radius: 7px;
   cursor: pointer;
 }
@@ -369,7 +372,7 @@ button:hover:not(:disabled) {
 }
 
 button:focus-visible {
-  outline: 2px solid #ffffff;
+  outline: 2px solid #fff;
   outline-offset: 3px;
 }
 
@@ -379,16 +382,71 @@ button:disabled {
 }
 
 .settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-2);
+}
+
+#batch-changes {
+  grid-column: 1 / -1;
+}
+
+.batch-folder-view {
   display: flex;
-  gap: 10px;
-  margin: -8px 0 8px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: var(--space-2) 6px;
+  border-top: 1px solid #292929;
+  border-bottom: 1px solid #292929;
+}
+
+.batch-folder-view > span {
+  flex: 1;
+}
+
+.batch-folder-view + .batch-folder-view {
+  border-top: 0;
+}
+
+.recommendation-list > label:has(+ .batch-folder-view) {
+  margin-bottom: 3px;
+}
+
+.batch-folder-view + label {
+  margin-top: 3px;
+}
+
+.batch-folder-view select {
+  max-width: 55%;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #facc15;
+  background: #171717;
+  border: 1px solid #555;
+  border-radius: 3px;
+}
+
+.batch-folder-view select:hover {
+  border-color: #888;
+}
+
+.batch-folder-view select:focus-visible {
+  outline: 2px solid #facc15;
+  outline-offset: 2px;
+}
+
+#batch-list label:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .settings-actions button {
-  flex: 1;
   font-size: 14px;
   background: #0a0a0a;
-  border-color: #333333;
+  border-color: #333;
 }
 
 .settings-actions button:hover:not(:disabled) {
@@ -396,7 +454,7 @@ button:disabled {
 }
 
 .preference {
-  padding: 12px 0;
+  padding: var(--space-3) 0;
 }
 
 #settings-title {
@@ -413,13 +471,13 @@ button:disabled {
 
 .preference-group {
   margin: 0;
-  padding-top: 14px;
-  border-top: 1px solid #333333;
+  padding-top: var(--space-4);
+  border-top: 1px solid #333;
   font-weight: 700;
 }
 
 .preference:has(+ .preference-group) {
-  padding-bottom: 14px;
+  padding-bottom: var(--space-4);
 }
 
 .preference .preference-description {
@@ -438,7 +496,7 @@ button:disabled {
 }
 
 .preference + .preference {
-  border-top: 1px solid #333333;
+  border-top: 1px solid #333;
 }
 
 #explorer-preferences > .preference:last-child {
@@ -485,10 +543,10 @@ button:disabled {
   z-index: 10;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #555555 #171717;
+  scrollbar-color: #555 #171717;
   padding: 4px;
   background: #171717;
-  border: 1px solid #555555;
+  border: 1px solid #555;
   border-radius: 7px;
   box-shadow: 0 8px 24px #0009;
   font-size: 12px;
@@ -513,11 +571,11 @@ button:disabled {
 .note {
   font-size: 12px;
   line-height: 1.6;
-  margin: 14px 0 0;
+  margin: var(--space-4) 0 0;
 }
 
 #explorer-preferences > .note {
-  margin-bottom: 6px;
+  margin: 6px 0;
 }
 
 #status {
@@ -537,10 +595,10 @@ button:disabled {
 dialog {
   overscroll-behavior: contain;
   background: #0a0a0a;
-  color: #ffffff;
-  border: 1px solid #555555;
+  color: #fff;
+  border: 1px solid #555;
   border-radius: 12px;
-  padding: 24px;
+  padding: var(--space-6);
   max-width: 380px;
   width: calc(100% - 40px);
   max-height: calc(100vh - 32px);
@@ -556,14 +614,17 @@ dialog p {
   overflow-wrap: anywhere;
 }
 
+dialog > :is(h2, p, form, details) {
+  margin: 0;
+}
+
+dialog > :not([hidden]) ~ :not([hidden]) {
+  margin-top: var(--space-4);
+}
+
 .changes-dialog {
   --list-space: 252px;
   max-width: 460px;
-  padding: 16px;
-}
-
-.changes-dialog > :is(h2, p, form) {
-  margin: 8px 0;
 }
 
 dialog > :first-child {
@@ -592,10 +653,10 @@ dialog > :last-child {
 }
 
 .changes-options {
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
-  background: #000000;
-  border-color: #555555;
+  background: #000;
+  border-color: #555;
   border-radius: 3px;
 }
 
@@ -607,11 +668,15 @@ dialog > :last-child {
 }
 
 .changes-options[open] > summary {
-  border-bottom: 1px solid #555555;
+  border-bottom: 1px solid #555;
 }
 
-#recommendation-scroll > .note {
-  margin: 8px 10px;
+.recommendation-scroll > .note {
+  margin: var(--space-2) 9px;
+}
+
+.recommendation-scroll > .preferences-divider {
+  margin-inline: 3px;
 }
 
 .changes-scroll {
@@ -625,6 +690,10 @@ dialog > :last-child {
   font-size: 12px;
 }
 
+.recommendation-scroll > .changes-list {
+  padding-bottom: 0;
+}
+
 .changes-list label {
   display: flex;
   gap: 8px;
@@ -632,19 +701,19 @@ dialog > :last-child {
   cursor: pointer;
 }
 
-#recommendation-list label {
+.recommendation-list label {
   align-items: center;
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
 }
 
-#recommendation-list label:hover,
-#recommendation-list label:focus-within {
+.recommendation-list > label:hover,
+.recommendation-list > label:has(input:focus-visible) {
   background: #1f2937;
   outline: 1px solid #475569;
   outline-offset: -1px;
 }
 
-#recommendation-list input {
+.recommendation-list input {
   flex-shrink: 0;
   margin: 0;
   color: inherit;
@@ -655,7 +724,7 @@ dialog form {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 24px;
+  margin-top: var(--space-4);
 }
 
 dialog .confirmation-footer {
@@ -663,19 +732,19 @@ dialog .confirmation-footer {
   flex-wrap: wrap;
 }
 
-#confirm-admin-note {
+.selection-note {
   flex: 1 1 150px;
   margin: 0;
   color: #b97575;
 }
 
-.changes-dialog #confirm-admin-note {
+.changes-dialog .selection-note {
   display: block;
   min-width: 150px;
-  min-height: 3.2em;
+  min-height: 38.4px;
 }
 
-.changes-dialog #confirm-admin-note[hidden] {
+.changes-dialog .selection-note[hidden] {
   visibility: hidden;
 }
 
@@ -696,11 +765,11 @@ dialog .confirmation-footer {
 
 .import-row {
   align-items: flex-start;
-  padding: 7px 6px;
+  padding: var(--space-2);
 }
 
 .import-row + .import-row {
-  border-top: 1px solid #222222;
+  border-top: 1px solid #222;
 }
 
 .import-row:has(input:enabled):hover,
@@ -725,9 +794,9 @@ dialog .confirmation-footer {
 }
 
 button.primary {
-  background: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
+  background: #fff;
+  color: #000;
+  border-color: #fff;
 }
 
 button.primary:hover:not(:disabled) {
@@ -739,7 +808,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .inject-intro {
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-5);
 }
 
 .inject-tag,
@@ -750,7 +819,7 @@ button.primary:hover:not(:disabled) {
 
 .inject-tag {
   padding: 3px 6px;
-  border: 1px solid #333333;
+  border: 1px solid #333;
   border-radius: 4px;
 }
 
@@ -766,21 +835,21 @@ button.primary:hover:not(:disabled) {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 18px;
-  border: 1px dashed #555555;
+  padding: var(--space-4);
+  border: 1px dashed #555;
   border-radius: 8px;
-  background: #000000;
+  background: #000;
   cursor: pointer;
 }
 
 .inject-file:hover,
 .inject-file:focus-within {
-  background: #111111;
+  background: #111;
   border-color: #b3b3b3;
 }
 
 .inject-file:has(:focus-visible) {
-  outline: 2px solid #ffffff;
+  outline: 2px solid #fff;
   outline-offset: 3px;
 }
 
@@ -792,12 +861,8 @@ button.primary:hover:not(:disabled) {
   padding-right: 24px;
 }
 
-.inject-remove,
-#inject-download {
-  z-index: 1;
-}
-
 .inject-remove {
+  z-index: 1;
   position: absolute;
   top: 10px;
   right: 10px;
@@ -808,6 +873,7 @@ button.primary:hover:not(:disabled) {
 }
 
 #inject-download {
+  z-index: 1;
   position: relative;
   align-self: flex-start;
   color: #b3b3b3;
@@ -816,7 +882,7 @@ button.primary:hover:not(:disabled) {
 }
 
 #inject-download:hover {
-  color: #ffffff;
+  color: #fff;
 }
 
 .inject-file input {
@@ -832,7 +898,7 @@ button.primary:hover:not(:disabled) {
   width: 80px;
   height: 80px;
   margin: auto 0;
-  color: #777777;
+  color: #777;
   image-rendering: pixelated;
 }
 
@@ -844,7 +910,7 @@ button.primary:hover:not(:disabled) {
 
 .inject-name,
 .inject-tree {
-  color: #777777;
+  color: #777;
 }
 
 .inject-file .note,
@@ -870,8 +936,8 @@ button.primary:hover:not(:disabled) {
 }
 
 .inject-later {
-  padding: 16px 18px;
-  border-left: 1px solid #333333;
+  padding: var(--space-4);
+  border-left: 1px solid #333;
 }
 
 .inject-later .inject-kicker {
@@ -883,10 +949,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .inject-plan {
-  margin-top: 20px;
+  margin-top: var(--space-5);
   padding: 16px 0;
-  border-top: 1px solid #333333;
-  border-bottom: 1px solid #333333;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
 }
 
 #inject-output {
@@ -897,7 +963,7 @@ button.primary:hover:not(:disabled) {
   display: grid;
   gap: 8px;
   padding-left: 12px;
-  border-left: 1px solid #333333;
+  border-left: 1px solid #333;
   font-size: 12px;
 }
 
@@ -948,7 +1014,7 @@ button.primary:hover:not(:disabled) {
 .inject-choices {
   display: grid;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: var(--space-4);
 }
 
 .inject-choices > .note,

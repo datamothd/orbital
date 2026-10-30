@@ -2,6 +2,11 @@
 
 const answer = (() => {
   const ns = "urn:schemas-microsoft-com:unattend", extraNs = "urn:orbital:answer";
+  const wcm = "http://schemas.microsoft.com/WMIConfig/2002/State";
+  const passes = ["windowsPE", "offlineServicing", "generalize", "specialize", "auditSystem", "auditUser", "oobeSystem"];
+  const utf8 = new TextEncoder();
+  const quote = text => "'" + text.replaceAll("'", "''") + "'";
+  const nonEmptyLines = text => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const yesNo = [["", "Windows default"], ["true", "Y"], ["false", "N"]];
   const options = values => values.map(value => Array.isArray(value) ? value : [value, value]);
   const choice = (values, config = {}) => ({ choices: options(values), toggle: values === yesNo, ...config });
@@ -71,7 +76,7 @@ const answer = (() => {
     ]],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
     ["virtual-machine", "Virtual machine", [
-      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Add the Guest Additions ISO through VirtualBox.: attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO, and can typically be found included in your VirtualBox installation. Installation runs automatically at sign-in and restarts Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
+      ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Add the Guest Additions ISO through VirtualBox. Attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO, and can typically be found included in your VirtualBox installation. Installation runs automatically at sign-in and restarts Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
     ]],
     ["commands", "Setup commands", []],
     ["scripts", "Embedded installation scripts", [
@@ -91,12 +96,32 @@ const answer = (() => {
   };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
   let rowId = 0, initialized = false;
-  const element = (tag, className = "", text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
   const read = control => control.type === "password" || control.dataset.key === "ssid" ? control.value : control.value.trim();
   const value = id => controls.get(id)?.disabled ? "" : read(controls.get(id));
   const rows = kind => [...lists.get(kind).children];
-  const rowValue = (row, key) => read(row.querySelector(`[data-key="${key}"]`));
+  const rowControl = (row, key) => row.querySelector(`[data-key="${key}"]`);
+  const rowValue = (row, key) => read(rowControl(row, key));
   const focusControl = control => control.hidden ? control.closest(".answer-field").querySelector(".answer-dropdown") || control : control;
+  function actionButton(className, text = "", title = text) {
+    const button = element("button", className, text);
+    button.type = "button";
+    button.title = title;
+    button.setAttribute("aria-label", title);
+    return button;
+  }
+  function dropdown(picker, label) {
+    const button = actionButton("folder-view-picker answer-dropdown", "", label);
+    const text = element("span"), arrow = element("span", "picker-arrow"), menu = element("div", "folder-view-options");
+    button.id = `${picker.id}-button`;
+    for (const [name, value] of Object.entries({ role: "combobox", "aria-haspopup": "listbox", "aria-expanded": "false", "aria-controls": `${picker.id}-options` })) button.setAttribute(name, value);
+    menu.id = `${picker.id}-options`; menu.hidden = true; menu.tabIndex = -1; menu.setAttribute("role", "listbox"); menu.setAttribute("aria-label", label);
+    arrow.setAttribute("aria-hidden", "true");
+    button.append(text, arrow); picker.hidden = true; picker.after(button, menu);
+    pickers.set(picker, createChoicePicker(button, menu, text, () => [...picker.options].filter(option => !option.hidden && !option.disabled).map(option => ({ value: option.value, label: option.textContent })), label, selected => {
+      picker.value = selected.value;
+      for (const type of ["input", "change"]) picker.dispatchEvent(new Event(type, { bubbles: true }));
+    }));
+  }
   function field(parent, id, label, config) {
     const wrapper = element(config.choices || config.suggestions ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "", label);
     if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) title.append(element("small", "answer-optional", "(optional)"));
@@ -125,24 +150,17 @@ const answer = (() => {
     if (config.toggle) {
       const buttons = element("div", "answer-toggle"); buttons.setAttribute("role", "group"); buttons.setAttribute("aria-label", label);
       for (const [key, text] of config.choices.slice(1)) {
-        const button = element("button", text === "N" ? "answer-no" : "", text); button.type = "button"; button.dataset.value = key;
-        button.title = text === "Y" ? "Yes" : "No";
+        const button = actionButton(text === "N" ? "answer-no" : "", text, text === "Y" ? "Yes" : "No");
+        button.dataset.value = key;
         button.addEventListener("click", () => { input.value = key; update(); });
         buttons.append(button);
       }
-      const forget = element("button", "answer-forget"); forget.type = "button"; forget.title = "Forget change (Windows default)"; forget.setAttribute("aria-label", `Forget change: ${label}`);
+      const forget = actionButton("answer-forget", "", `Forget change: ${label}`);
+      forget.title = "Forget change (Windows default)";
       forget.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 1h4v2H6zM2 3h12v2H2zM3 6h2v7h6V6h2v7h-1v2H4v-2H3zM7 6h2v5H7z"/></svg>';
       forget.addEventListener("click", () => { input.value = ""; update(); }); buttons.append(forget); wrapper.append(buttons);
     }
-    for (const picker of wrapper.querySelectorAll("select")) {
-      const button = element("button", "folder-view-picker answer-dropdown"), text = element("span"), arrow = element("span", "picker-arrow"), menu = element("div", "folder-view-options");
-      button.type = "button"; button.id = `${picker.id}-button`; button.setAttribute("role", "combobox"); button.setAttribute("aria-label", label); button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false");
-      menu.id = `${picker.id}-options`; menu.hidden = true; menu.tabIndex = -1; menu.setAttribute("role", "listbox"); menu.setAttribute("aria-label", label); button.setAttribute("aria-controls", menu.id); arrow.setAttribute("aria-hidden", "true");
-      button.append(text, arrow); picker.hidden = true; picker.after(button, menu);
-      pickers.set(picker, createChoicePicker(button, menu, text, () => [...picker.options].filter(option => !option.hidden && !option.disabled).map(option => ({ value: option.value, label: option.textContent })), label, selected => {
-        picker.value = selected.value; picker.dispatchEvent(new Event("input", { bubbles: true })); picker.dispatchEvent(new Event("change", { bubbles: true }));
-      }));
-    }
+    for (const picker of wrapper.querySelectorAll("select")) dropdown(picker, label);
     parent.append(wrapper);
     return input;
   }
@@ -156,10 +174,10 @@ const answer = (() => {
       input.dataset.key = key;
       if (values[key] != null) input.value = values[key];
     }
-    const remove = element("button", "answer-row-remove"); remove.type = "button"; remove.title = "Remove entry"; remove.setAttribute("aria-label", "Remove entry");
+    const remove = actionButton("answer-row-remove", "", "Remove entry");
     remove.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8"/></svg>';
     remove.addEventListener("click", event => { event.preventDefault(); const focus = (row.nextElementSibling || row.previousElementSibling)?.querySelector("summary") || lists.get(kind).nextElementSibling; row.remove(); update(); focus.focus(); });
-    summary.append(title, count, remove); row.append(summary, grid); lists.get(kind).append(row); update(); return row;
+    summary.append(title, count, remove); row.append(summary, grid); lists.get(kind).append(row); update();
   }
   function initialize() {
     if (initialized) return;
@@ -171,12 +189,12 @@ const answer = (() => {
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
       if (rowFields[id]) {
-        const list = element("div", "answer-wide answer-list"), add = element("button", "answer-add answer-wide", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : "installation script"}`);
-        add.type = "button"; add.addEventListener("click", () => addRow(id)); lists.set(id, list); grid.append(list, add);
+        const list = element("div", "answer-wide answer-list"), add = actionButton("answer-add answer-wide", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : "installation script"}`);
+        add.addEventListener("click", () => addRow(id)); lists.set(id, list); grid.append(list, add);
       }
       section.append(grid); sections.set(id, section); byId("answer-groups").append(section);
     }
-    const copy = element("button", "answer-add answer-wide", "Copy settings to XML"); copy.type = "button";
+    const copy = actionButton("answer-add answer-wide", "Copy settings to XML");
     copy.addEventListener("click", () => attempt(() => { const xml = build("guided"); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); status("Installation settings copied to XML."); }));
     const copyNote = element("p", "note answer-wide", "Copying settings replaces any XML in the complete answer file field.");
     controls.get("xml").closest(".answer-field").before(copy, copyNote);
@@ -211,7 +229,7 @@ const answer = (() => {
       }
     }
     for (const row of rows("accounts")) for (const [key, visible] of [["groups", rowValue(row, "group") === "Custom"], ["password", rowValue(row, "password-mode") === "custom"]]) {
-      const control = row.querySelector(`[data-key="${key}"]`); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
+      const control = rowControl(row, key); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
       control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", visible);
     }
     for (const [kind, key, label] of [["accounts", "name", "Local account"], ["commands", "description", "Setup command"], ["scripts", "label", "Installation script"]]) rows(kind).forEach((row, index) => {
@@ -219,7 +237,11 @@ const answer = (() => {
       row.querySelector(".answer-row-title").textContent = title;
       row.querySelector(".answer-row-remove").setAttribute("aria-label", `Remove ${title}`);
     });
-    for (const picker of byId("answer-form").querySelectorAll("select")) { pickers.get(picker).load(picker.value); pickers.get(picker).setDisabled(picker.disabled); }
+    for (const picker of byId("answer-form").querySelectorAll("select")) {
+      const control = pickers.get(picker);
+      control.load(picker.value);
+      control.setDisabled(picker.disabled);
+    }
     const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
     for (const [id, section] of sections) { section.hidden = Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
     if (term) for (const kind of Object.keys(rowFields)) for (const row of rows(kind)) if (row.textContent.toLowerCase().includes(term)) row.open = true;
@@ -235,9 +257,9 @@ const answer = (() => {
     if (mode === "xml") {
       try {
         const xml = parse(value("xml"));
-        if (new TextEncoder().encode(value("xml")).length > 1048576) add("xml", "Answer files must be under 1 MiB.");
+        if (utf8.encode(value("xml")).length > 1048576) add("xml", "Answer files must be under 1 MiB.");
         for (const setting of xml.documentElement.children) if (setting.localName === "settings") {
-          if (!["windowsPE", "offlineServicing", "generalize", "specialize", "auditSystem", "auditUser", "oobeSystem"].includes(setting.getAttribute("pass"))) add("xml", "Every settings element needs a supported configuration pass.");
+          if (!passes.includes(setting.getAttribute("pass"))) add("xml", "Every settings element needs a supported configuration pass.");
           for (const component of setting.children) if (component.localName === "component" && !component.getAttribute("name")) add("xml", "Every component needs a name.");
         }
       } catch (error) { add("xml", error.message); }
@@ -251,31 +273,36 @@ const answer = (() => {
       if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(read(control))) add(control, "Remove characters that XML does not support.");
     }
     const name = value("computer");
-    if (name && name !== "*" && (new TextEncoder().encode(name).length > 15 || !/^[\p{L}\p{M}\p{N}_-]+$/u.test(name) || /^\d+$/.test(name))) add("computer", "Use a computer name up to 15 bytes with letters, numbers, underscores or hyphens; it cannot contain only numbers.");
+    if (name && name !== "*" && (utf8.encode(name).length > 15 || !/^[\p{L}\p{M}\p{N}_-]+$/u.test(name) || /^\d+$/.test(name))) add("computer", "Use a computer name up to 15 bytes with letters, numbers, underscores or hyphens; it cannot contain only numbers.");
     if (value("disk-mode") === "erase" && value("disk-confirm") && value("disk-confirm") !== String(Number(value("disk")))) add(["disk", "disk-confirm"], "Confirm disk erasure by typing the target disk number again.");
     const seen = new Map();
     for (const row of rows("accounts")) {
-      const control = row.querySelector('[data-key="name"]'), name = rowValue(row, "name");
+      const control = rowControl(row, "name"), name = rowValue(row, "name");
       if (name && (name.length > 256 || /["/\\\[\]:|<>+=;,?*%@\u0000-\u001f]/.test(name) || name.endsWith(".") || name.toUpperCase() === "NONE")) add(control, "Use a valid local account name without reserved characters.");
       if (name && seen.has(name.toLowerCase())) add([seen.get(name.toLowerCase()), control], "Account names must be unique.");
       if (name) seen.set(name.toLowerCase(), control);
-      if (rowValue(row, "group") === "Custom" && rowValue(row, "groups") && rowValue(row, "groups").split(";").some(name => !name.trim())) add(row.querySelector('[data-key="groups"]'), "Separate non-empty Windows group names with semicolons.");
+      if (rowValue(row, "group") === "Custom" && rowValue(row, "groups") && rowValue(row, "groups").split(";").some(name => !name.trim())) add(rowControl(row, "groups"), "Separate non-empty Windows group names with semicolons.");
     }
     if (value("autologon") && value("autologon") !== "@Administrator") {
       const row = rows("accounts").find(row => rowValue(row, "name") === value("autologon"));
-      if (!rowValue(row, "password-mode")) add(["autologon", row.querySelector('[data-key="password-mode"]')], "Automatic sign-in requires a configured or explicitly empty password.");
+      if (!rowValue(row, "password-mode")) add(["autologon", rowControl(row, "password-mode")], "Automatic sign-in requires a configured or explicitly empty password.");
     }
     if (value("wifi-mode") === "personal") {
-      if (new TextEncoder().encode(value("ssid")).length > 32) add("ssid", "The network name must be at most 32 UTF-8 bytes.");
+      if (utf8.encode(value("ssid")).length > 32) add("ssid", "The network name must be at most 32 UTF-8 bytes.");
       const password = value("wifi-password");
       if (password && value("wifi-auth") !== "open" && !(password.length >= 8 && password.length <= 63 || value("wifi-auth") === "WPA2PSK" && /^[0-9a-f]{64}$/i.test(password))) add("wifi-password", "Use 8–63 characters, or a 64-digit hexadecimal WPA2 key.");
     }
     if (value("wifi-mode") === "xml") try { parse(value("wifi-xml"), "WLANProfile", "http://www.microsoft.com/networking/WLAN/profile/v1"); } catch (error) { add("wifi-xml", error.message); }
-    if (value("drivers").split(/\r?\n/).filter(line => line.trim()).some(path => path.trim().length > 259 || !/^(?:[a-z]:\\|\\\\|%[a-z_]+%\\)/i.test(path.trim()))) add("drivers", "Use one full driver-folder path per line, at most 259 characters each.");
+    if (nonEmptyLines(value("drivers")).some(path => path.length > 259 || !/^(?:[a-z]:\\|\\\\|%[a-z_]+%\\)/i.test(path))) add("drivers", "Use one full driver-folder path per line, at most 259 characters each.");
     if (!/^[a-z]:\\(?:[^\\]+\\)*Orbital\\Setup$/i.test(value("payload")) || /["<>|?*]/.test(value("payload")) || value("payload").split("\\").some(part => [".", ".."].includes(part))) add("payload", "Use a dedicated full path ending in \\Orbital\\Setup.");
-    for (const row of rows("commands")) if (rowValue(row, "path").length > (rowValue(row, "pass") === "windowsPE" ? 1024 : 259)) add(row.querySelector('[data-key="path"]'), "This command is too long for its configuration pass. Use an embedded script.");
+    const commands = rows("commands");
+    for (const row of commands) if (rowValue(row, "path").length > (rowValue(row, "pass") === "windowsPE" ? 1024 : 259)) add(rowControl(row, "path"), "This command is too long for its configuration pass. Use an embedded script.");
     const setupScripts = Boolean(value("wifi-mode") || value("builtin-admin") || value("guest-tools") || rows("scripts").length || value("disk-mode") === "erase" && value("recovery") === "false");
-    for (const pass of ["windowsPE", "specialize", "auditUser"]) if (rows("commands").filter(row => rowValue(row, "pass") === pass).length + (pass === "specialize" && setupScripts ? 2 : pass === "windowsPE" && value("disk-mode") === "erase" ? 1 : 0) > 500) add(rows("commands").find(row => rowValue(row, "pass") === pass).querySelector('[data-key="pass"]'), `${pass} supports up to 500 commands, including generated setup steps.`);
+    for (const pass of ["windowsPE", "specialize", "auditUser"]) {
+      const selected = commands.filter(row => rowValue(row, "pass") === pass);
+      const generated = pass === "specialize" && setupScripts ? 2 : pass === "windowsPE" && value("disk-mode") === "erase" ? 1 : 0;
+      if (selected.length + generated > 500) add(rowControl(selected[0], "pass"), `${pass} supports up to 500 commands, including generated setup steps.`);
+    }
     return issues;
   }
   function renderIssues(issues, scroll = false) {
@@ -283,12 +310,12 @@ const answer = (() => {
     const counts = new Map(), summary = byId("answer-errors"), list = element("ul");
     summary.replaceChildren(element("h2", "", `${issues.length} ${issues.length === 1 ? "issue prevents" : "issues prevent"} creating this answer file`), list); summary.hidden = !issues.length;
     for (const issue of issues) {
-      const item = element("li"), button = element("button", "", issue.message); button.type = "button";
+      const item = element("li"), button = actionButton("", issue.message);
       button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = focusControl(issue.controls[0]); for (let section = control.closest("details"); section; section = section.parentElement.closest("details")) section.open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
       item.append(button); list.append(item);
       const affected = new Set();
       for (const control of issue.controls) {
-        const field = control.closest(".answer-field"); field.classList.add("answer-invalid"); control.setAttribute("aria-invalid", "true");
+        const field = control.closest(".answer-field"); field.classList.add("answer-invalid");
         let message = field.querySelector(".answer-field-error");
         if (!message) { message = element("span", "answer-field-error"); message.id = `${control.id}-error`; field.append(message); }
         message.textContent += (message.textContent ? " " : "") + issue.message;
@@ -300,8 +327,20 @@ const answer = (() => {
     for (const section of [...sections.values(), ...Object.keys(rowFields).flatMap(rows)]) { const badge = section.querySelector(".answer-count"), count = counts.get(section) || 0; badge.hidden = !count; badge.firstChild.textContent = count; badge.setAttribute("aria-label", `${count} blocking issues`); }
     if (scroll && issues.length) { window.scrollTo(0, window.scrollY + byId("answer-search").getBoundingClientRect().bottom); summary.focus({ preventScroll: true }); }
   }
-  function status(text, error = false) { byId("answer-status").textContent = text; byId("answer-status").classList.toggle("error", error); }
-  async function attempt(operation) { try { await operation(); } catch (error) { if (error.issues) renderIssues(error.issues, true); if (byId("answer-page").hidden) setInjectStatus(error.message || String(error), true); else status(error.message || String(error), true); } }
+  function status(text, error = false) {
+    const notice = byId("answer-status");
+    notice.textContent = text;
+    notice.classList.toggle("error", error);
+  }
+  async function attempt(operation) {
+    try {
+      await operation();
+    } catch (error) {
+      if (error.issues) renderIssues(error.issues, true);
+      const report = byId("answer-page").hidden ? setInjectStatus : status;
+      report(error.message || String(error), true);
+    }
+  }
   function capture() {
     return { format: "orbital-answer", version: 1, values: Object.fromEntries([...controls].map(([key, control]) => [key, read(control)])), ...Object.fromEntries(Object.keys(rowFields).map(kind => [kind, rows(kind).map(row => Object.fromEntries(rowFields[kind].map(([key]) => [key, rowValue(row, key)])))])) };
   }
@@ -327,7 +366,7 @@ const answer = (() => {
     update(); controls.get("autologon").value = logon || ""; controls.get("disk-confirm").value = ""; update();
   }
   function base64(text, utf16 = false) {
-    const bytes = utf16 ? new Uint8Array(text.length * 2) : new TextEncoder().encode(text);
+    const bytes = utf16 ? new Uint8Array(text.length * 2) : utf8.encode(text);
     if (utf16) { const view = new DataView(bytes.buffer); for (let i = 0; i < text.length; i++) view.setUint16(i * 2, text.charCodeAt(i), true); }
     let binary = ""; for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
     return btoa(binary);
@@ -339,11 +378,25 @@ const answer = (() => {
   }
   function serialize(xml) {
     const text = '<?xml version="1.0" encoding="utf-8"?>\n' + new XMLSerializer().serializeToString(xml.documentElement);
-    if (new TextEncoder().encode(text).length > 1048576) throw new Error("The generated answer file exceeds 1 MiB. Reduce embedded content.");
+    if (utf8.encode(text).length > 1048576) throw new Error("The generated answer file exceeds 1 MiB. Reduce embedded content.");
     return text;
   }
+  function node(parent, path, text, repeated = false) {
+    const parts = path.split("/"), xml = parent.ownerDocument;
+    for (const [index, part] of parts.entries()) {
+      const add = repeated && index === parts.length - 1;
+      let child = add ? null : [...parent.children].find(child => child.localName === part);
+      if (!child) {
+        child = xml.createElementNS(parent.namespaceURI, part);
+        if (add) child.setAttributeNS(wcm, "wcm:action", "add");
+        parent.append(child);
+      }
+      parent = child;
+    }
+    if (text !== undefined) parent.textContent = String(text);
+    return parent;
+  }
   function virtualBoxScripts(folder, hidden, logging) {
-    const quote = text => "'" + text.replaceAll("'", "''") + "'";
     const task = "Orbital Install VirtualBox Guest Additions";
     return {
       install: `$ErrorActionPreference = 'Stop'
@@ -391,18 +444,9 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     if (issues.length) throw Object.assign(new Error(`Fix ${issues.length} ${issues.length === 1 ? "issue" : "issues"} listed above.`), { issues });
     if (mode === "xml") return serialize(parse(value("xml")));
     const xml = document.implementation.createDocument(ns, "unattend"), root = xml.documentElement;
-    const wcm = "http://schemas.microsoft.com/WMIConfig/2002/State"; root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:wcm", wcm);
+    root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:wcm", wcm);
     const names = { setup: "Microsoft-Windows-Setup", shell: "Microsoft-Windows-Shell-Setup", locale: "Microsoft-Windows-International-Core", winpe: "Microsoft-Windows-International-Core-WinPE", join: "Microsoft-Windows-UnattendedJoin", deployment: "Microsoft-Windows-Deployment" };
     const architecture = value("architecture") === "all" ? "amd64" : value("architecture");
-    function node(parent, path, text, repeated = false) {
-      const parts = path.split("/");
-      for (const [index, part] of parts.entries()) {
-        let child = repeated && index === parts.length - 1 ? null : [...parent.children].find(child => child.localName === part);
-        if (!child) { child = xml.createElementNS(ns, part); if (repeated && index === parts.length - 1) child.setAttributeNS(wcm, "wcm:action", "add"); parent.append(child); }
-        parent = child;
-      }
-      if (text !== undefined) parent.textContent = String(text); return parent;
-    }
     function component(pass, name) {
       let settings = [...root.children].find(child => child.getAttribute("pass") === pass);
       if (!settings) { settings = node(root, "settings", undefined, true); settings.removeAttributeNS(wcm, "action"); settings.setAttribute("pass", pass); }
@@ -438,7 +482,6 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       if (value("join-mode") === "domain") for (const [id, path] of [["join-user", "Credentials/Username"], ["join-password", "Credentials/Password"], ["join-domain", "Credentials/Domain"], ["join-ou", "MachineObjectOU"]]) if (value(id)) setting("specialize", "join", `Identification/${path}`, value(id));
     }
     const orders = {}, commands = [], scripts = [], files = new Map(), folder = value("payload"), hidden = value("windows") === "hidden" ? " -WindowStyle Hidden" : "";
-    const quote = text => "'" + text.replaceAll("'", "''") + "'";
     const embed = (name, content) => { files.set(name, content); return `${folder}\\${name}`; };
     const script = (label, content) => scripts.push(`try {\nWrite-Output ${quote(label)}\n& {\n${content}\n}\n} catch { Write-Warning $_.Exception.Message }`);
     if (value("disk-mode") === "erase") {
@@ -461,15 +504,14 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       let profile = value("wifi-xml");
       if (value("wifi-mode") === "personal") {
         const profileXml = document.implementation.createDocument("http://www.microsoft.com/networking/WLAN/profile/v1", "WLANProfile"), wlan = profileXml.documentElement;
-        const set = (path, text) => { let parent = wlan; for (const part of path.split("/")) { let child = [...parent.children].find(child => child.localName === part); if (!child) { child = profileXml.createElementNS(wlan.namespaceURI, part); parent.append(child); } parent = child; } parent.textContent = String(text); };
-        for (const [path, text] of [["name", value("ssid")], ["SSIDConfig/SSID/name", value("ssid")], ["SSIDConfig/nonBroadcast", value("wifi-hidden")], ["connectionType", "ESS"], ["connectionMode", "auto"], ["MSM/security/authEncryption/authentication", value("wifi-auth")], ["MSM/security/authEncryption/encryption", value("wifi-auth") === "open" ? "none" : "AES"], ["MSM/security/authEncryption/useOneX", "false"]]) set(path, text);
-        if (value("wifi-auth") !== "open") for (const [path, text] of [["keyType", value("wifi-password").length === 64 ? "networkKey" : "passPhrase"], ["protected", "false"], ["keyMaterial", value("wifi-password")]]) set(`MSM/security/sharedKey/${path}`, text);
+        for (const [path, text] of [["name", value("ssid")], ["SSIDConfig/SSID/name", value("ssid")], ["SSIDConfig/nonBroadcast", value("wifi-hidden")], ["connectionType", "ESS"], ["connectionMode", "auto"], ["MSM/security/authEncryption/authentication", value("wifi-auth")], ["MSM/security/authEncryption/encryption", value("wifi-auth") === "open" ? "none" : "AES"], ["MSM/security/authEncryption/useOneX", "false"]]) node(wlan, path, text);
+        if (value("wifi-auth") !== "open") for (const [path, text] of [["keyType", value("wifi-password").length === 64 ? "networkKey" : "passPhrase"], ["protected", "false"], ["keyMaterial", value("wifi-password")]]) node(wlan, `MSM/security/sharedKey/${path}`, text);
         profile = new XMLSerializer().serializeToString(profileXml);
       }
       const path = embed("wifi.xml", profile);
       script("Import initial Wi-Fi profile", `Set-Service WlanSvc -StartupType Automatic\nStart-Service WlanSvc\n& netsh.exe wlan add profile ${quote(`filename=${path}`)} user=all\nif ($LASTEXITCODE -ne 0) { throw 'Could not import the Wi-Fi profile.' }\nRemove-Item -LiteralPath ${quote(path)} -Force`);
     }
-    for (const [index, path] of value("drivers").split(/\r?\n/).map(path => path.trim()).filter(Boolean).entries()) { const entry = node(component("windowsPE", "Microsoft-Windows-PnpCustomizationsWinPE"), "DriverPaths/PathAndCredentials", undefined, true); entry.setAttributeNS(wcm, "wcm:keyValue", String(index + 1)); node(entry, "Path", path); }
+    for (const [index, path] of nonEmptyLines(value("drivers")).entries()) { const entry = node(component("windowsPE", "Microsoft-Windows-PnpCustomizationsWinPE"), "DriverPaths/PathAndCredentials", undefined, true); entry.setAttributeNS(wcm, "wcm:keyValue", String(index + 1)); node(entry, "Path", path); }
     for (const [index, row] of rows("scripts").entries()) {
       const type = rowValue(row, "type"), path = embed(`custom-${index + 1}.${type}`, type === "cmd" ? `@echo off\r\nchcp 65001 >nul\r\n${rowValue(row, "content")}` : rowValue(row, "content"));
       script(rowValue(row, "label") || `Installation script ${index + 1}`, `$global:LASTEXITCODE = 0\n${type === "ps1" ? `& ${quote(path)}` : type === "reg" ? `& reg.exe import ${quote(path)}` : `& $env:ComSpec /d /c ${quote('"' + path + '"')}`}\nif ($LASTEXITCODE -ne 0) { throw \"Script failed with exit code $LASTEXITCODE\" }`);
@@ -495,7 +537,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       const command = node(component(pass, pass === "windowsPE" ? "setup" : "deployment"), "RunSynchronous/RunSynchronousCommand", undefined, true);
       node(command, "Order", order); node(command, "Path", path); if (description) node(command, "Description", description); if (reboot && pass !== "windowsPE") node(command, "WillReboot", reboot);
     }
-    for (const pass of ["windowsPE", "offlineServicing", "generalize", "specialize", "auditSystem", "auditUser", "oobeSystem"]) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
+    for (const pass of passes) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
     if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of value("edition").startsWith("Windows 10 ") ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
     for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
     const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.setAttribute("hash", fingerprint(root)); metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
@@ -507,7 +549,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
   }
   function importText(source) {
     initialize();
-    if (new TextEncoder().encode(source).length > 1048576) throw new Error("Choose a file under 1 MiB.");
+    if (utf8.encode(source).length > 1048576) throw new Error("Choose a file under 1 MiB.");
     if (source.trimStart().startsWith("{")) restore(JSON.parse(source));
     else {
       const xml = parse(source), metadata = [...xml.documentElement.children].find(child => child.namespaceURI === extraNs && child.localName === "Configuration");
@@ -548,10 +590,10 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
   }));
   for (const button of document.querySelectorAll("[data-answer-save]")) button.addEventListener("click", () => attempt(async () => {
     const kind = button.dataset.answerSave, content = kind === "json" ? JSON.stringify(capture(), null, 2) : build();
-    if (new TextEncoder().encode(content).length > 1048576) throw new Error("Reduce the configuration to less than 1 MiB.");
+    if (utf8.encode(content).length > 1048576) throw new Error("Reduce the configuration to less than 1 MiB.");
     if (invoke) { if (await invoke("answer_document", { content, kind }) !== null) status("File saved."); }
     else { const link = element("a"), url = URL.createObjectURL(new Blob([content], { type: kind === "json" ? "application/json" : "application/xml" })); link.href = url; link.download = kind === "json" ? "orbital-answer.json" : "autounattend.xml"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status("File downloaded."); }
   }));
   byId("answer-form").addEventListener("submit", event => { event.preventDefault(); attempt(async () => { const xml = build(); const file = invoke ? await invoke("set_answer_file", { xml }) : { name: "Orbital answer file.xml", xml }; setInjectFile("xml", file); show(false); }); });
-  return { open: () => show(true), build, capture, restore, validate, addRow, importText, choose };
+  return { choose };
 })();

@@ -34,14 +34,12 @@ fn main() -> io::Result<()> {
     let additional = matches
         .subcommand()
         .and_then(|(_, args)| args.get_many::<String>("commands"));
-    let commands = std::iter::once(cli.command)
-        .chain(
-            additional
-                .into_iter()
-                .flatten()
-                .map(|command| Cli::parse_from(["orbital", command]).command),
-        )
-        .collect::<Vec<_>>();
+    let commands = std::iter::once(cli.command).chain(
+        additional
+            .into_iter()
+            .flatten()
+            .map(|command| Cli::parse_from(["orbital", command]).command),
+    );
     let mut batch = Vec::new();
     for command in commands {
         match command {

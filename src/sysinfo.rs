@@ -16,14 +16,13 @@ pub struct SystemInfo {
 pub fn collect() -> io::Result<SystemInfo> {
     let mut system = System::new();
     let cur_ver = HKLM.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion")?;
-    let current_version: String = cur_ver.get_value("DisplayVersion")?;
     system.refresh_cpu_all();
     system.refresh_memory();
 
     Ok(SystemInfo {
         host: System::host_name().unwrap_or_else(|| "Unknown".into()),
         os: System::long_os_version().unwrap_or_else(|| "Unknown".into()),
-        windows_version: current_version,
+        windows_version: cur_ver.get_value("DisplayVersion")?,
         cpu: system
             .cpus()
             .first()

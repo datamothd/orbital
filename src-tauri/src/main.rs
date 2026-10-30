@@ -79,7 +79,7 @@ async fn toggle_preference(
     preference: explorer::Preference,
     replace_blank_icon: Option<bool>,
 ) -> Result<(), serde_json::Value> {
-    explorer::toggle_preference(preference, true, replace_blank_icon.unwrap_or(false))
+    explorer::toggle_preference(preference, replace_blank_icon.unwrap_or(false))
         .map_err(preference_error)
 }
 

@@ -7,7 +7,7 @@ pub(super) fn decode(bytes: &[u8]) -> io::Result<String> {
     if bytes.is_empty() || bytes.len() as u64 > MAX_DOCUMENT_SIZE {
         return Err(error("Choose a non-empty answer file under 1 MiB."));
     }
-    let text = if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
         if !bytes.len().is_multiple_of(2) {
             return Err(error("The answer file contains invalid UTF-16."));
         }
@@ -24,17 +24,12 @@ pub(super) fn decode(bytes: &[u8]) -> io::Result<String> {
                 }
             })
             .collect();
-        String::from_utf16(&chars).map_err(|_| error("The answer file contains invalid UTF-16."))?
+        String::from_utf16(&chars).map_err(|_| error("The answer file contains invalid UTF-16."))
     } else {
-        String::from_utf8(
-            bytes
-                .strip_prefix(&[0xef, 0xbb, 0xbf])
-                .unwrap_or(bytes)
-                .to_vec(),
-        )
-        .map_err(|_| error("The answer file must use UTF-8 or UTF-16."))?
-    };
-    Ok(text)
+        std::str::from_utf8(bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes))
+            .map(str::to_owned)
+            .map_err(|_| error("The answer file must use UTF-8 or UTF-16."))
+    }
 }
 
 pub(super) fn validate_answer(bytes: &[u8]) -> io::Result<()> {

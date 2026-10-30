@@ -56,6 +56,13 @@ impl TweakProfile {
         Ok(())
     }
 
+    fn change_count(&self) -> usize {
+        self.tweaks.len()
+            + self.disabled_tweaks.len()
+            + usize::from(self.folder_sort.is_some())
+            + usize::from(self.folder_grouping.is_some())
+    }
+
     fn retain_changes(&mut self, current: &ExplorerSettings) {
         for (tweaks, enabled) in [(&mut self.tweaks, true), (&mut self.disabled_tweaks, false)] {
             tweaks.retain(|tweak| tweak.state(current) != Some(enabled));
@@ -70,6 +77,22 @@ impl TweakProfile {
 }
 
 impl Preference {
+    const ALL: [Self; 13] = [
+        Self::DisableTaskbarCentering,
+        Self::HideTaskView,
+        Self::DisableWidgets,
+        Self::EnableTaskbarEndTask,
+        Self::DisableExplorerSpacing,
+        Self::DisableModernContextMenu,
+        Self::HideRecentFiles,
+        Self::HideRecommendations,
+        Self::HideFrequentFolders,
+        Self::HideOfficeFiles,
+        Self::HideHomeFolder,
+        Self::HideGallery,
+        Self::HideShortcutArrow,
+    ];
+
     fn name(self) -> &'static str {
         match self {
             Self::DisableTaskbarCentering => DISABLE_TASKBAR_CENTERING.name,
@@ -137,24 +160,10 @@ pub fn export_tweaks() -> io::Result<TweakProfile> {
 }
 
 fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
-    let (tweaks, disabled_tweaks) = [
-        Preference::DisableTaskbarCentering,
-        Preference::HideTaskView,
-        Preference::DisableWidgets,
-        Preference::EnableTaskbarEndTask,
-        Preference::DisableExplorerSpacing,
-        Preference::DisableModernContextMenu,
-        Preference::HideRecentFiles,
-        Preference::HideRecommendations,
-        Preference::HideFrequentFolders,
-        Preference::HideOfficeFiles,
-        Preference::HideHomeFolder,
-        Preference::HideGallery,
-        Preference::HideShortcutArrow,
-    ]
-    .into_iter()
-    .filter(|preference| preference.supported(current) && preference.state(current).is_some())
-    .partition(|preference| preference.state(current) == Some(true));
+    let (tweaks, disabled_tweaks) = Preference::ALL
+        .into_iter()
+        .filter(|preference| preference.supported(current) && preference.state(current).is_some())
+        .partition(|preference| preference.state(current) == Some(true));
     TweakProfile {
         format: "orbital-tweaks".into(),
         version: 3,
@@ -212,11 +221,7 @@ fn batch_profile(
 
 pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
     let profile = batch_profile(commands, &settings()?)?;
-    if profile.tweaks.is_empty()
-        && profile.disabled_tweaks.is_empty()
-        && profile.folder_sort.is_none()
-        && profile.folder_grouping.is_none()
-    {
+    if profile.change_count() == 0 {
         println!("No settings need to change.");
         return Ok(());
     }
@@ -242,6 +247,12 @@ pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
     let changed = apply_imported_tweaks(profile, true)?;
     println!("{changed} settings applied.");
     Ok(())
+}
+
+pub fn toggle_preference(preference: Preference, replace_blank_icon: bool) -> io::Result<()> {
+    let current = settings()?;
+    let profile = batch_profile(&[SettingsCommand::Toggle(preference)], &current)?;
+    apply_profile(profile, &current, replace_blank_icon).map(|_| ())
 }
 
 fn imported_changes<'a>(
@@ -301,10 +312,17 @@ pub fn apply_imported_tweaks(
     replace_blank_icon: bool,
 ) -> io::Result<usize> {
     profile.normalize()?;
-    let current = settings()?;
-    profile.retain_changes(&current);
+    apply_profile(profile, &settings()?, replace_blank_icon)
+}
+
+fn apply_profile(
+    mut profile: TweakProfile,
+    current: &ExplorerSettings,
+    replace_blank_icon: bool,
+) -> io::Result<usize> {
+    profile.retain_changes(current);
     let selected = || profile.tweaks.iter().chain(&profile.disabled_tweaks);
-    if selected().any(|tweak| !tweak.supported(&current)) {
+    if selected().any(|tweak| !tweak.supported(current)) {
         return Err(io::Error::other(
             "Some imported tweaks are unavailable on this system.",
         ));
@@ -314,14 +332,7 @@ pub fn apply_imported_tweaks(
             "This preference requires administrator access. Close Orbital and run it as administrator.",
         ));
     }
-    let mut views = Vec::new();
-    if let Some(sort) = profile.folder_sort {
-        views.push(folder_views::ViewChange::Sort(sort));
-    }
-    if let Some(grouping) = profile.folder_grouping {
-        views.push(folder_views::ViewChange::Grouping(grouping));
-    }
-    let count = profile.tweaks.len() + profile.disabled_tweaks.len() + views.len();
+    let count = profile.change_count();
     if count == 0 {
         return Ok(0);
     }
@@ -338,7 +349,16 @@ pub fn apply_imported_tweaks(
     if profile.tweaks.contains(&Preference::HideShortcutArrow) {
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
-    folder_views::apply_recommended(&views, || apply_changes(&changes, &prepared))?;
+    let views: Vec<_> = [
+        profile.folder_sort.map(folder_views::ViewChange::Sort),
+        profile
+            .folder_grouping
+            .map(folder_views::ViewChange::Grouping),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    folder_views::apply_in(HKCU, HKLM, &views, || apply_changes(&changes, &prepared))?;
     restart_explorer(
         "Settings",
         selected().any(|tweak| *tweak == Preference::HideShortcutArrow),
@@ -350,6 +370,39 @@ pub fn apply_imported_tweaks(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn single_toggles_leave_other_preferences_and_folder_views_out_of_the_profile() {
+        let mut current = ExplorerSettings {
+            windows11_supported: true,
+            home_supported: true,
+            gallery_supported: true,
+            taskbar_end_task_supported: true,
+            hide_shortcut_arrow: Some(false),
+            folder_sort: Some(FolderSort {
+                column: SortColumn::Size,
+                descending: true,
+            }),
+            folder_grouping: Some(FolderGrouping::DateModified),
+            ..Default::default()
+        };
+        for preference in Preference::ALL {
+            let profile = batch_profile(&[SettingsCommand::Toggle(preference)], &current).unwrap();
+            assert_eq!(profile.tweaks, [preference]);
+            assert!(profile.disabled_tweaks.is_empty());
+            assert_eq!(profile.change_count(), 1);
+            assert_eq!(profile.folder_sort, None);
+            assert_eq!(profile.folder_grouping, None);
+        }
+        current.hide_shortcut_arrow = None;
+        let profile = batch_profile(
+            &[SettingsCommand::Toggle(Preference::HideShortcutArrow)],
+            &current,
+        )
+        .unwrap();
+        assert_eq!(profile.tweaks, [Preference::HideShortcutArrow]);
+        assert_eq!(profile.change_count(), 1);
+    }
 
     #[test]
     fn batch_keeps_only_final_selected_changes() {
@@ -627,21 +680,7 @@ mod tests {
         let registry = super::super::tests::TestRegistry::new();
         let user = registry.key.create_subkey("User").unwrap().0;
         let machine = registry.key.create_subkey("Machine").unwrap().0;
-        let tweaks = [
-            Preference::DisableTaskbarCentering,
-            Preference::HideTaskView,
-            Preference::DisableWidgets,
-            Preference::EnableTaskbarEndTask,
-            Preference::DisableExplorerSpacing,
-            Preference::DisableModernContextMenu,
-            Preference::HideRecentFiles,
-            Preference::HideRecommendations,
-            Preference::HideFrequentFolders,
-            Preference::HideOfficeFiles,
-            Preference::HideHomeFolder,
-            Preference::HideGallery,
-            Preference::HideShortcutArrow,
-        ];
+        let tweaks = Preference::ALL;
         let icon = Path::new("test-import-icon.ico");
         for enabled in [true, false] {
             let changes = if enabled {

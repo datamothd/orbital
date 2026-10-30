@@ -9,6 +9,7 @@
   <script src="js/shared.js" defer></script>
   <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
+  <script src="js/batch.js" defer></script>
   <script src="js/profiles.js" defer></script>
   <script src="js/answer.js" defer></script>
   <script src="js/inject.js" defer></script>
@@ -57,6 +58,7 @@
       <div class="settings-actions" role="group" aria-label="Settings actions">
         <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Enable recommended settings</button>
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
+        <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
       </div>
       <details id="explorer-preferences" aria-labelledby="preferences-title">
         <summary>
@@ -343,16 +345,16 @@
     <p id="confirm-description"></p>
     <details id="recommended-options" class="changes-options" hidden open>
       <summary>List of changes</summary>
-      <div id="recommendation-scroll" class="changes-scroll">
+      <div class="changes-scroll recommendation-scroll">
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
-        <div id="recommendation-list" class="changes-list" role="group" aria-label="Recommended changes"></div>
+        <div id="recommendation-list" class="changes-list recommendation-list" role="group" aria-label="Recommended changes"></div>
         <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
       </div>
     </details>
     <p class="note">Windows Explorer will restart to apply this change.</p>
     <form method="dialog" class="confirmation-footer">
-      <p id="confirm-admin-note" class="note" role="status" hidden></p>
+      <p id="confirm-admin-note" class="note selection-note" role="status" hidden></p>
       <span class="confirmation-buttons">
         <button value="cancel" autofocus>Cancel</button>
         <button id="confirm-apply" value="apply" class="primary" aria-describedby="confirm-admin-note">Apply &amp; restart</button>
@@ -366,6 +368,27 @@
     <form method="dialog">
       <button value="cancel" class="primary" autofocus>Close</button>
       <button id="replace-icon-apply" value="apply" class="primary" hidden>Replace</button>
+    </form>
+  </dialog>
+  <dialog id="batch-dialog" class="changes-dialog" aria-labelledby="batch-title" aria-describedby="batch-description">
+    <h2 id="batch-title">Batch changes</h2>
+    <p id="batch-description">Check preferences to enable them. Uncheck preferences to disable them.</p>
+    <details id="batch-options" class="changes-options" open>
+      <summary>List of changes</summary>
+      <div class="changes-scroll recommendation-scroll">
+        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
+        <hr class="preferences-divider" aria-hidden="true">
+        <div id="batch-list" class="changes-list recommendation-list" role="group" aria-label="Preference states"></div>
+        <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
+      </div>
+    </details>
+    <p class="note">Windows Explorer will restart once to apply these changes.</p>
+    <form method="dialog" class="confirmation-footer">
+      <p id="batch-summary" class="note selection-note" role="status" hidden></p>
+      <span class="confirmation-buttons">
+        <button value="cancel" autofocus>Cancel</button>
+        <button id="batch-apply" value="apply" class="primary" disabled>Apply &amp; restart</button>
+      </span>
     </form>
   </dialog>
   <dialog id="import-preview" class="changes-dialog" aria-labelledby="import-title" aria-describedby="import-description">

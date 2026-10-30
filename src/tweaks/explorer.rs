@@ -8,9 +8,13 @@ mod profiles;
 pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
 pub use profiles::{
     SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
+    toggle_preference,
 };
 
-use std::os::windows::process::CommandExt;
+use std::os::windows::{
+    io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    process::CommandExt,
+};
 use std::{
     fs::OpenOptions,
     io::{self, Write},
@@ -156,8 +160,8 @@ pub fn settings() -> io::Result<ExplorerSettings> {
     Ok(ExplorerSettings {
         is_administrator: is_administrator()?,
         desktop_layout_safe_mode: desktop_layout_safe_mode_in(HKCU)?,
-        folder_sort: folder_views::current()?,
-        folder_grouping: folder_views::current_grouping()?,
+        folder_sort: folder_views::current_in(HKCU, HKLM)?,
+        folder_grouping: folder_views::current_grouping_in(HKCU, HKLM)?,
         disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
         hide_task_view: HIDE_TASK_VIEW.enabled_in(HKCU)?,
         disable_widgets: windows11_supported && DISABLE_WIDGETS.enabled_in(HKLM)?,
@@ -214,55 +218,6 @@ pub enum Preference {
     HideHomeFolder,
     HideGallery,
     HideShortcutArrow,
-}
-
-pub fn toggle_preference(
-    preference: Preference,
-    yes: bool,
-    replace_blank_icon: bool,
-) -> io::Result<()> {
-    let (setting, root) = match preference {
-        Preference::DisableTaskbarCentering => (&DISABLE_TASKBAR_CENTERING, HKCU),
-        Preference::HideTaskView => (&HIDE_TASK_VIEW, HKCU),
-        Preference::DisableWidgets => (&DISABLE_WIDGETS, HKLM),
-        Preference::EnableTaskbarEndTask => (&ENABLE_TASKBAR_END_TASK, HKCU),
-        Preference::DisableExplorerSpacing => (&DISABLE_EXPLORER_SPACING, HKCU),
-        Preference::HideRecentFiles => (&HIDE_RECENT_FILES, HKCU),
-        Preference::HideRecommendations => (&HIDE_RECOMMENDATIONS, HKCU),
-        Preference::HideFrequentFolders => (&HIDE_FREQUENT_FOLDERS, HKCU),
-        Preference::HideOfficeFiles => (&HIDE_OFFICE_FILES, HKCU),
-        Preference::DisableModernContextMenu => return toggle_modern_context_menu(yes),
-        Preference::HideHomeFolder => return toggle_namespace("Hide Home folder", HOME_CLSID, yes),
-        Preference::HideGallery => return toggle_namespace("Hide Gallery", GALLERY_CLSID, yes),
-        Preference::HideShortcutArrow => return toggle_shortcut_arrow(yes, replace_blank_icon),
-    };
-    match preference {
-        Preference::HideTaskView
-        | Preference::HideRecentFiles
-        | Preference::HideFrequentFolders => {}
-        Preference::EnableTaskbarEndTask => {
-            if !supports_taskbar_end_task(windows_build()?)? {
-                return Err(io::Error::other(
-                    "Taskbar End task is unavailable on this system",
-                ));
-            }
-        }
-        _ => require_windows11(setting.name)?,
-    }
-    setting.toggle(root, yes)
-}
-
-fn toggle_modern_context_menu(yes: bool) -> io::Result<()> {
-    let name = "Disable Windows 11 context menu";
-    require_windows11(name)?;
-    let current = classic_context_menu_enabled()?;
-    let changes = [RegistryChange::new(
-        HKCU,
-        CLASSIC_CONTEXT_MENU_KEY,
-        "",
-        (!current).then(|| "".to_reg_value()),
-    )];
-    apply_toggle(name, current, yes, &changes)
 }
 
 fn read_toggle(root: &RegKey, path: &str, name: &str, default: bool) -> io::Result<bool> {
@@ -413,37 +368,6 @@ fn apply_changes(changes: &[RegistryChange<'_>], prepared: &[RegistrySnapshot]) 
     Ok(())
 }
 
-fn confirm_toggle(name: &str, current: bool, yes: bool) -> io::Result<bool> {
-    if yes {
-        return Ok(true);
-    }
-    println!("{name}: {}", if current { "enabled" } else { "disabled" });
-    if !confirm(&format!("Toggle {name} and restart Explorer?"))? {
-        println!("Cancelled.");
-        return Ok(false);
-    }
-    Ok(true)
-}
-
-fn apply_toggle(
-    name: &str,
-    current: bool,
-    yes: bool,
-    changes: &[RegistryChange<'_>],
-) -> io::Result<()> {
-    if !confirm_toggle(name, current, yes)? {
-        return Ok(());
-    }
-    save_original_settings()?;
-    let prepared = prepare_changes(changes)?;
-    apply_changes(changes, &prepared)?;
-    println!(
-        "{name} saved: {}",
-        if current { "disabled" } else { "enabled" }
-    );
-    restart_explorer(name, false, false)
-}
-
 struct DwordPreference {
     name: &'static str,
     path: &'static str,
@@ -530,33 +454,6 @@ impl DwordPreference {
         };
         RegistryChange::new(root, self.path, self.value, value)
     }
-
-    fn toggle(&self, root: &RegKey, yes: bool) -> io::Result<()> {
-        let current = self.enabled_in(root)?;
-        apply_toggle(self.name, current, yes, &[self.change_in(root, !current)])
-    }
-}
-
-fn require_windows11(name: &str) -> io::Result<()> {
-    if supports_windows11()? {
-        Ok(())
-    } else {
-        Err(io::Error::other(format!(
-            "{name} is unavailable on this system"
-        )))
-    }
-}
-
-fn toggle_namespace(name: &str, clsid: &str, yes: bool) -> io::Result<()> {
-    require_windows11(name)?;
-    if !namespace_supported_in(HKLM, clsid)? {
-        return Err(io::Error::other(format!(
-            "{name} is unavailable on this system"
-        )));
-    }
-    let current = !namespace_visible_in(HKCU, HKLM, clsid)?;
-    let changes = namespace_changes(HKCU, HKLM, clsid, current);
-    apply_toggle(name, current, yes, &changes)
 }
 
 fn namespace_changes<'a>(
@@ -593,16 +490,16 @@ fn settings_changes<'a>(
     machine: &'a RegKey,
     windows11: bool,
 ) -> Vec<RegistryChange<'a>> {
-    let mut changes = Vec::new();
-    for preference in [
+    let mut changes: Vec<_> = [
         &DISABLE_TASKBAR_CENTERING,
         &DISABLE_EXPLORER_SPACING,
         &HIDE_RECENT_FILES,
         &HIDE_RECOMMENDATIONS,
         &HIDE_FREQUENT_FOLDERS,
-    ] {
-        changes.push(preference.change_in(user, true));
-    }
+    ]
+    .into_iter()
+    .map(|preference| preference.change_in(user, true))
+    .collect();
     if windows11 {
         changes.push(HIDE_OFFICE_FILES.change_in(user, true));
         changes.push(RegistryChange::new(
@@ -731,10 +628,6 @@ pub enum Recommendation {
     FolderGrouping,
 }
 
-pub fn apply_recommended(yes: bool) -> io::Result<()> {
-    apply_batch(&[SettingsCommand::Recommended], yes)
-}
-
 pub fn apply_recommended_settings(
     preview: bool,
     selected: Option<&[Recommendation]>,
@@ -749,7 +642,7 @@ pub fn apply_recommended_settings(
         changes.retain(|change| change.name != "TaskbarEndTask");
     }
     changes.retain(|change| recommendation(change).is_some_and(selected));
-    let mut view_changes = folder_views::recommended_changes()?;
+    let mut view_changes = folder_views::recommended_changes_in(HKCU, HKLM)?;
     let view_id = |change: &folder_views::ViewChange| match change {
         folder_views::ViewChange::Sort(_) => Recommendation::FolderSort,
         folder_views::ViewChange::Grouping(_) => Recommendation::FolderGrouping,
@@ -766,7 +659,9 @@ pub fn apply_recommended_settings(
     if missing_icon {
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
-    folder_views::apply_recommended(&view_changes, || apply_changes(&changes, &prepared))?;
+    folder_views::apply_in(HKCU, HKLM, &view_changes, || {
+        apply_changes(&changes, &prepared)
+    })?;
     restart_explorer(
         "Recommended settings",
         preferences.contains(&Recommendation::HideShortcutArrow),
@@ -836,7 +731,7 @@ pub fn restore_original_settings() -> io::Result<bool> {
     let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
     let changes = pending_changes(original_changes(HKCU, HKLM, &backup)?)?;
     let prepared = prepare_changes(&changes)?;
-    let views_restored = folder_views::restore()?;
+    let views_restored = folder_views::restore_in(HKCU)?;
     if changes.is_empty() && !views_restored {
         return Ok(false);
     }
@@ -852,12 +747,19 @@ pub fn restore_original_settings() -> io::Result<bool> {
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
-    folder_views::apply(sort)?;
+    folder_views::apply_in(HKCU, HKLM, &[folder_views::ViewChange::Sort(sort)], || {
+        Ok(())
+    })?;
     restart_explorer("Folder sorting", false, true)
 }
 
 pub fn set_folder_grouping(grouping: FolderGrouping) -> io::Result<()> {
-    folder_views::apply_grouping(grouping)?;
+    folder_views::apply_in(
+        HKCU,
+        HKLM,
+        &[folder_views::ViewChange::Grouping(grouping)],
+        || Ok(()),
+    )?;
     restart_explorer("Folder grouping", false, true)
 }
 
@@ -917,52 +819,26 @@ fn ensure_blank_icon_at(path: &Path, replace: bool) -> io::Result<()> {
             }
         }
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            if !blank_icon_valid(path)? {
-                use std::os::windows::fs::MetadataExt;
-                let metadata = std::fs::symlink_metadata(path)?;
-                if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
-                    return Err(io::Error::other(format!(
-                        "{} is not a regular file and cannot be replaced by Orbital.",
-                        path.display()
-                    )));
-                }
-                if !replace {
-                    return Err(io::Error::other(BlankIconConflict(path.to_path_buf())));
-                }
-                std::fs::remove_file(path).map_err(setting_error)?;
-                ensure_blank_icon_at(path, false)?;
+            if blank_icon_valid(path)? {
+                return Ok(());
             }
+            use std::os::windows::fs::MetadataExt;
+            let metadata = std::fs::symlink_metadata(path)?;
+            if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+                return Err(io::Error::other(format!(
+                    "{} is not a regular file and cannot be replaced by Orbital.",
+                    path.display()
+                )));
+            }
+            if !replace {
+                return Err(io::Error::other(BlankIconConflict(path.to_path_buf())));
+            }
+            std::fs::remove_file(path).map_err(setting_error)?;
+            return ensure_blank_icon_at(path, false);
         }
         Err(error) => return Err(setting_error(error)),
     }
     Ok(())
-}
-
-fn toggle_shortcut_arrow(yes: bool, replace_blank_icon: bool) -> io::Result<()> {
-    let name = "Hide shortcut arrow icon";
-    let path = blank_icon_path()?;
-    let current = shortcut_arrows_hidden_in(HKLM, &path)?.unwrap_or(false);
-    if !confirm_toggle(name, current, yes)? {
-        return Ok(());
-    }
-    save_original_settings()?;
-    let mut changes = [RegistryChange::new(HKLM, SHELL_ICONS_KEY, "29", None)];
-    let prepared = prepare_changes(&changes)?;
-    if !current {
-        ensure_blank_icon_at(&path, replace_blank_icon)?;
-        changes[0] = RegistryChange::new(
-            HKLM,
-            SHELL_ICONS_KEY,
-            "29",
-            Some(path.as_os_str().to_reg_value()),
-        );
-    }
-    apply_changes(&changes, &prepared)?;
-    println!(
-        "{name} saved: {}",
-        if current { "disabled" } else { "enabled" }
-    );
-    restart_explorer(name, true, false)
 }
 
 fn clear_icon_cache(local: &Path) -> io::Result<()> {
@@ -980,6 +856,31 @@ fn clear_icon_cache(local: &Path) -> io::Result<()> {
     optional(std::fs::remove_file(local.join("IconCache.db"))).map(|_| ())
 }
 
+fn stop_explorer(process: u32) -> io::Result<()> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, process: u32) -> *mut std::ffi::c_void;
+        fn TerminateProcess(process: *mut std::ffi::c_void, exit_code: u32) -> i32;
+        fn WaitForSingleObject(handle: *mut std::ffi::c_void, milliseconds: u32) -> u32;
+    }
+    let handle = unsafe { OpenProcess(0x0010_0001, 0, process) };
+    if handle.is_null() {
+        return Err(io::Error::last_os_error());
+    }
+    let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
+    if unsafe { TerminateProcess(handle.as_raw_handle(), 0) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    match unsafe { WaitForSingleObject(handle.as_raw_handle(), 5000) } {
+        0 => Ok(()),
+        258 => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "Explorer did not stop in time",
+        )),
+        _ => Err(io::Error::last_os_error()),
+    }
+}
+
 fn restart_explorer(
     setting: &str,
     rebuild_icons: bool,
@@ -988,8 +889,39 @@ fn restart_explorer(
     #[link(name = "user32")]
     unsafe extern "system" {
         fn GetShellWindow() -> *mut std::ffi::c_void;
+        fn GetForegroundWindow() -> *mut std::ffi::c_void;
+        fn SetForegroundWindow(window: *mut std::ffi::c_void) -> i32;
+        fn IsWindow(window: *mut std::ffi::c_void) -> i32;
         fn GetWindowThreadProcessId(window: *mut std::ffi::c_void, process: *mut u32) -> u32;
     }
+    struct RestoreFocus(*mut std::ffi::c_void);
+    impl Drop for RestoreFocus {
+        fn drop(&mut self) {
+            unsafe {
+                if self.0.is_null() || IsWindow(self.0) == 0 {
+                    return;
+                }
+                let foreground = GetForegroundWindow();
+                let mut foreground_process = 0;
+                let mut shell_process = 0;
+                GetWindowThreadProcessId(foreground, &mut foreground_process);
+                GetWindowThreadProcessId(GetShellWindow(), &mut shell_process);
+                if foreground.is_null()
+                    || (shell_process != 0 && foreground_process == shell_process)
+                {
+                    SetForegroundWindow(self.0);
+                }
+            }
+        }
+    }
+    let foreground = unsafe { GetForegroundWindow() };
+    let mut foreground_process = 0;
+    unsafe { GetWindowThreadProcessId(foreground, &mut foreground_process) };
+    let _focus = RestoreFocus(if foreground_process == std::process::id() {
+        foreground
+    } else {
+        std::ptr::null_mut()
+    });
     let desktop = if protect_desktop_layout_in(HKCU, folder_views_changed)? {
         Some(desktop_layout::DesktopLayout::capture()?)
     } else {
@@ -1002,16 +934,11 @@ fn restart_explorer(
             "{setting} saved, but the desktop process could not be found."
         )));
     }
-    let stopped = ProcessCommand::new("taskkill")
-        .creation_flags(0x08000000)
-        .args(["/F", "/PID", &process.to_string()])
-        .output()?;
-    if !stopped.status.success() {
-        return Err(io::Error::other(format!(
-            "{setting} saved, but Explorer could not be stopped: {}",
-            String::from_utf8_lossy(&stopped.stderr).trim()
-        )));
-    }
+    stop_explorer(process).map_err(|error| {
+        io::Error::other(format!(
+            "{setting} saved, but Explorer could not be stopped: {error}"
+        ))
+    })?;
     let cache_result = if rebuild_icons {
         std::env::var_os("LOCALAPPDATA")
             .ok_or_else(|| io::Error::other("LOCALAPPDATA is unavailable"))
@@ -1019,9 +946,11 @@ fn restart_explorer(
     } else {
         Ok(())
     };
-    ProcessCommand::new("explorer.exe")
-        .creation_flags(0x08000000)
-        .spawn()?;
+    if unsafe { GetShellWindow() }.is_null() {
+        ProcessCommand::new("explorer.exe")
+            .creation_flags(0x08000000)
+            .spawn()?;
+    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     while unsafe { GetShellWindow() }.is_null() {
         if std::time::Instant::now() >= deadline {
@@ -1046,6 +975,22 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn native_stop_waits_for_child_process_exit() {
+        let mut child = ProcessCommand::new("powershell.exe")
+            .creation_flags(0x08000000)
+            .args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"])
+            .spawn()
+            .unwrap();
+        let result = stop_explorer(child.id());
+        if result.is_err() {
+            let _ = child.kill();
+        }
+        let status = child.wait().unwrap();
+        result.unwrap();
+        assert_eq!(status.code(), Some(0));
+    }
 
     #[test]
     fn administrator_check_matches_windows() {

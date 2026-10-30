@@ -68,6 +68,17 @@ impl Drop for Workspace {
     }
 }
 
+fn replace_file(source: &Path, destination: &Path) -> io::Result<()> {
+    unsafe {
+        MoveFileExW(
+            &HSTRING::from(source),
+            &HSTRING::from(destination),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )?;
+    }
+    Ok(())
+}
+
 fn extension(path: &Path, kind: &str) -> io::Result<()> {
     if !path
         .extension()
@@ -188,14 +199,7 @@ pub async fn answer_document(
                 .map_err(|error| error.to_string())?;
             let temporary = workspace.0.join("answer.tmp");
             fs::write(&temporary, text).map_err(|error| error.to_string())?;
-            unsafe {
-                MoveFileExW(
-                    &HSTRING::from(temporary.as_path()),
-                    &HSTRING::from(path.as_path()),
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-                )
-            }
-            .map_err(|error| error.to_string())?;
+            replace_file(&temporary, &path).map_err(|error| error.to_string())?;
             Ok(Some("File saved.".into()))
         } else {
             let bytes = crate::files::read_document(&path).map_err(|error| error.to_string())?;
@@ -381,14 +385,7 @@ fn inject(
     drop(mounted);
     drop(source_file);
     progress("Saving the verified ISO…", None);
-    unsafe {
-        MoveFileExW(
-            &HSTRING::from(temporary.as_path()),
-            &HSTRING::from(destination),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )?;
-    }
-    Ok(())
+    replace_file(&temporary, destination)
 }
 
 #[tauri::command]

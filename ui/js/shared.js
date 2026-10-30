@@ -2,6 +2,7 @@
 
 const invoke = window.__TAURI__?.core.invoke;
 const byId = (id) => document.getElementById(id);
+const element = (tag, className = "", textContent = "") => Object.assign(document.createElement(tag), { className, textContent });
 
 let backdropDialog = null;
 function dialogOutsideBounds(event) {
@@ -34,14 +35,17 @@ async function confirmDialog(dialog) {
   return await showDialog(dialog) === "apply";
 }
 
-function createChangeRow(value, title) {
-  const row = document.createElement("label");
+function createChangeRow(value, title, description = "", visual = false) {
+  const row = element("label", visual ? "visual-preference" : "");
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.value = value;
   checkbox.checked = true;
-  const text = document.createElement("span");
-  text.textContent = title;
+  if (description) {
+    row.title = description;
+    checkbox.setAttribute("aria-description", description);
+  }
+  const text = element("span", "", title);
   row.append(checkbox, text);
   return { row, checkbox, text };
 }

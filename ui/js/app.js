@@ -5,16 +5,17 @@ let busy = false;
 
 function createSettingToggle(id, key, defaultValue, onChange) {
   const setting = { enabled: defaultValue };
+  const toggle = byId(`${id}-toggle`);
   try {
     const stored = localStorage.getItem(`orbital.${key}`);
     setting.enabled = defaultValue ? stored !== "false" : stored === "true";
   } catch {
   }
   function render() {
-    byId(`${id}-toggle`).setAttribute("aria-checked", String(setting.enabled));
+    toggle.setAttribute("aria-checked", String(setting.enabled));
     setPreferenceValue(`${id}-value`, setting.enabled ? "Enabled" : "Disabled");
   }
-  byId(`${id}-toggle`).addEventListener("click", () => {
+  toggle.addEventListener("click", () => {
     setting.enabled = !setting.enabled;
     onChange?.();
     render();
@@ -46,12 +47,17 @@ const explorerPreferences = [
 ];
 
 const folderViews = [
-  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting" },
-  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping" },
+  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", recommendation: "Sort folders by Type · A to Z" },
+  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", recommendation: "Set folder grouping to None" },
 ];
 
 function preferenceAvailable(preference) {
   return Boolean(settings) && (!preference.supported || settings[preference.supported]);
+}
+
+function preferenceRestriction(preference, unavailable = "Unavailable on this system") {
+  if (!preferenceAvailable(preference)) return unavailable;
+  return preference.requiresAdmin && !settings.is_administrator ? "Requires administrator access" : "";
 }
 
 function preferenceValue(preference, enabled) {
@@ -76,7 +82,7 @@ function setBusy(value) {
   busy = value;
   byId("refresh").disabled = busy || !invoke;
   byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
-  for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
+  for (const id of ["apply-recommended", "restore-original", "batch-changes", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
   for (const view of folderViews) view.picker.setDisabled(busy || !settings);
@@ -105,15 +111,14 @@ function bohrPixelCircle(radius) {
 function renderBohr() {
   if (!settings) return;
   const available = explorerPreferences.filter(preference => !preference.visual && preferenceAvailable(preference));
-  const changes = available
-    .filter(preference => settings[preference.field] === true)
-    .map(preference => preference.label);
+  const changes = available.filter(preference => settings[preference.field] === true);
   const count = byId("preferences-made");
   if (count) count.textContent = `${changes.length} / ${available.length}`;
   const diagram = byId("bohr");
   diagram.setAttribute("aria-label", `${changes.length} preferences differ from Windows defaults`);
-  if (diagram.dataset.changes === changes.join("|")) return;
-  diagram.dataset.changes = changes.join("|");
+  const signature = changes.map(preference => preference.field).join("|");
+  if (diagram.dataset.changes === signature) return;
+  diagram.dataset.changes = signature;
   const shellCount = 1 + Math.ceil(Math.max(0, changes.length - 2) / 8);
   const center = 30;
   const orbitScale = 29 / (13 + (shellCount - 1) * 8 + 2.5);
@@ -134,7 +139,7 @@ function renderBohr() {
     const shell = document.createElementNS(diagram.namespaceURI, "g");
     shell.classList.add("bohr-shell");
     shell.append(circle(radius, "bohr-ring"));
-    electrons.forEach((label, position) => {
+    electrons.forEach((preference, position) => {
       const angle = position * Math.PI * 2 / electrons.length - Math.PI / 2;
       const placement = document.createElementNS(diagram.namespaceURI, "g");
       placement.setAttribute("transform", `translate(${center + Math.cos(angle) * radius} ${center + Math.sin(angle) * radius})`);
@@ -150,7 +155,7 @@ function renderBohr() {
         electron.append(path);
       }
       const title = document.createElementNS(diagram.namespaceURI, "title");
-      title.textContent = label;
+      title.textContent = preference.label;
       electron.append(title);
       placement.append(electron);
       shell.append(placement);
@@ -232,10 +237,8 @@ async function loadSystem() {
     ["Changes:", "…"],
   ];
   byId("system").replaceChildren(...rows.flatMap(([label, value]) => {
-    const term = document.createElement("dt");
-    const description = document.createElement("dd");
-    term.textContent = label;
-    description.textContent = value;
+    const term = element("dt", "", label);
+    const description = element("dd", "", value);
     if (label === "Changes:") {
       description.className = "changes-count";
       description.replaceChildren(byId("changes-count").content.cloneNode(true));
@@ -303,7 +306,7 @@ function adminWarning(warning = document.createElement("span")) {
     return svg;
   };
   const icons = [icon("M12 3 22 21H2Z", "M10.5 8h3v6h-3Z M10.5 16.5h3v3h-3Z")];
-  if (administrator !== undefined && administrator !== null) {
+  if (administrator != null) {
     icons.push(icon(administrator ? "M3 12l6 9L21 3" : "M3 3l18 18 M21 3 3 21"));
   }
   warning.replaceChildren(...icons);
@@ -338,24 +341,12 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("confirm-description").textContent = description;
   byId("recommended-options").hidden = !recommendations.length;
   byId("recommended-options").open = true;
-  const list = byId("recommendation-list");
-  list.replaceChildren(...recommendations.map((id) => {
+  byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
     const preference = explorerPreferences.find(preference => preference.field === id);
-    const { row, checkbox, text } = createChangeRow(id, preference?.label
-      || (id === "folder_sort" ? "Sort folders by Type · A to Z" : "Set folder grouping to None"));
     const view = folderViews.find(view => view.field === id);
-    const source = preference
-      ? document.querySelector(`[data-preference="${preference.id}"]`)
-      : view && byId(`${view.id}-label`).closest(".preference");
-    const note = source?.querySelector(".preference-description")?.textContent.trim();
-    if (note) {
-      row.title = note;
-      checkbox.setAttribute("aria-description", note);
-    }
+    const { row, text } = createChangeRow(id, preference?.label || view.recommendation,
+      (preference || view).description, preference?.visual || Boolean(view));
     if (preference?.requiresAdmin) text.append(adminWarning());
-    if (preference?.visual || folderViews.some(view => view.field === id)) {
-      row.className = "visual-preference";
-    }
     return row;
   }).sort((a, b) => Number(b.classList.contains("visual-preference")) - Number(a.classList.contains("visual-preference"))));
   if (recommendations.length) {
@@ -464,6 +455,8 @@ byId("restore-original").addEventListener("click", () => applyChange(
   "restore_original_settings", {}, "Restore your original settings? If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved.", false, "Original settings restored. Explorer restarted.",
 ));
 for (const view of folderViews) {
+  view.row = byId(`${view.id}-label`).closest(".preference");
+  view.description = view.row.querySelector(".preference-description").textContent.trim();
   byId(`${view.id}-apply`).addEventListener("click", (event) => {
     const selected = view.picker.selected;
     if (selected !== null) applyChange(
@@ -478,6 +471,8 @@ for (const view of folderViews) {
 for (const preference of explorerPreferences) {
   const row = document.querySelector(`[data-preference="${preference.id}"]`);
   const title = row.querySelector("h3");
+  preference.row = row;
+  preference.description = row.querySelector(".preference-description").textContent.trim();
   preference.label = title.textContent.trim();
   if (preference.requiresAdmin) title.append(adminWarning());
   const value = document.createElement("p");

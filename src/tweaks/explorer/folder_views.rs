@@ -1,6 +1,6 @@
 use super::{delete_value_if_present, optional};
 use std::io;
-use winreg::{HKCU, HKLM, RegKey, enums::KEY_READ};
+use winreg::{RegKey, enums::KEY_READ};
 
 const FOLDER_TYPES: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\FolderTypes";
 const BACKUP: &str = r"Software\Orbital\OriginalFolderSorting";
@@ -104,27 +104,29 @@ impl BagGrouping {
         })
     }
 
-    fn view(&self) -> u32 {
-        if self.grouping == FolderGrouping::None {
+    fn values(&self) -> [(&'static str, u32); 3] {
+        let view = if self.grouping == FolderGrouping::None {
             0
         } else {
             u32::MAX
-        }
-    }
-
-    fn direction(&self) -> u32 {
-        if self.grouping.descending() {
+        };
+        let direction = if self.grouping.descending() {
             u32::MAX
         } else {
             1
-        }
+        };
+        [
+            ("GroupView", view),
+            ("GroupByKey:PID", self.property_id),
+            ("GroupByDirection", direction),
+        ]
     }
 
     fn write(&self, key: &RegKey) -> io::Result<()> {
-        key.set_value("GroupView", &self.view())?;
+        for (name, value) in self.values() {
+            key.set_value(name, &value)?;
+        }
         key.set_value("GroupByKey:FMTID", &self.format)?;
-        key.set_value("GroupByKey:PID", &self.property_id)?;
-        key.set_value("GroupByDirection", &self.direction())?;
         if self.grouping != FolderGrouping::None
             && let Some(flags) = optional(key.get_value::<u32, _>("FFlags"))?
         {
@@ -134,11 +136,7 @@ impl BagGrouping {
     }
 
     fn matches(&self, key: &RegKey) -> io::Result<bool> {
-        for (name, expected) in [
-            ("GroupView", self.view()),
-            ("GroupByKey:PID", self.property_id),
-            ("GroupByDirection", self.direction()),
-        ] {
+        for (name, expected) in self.values() {
             if optional(key.get_value::<u32, _>(name))? != Some(expected) {
                 return Ok(false);
             }
@@ -341,15 +339,10 @@ fn top_views(root: &RegKey) -> io::Result<Vec<String>> {
     Ok(views)
 }
 
-pub(super) fn current() -> io::Result<Option<FolderSort>> {
-    current_in(HKCU, HKLM)
-}
-
-pub(super) fn current_grouping() -> io::Result<Option<FolderGrouping>> {
-    current_grouping_in(HKCU, HKLM)
-}
-
-fn current_grouping_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderGrouping>> {
+pub(super) fn current_grouping_in(
+    user: &RegKey,
+    machine: &RegKey,
+) -> io::Result<Option<FolderGrouping>> {
     let Some(grouping) = current_view_in(user, machine, "GroupBy", FolderGrouping::parse)? else {
         return Ok(None);
     };
@@ -366,7 +359,7 @@ fn current_grouping_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<Fol
     Ok(Some(grouping))
 }
 
-fn current_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderSort>> {
+pub(super) fn current_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderSort>> {
     current_view_in(user, machine, "SortByList", FolderSort::parse)
 }
 
@@ -487,15 +480,7 @@ fn reset_saved_view(key: &RegKey, changes: &[ViewChange]) -> io::Result<()> {
     Ok(())
 }
 
-fn apply_in(user: &RegKey, machine: &RegKey, sort: FolderSort) -> io::Result<()> {
-    change_views_in(user, machine, ViewChange::Sort(sort))
-}
-
-fn change_views_in(user: &RegKey, machine: &RegKey, change: ViewChange) -> io::Result<()> {
-    apply_recommended_in(user, machine, &[change], || Ok(()))
-}
-
-fn apply_recommended_in(
+pub(super) fn apply_in(
     user: &RegKey,
     machine: &RegKey,
     changes: &[ViewChange],
@@ -565,15 +550,10 @@ fn apply_recommended_in(
     })
 }
 
-pub(super) fn apply(sort: FolderSort) -> io::Result<()> {
-    apply_in(HKCU, HKLM, sort)
-}
-
-pub(super) fn apply_grouping(grouping: FolderGrouping) -> io::Result<()> {
-    change_views_in(HKCU, HKLM, ViewChange::Grouping(grouping))
-}
-
-fn recommended_changes_in(user: &RegKey, machine: &RegKey) -> io::Result<Vec<ViewChange>> {
+pub(super) fn recommended_changes_in(
+    user: &RegKey,
+    machine: &RegKey,
+) -> io::Result<Vec<ViewChange>> {
     let sort = FolderSort {
         column: SortColumn::Type,
         descending: false,
@@ -588,22 +568,7 @@ fn recommended_changes_in(user: &RegKey, machine: &RegKey) -> io::Result<Vec<Vie
     Ok(changes)
 }
 
-pub(super) fn recommended_changes() -> io::Result<Vec<ViewChange>> {
-    recommended_changes_in(HKCU, HKLM)
-}
-
-pub(super) fn apply_recommended(
-    changes: &[ViewChange],
-    apply_other: impl FnOnce() -> io::Result<()>,
-) -> io::Result<()> {
-    apply_recommended_in(HKCU, HKLM, changes, apply_other)
-}
-
-pub(super) fn restore() -> io::Result<bool> {
-    restore_in(HKCU)
-}
-
-fn restore_in(user: &RegKey) -> io::Result<bool> {
+pub(super) fn restore_in(user: &RegKey) -> io::Result<bool> {
     let Some(backup) = open_optional(user, BACKUP)? else {
         return Ok(false);
     };
@@ -619,31 +584,20 @@ fn restore_in(user: &RegKey) -> io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::tests::TestRegistry;
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     struct Registry {
         user: RegKey,
         machine: RegKey,
-        path: String,
+        _registry: TestRegistry,
     }
 
     impl Registry {
         fn new() -> Self {
-            static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
-            let path = format!(
-                r"Software\OrbitalTests\FolderSort-{}-{timestamp}-{}",
-                std::process::id(),
-                NEXT_ID.fetch_add(1, Ordering::Relaxed)
-            );
-            let (root, _) = HKCU.create_subkey(&path).unwrap();
-            let (user, _) = root.create_subkey("User").unwrap();
-            let (machine, _) = root.create_subkey("Machine").unwrap();
+            let registry = TestRegistry::new();
+            let (user, _) = registry.key.create_subkey("User").unwrap();
+            let (machine, _) = registry.key.create_subkey("Machine").unwrap();
             for template in [
                 "Generic",
                 "Downloads",
@@ -674,15 +628,17 @@ mod tests {
             Self {
                 user,
                 machine,
-                path,
+                _registry: registry,
             }
         }
     }
 
-    impl Drop for Registry {
-        fn drop(&mut self) {
-            HKCU.delete_subkey_all(&self.path).unwrap();
-        }
+    fn apply_sort(user: &RegKey, machine: &RegKey, sort: FolderSort) -> io::Result<()> {
+        change_views_in(user, machine, ViewChange::Sort(sort))
+    }
+
+    fn change_views_in(user: &RegKey, machine: &RegKey, change: ViewChange) -> io::Result<()> {
+        apply_in(user, machine, &[change], || Ok(()))
     }
 
     fn set_binary(key: &RegKey, name: &str, bytes: &[u8]) {
@@ -734,7 +690,7 @@ mod tests {
                     .unwrap();
                 desktops.push((bag_path, bag, desktop));
             }
-            apply_recommended_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
+            apply_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
             for (bag_path, bag, desktop) in &desktops {
                 assert_eq!(
                     desktop.get_raw_value("IconLayouts").unwrap().bytes.as_ref(),
@@ -789,7 +745,7 @@ mod tests {
         let old_path = format!(r"{}\1\Desktop", VIEW_KEYS[3]);
         let (old, _) = registry.user.create_subkey(&old_path).unwrap();
         set_binary(&old, "IconLayouts", &[1, 2, 3]);
-        apply_in(
+        apply_sort(
             &registry.user,
             &registry.machine,
             FolderSort {
@@ -822,7 +778,7 @@ mod tests {
             .0
             .set_value("Original", &1u32)
             .unwrap();
-        let result = apply_recommended_in(
+        let result = apply_in(
             &registry.user,
             &registry.machine,
             &[ViewChange::Grouping(FolderGrouping::Size)],
@@ -865,7 +821,7 @@ mod tests {
         ] {
             let values = BagGrouping::resolve(grouping).unwrap();
             assert_eq!(values.property_id, id);
-            assert_eq!(values.direction(), direction);
+            assert!(values.values().contains(&("GroupByDirection", direction)));
             assert_eq!(
                 values.format,
                 if grouping == FolderGrouping::None {
@@ -957,7 +913,7 @@ mod tests {
             column: SortColumn::Size,
             descending: true,
         };
-        apply_in(&registry.user, &registry.machine, sort).unwrap();
+        apply_sort(&registry.user, &registry.machine, sort).unwrap();
         let saved_path = format!(r"{}\AllFolders\Shell", VIEW_KEYS[1]);
         registry.user.create_subkey(&saved_path).unwrap();
         for grouping in [
@@ -1003,7 +959,7 @@ mod tests {
         let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
         assert_eq!(changes.len(), 2);
         let mut other_applies = 0;
-        apply_recommended_in(&registry.user, &registry.machine, &changes, || {
+        apply_in(&registry.user, &registry.machine, &changes, || {
             other_applies += 1;
             Ok(())
         })
@@ -1021,7 +977,7 @@ mod tests {
         assert!(changes.is_empty());
         let cached_path = format!(r"{}\ExistingFolder", VIEW_KEYS[1]);
         registry.user.create_subkey(&cached_path).unwrap();
-        apply_recommended_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
+        apply_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
         assert!(registry.user.open_subkey(&cached_path).is_ok());
         change_views_in(
             &registry.user,
@@ -1032,7 +988,7 @@ mod tests {
         let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
         assert_eq!(changes.len(), 1);
         assert!(
-            apply_recommended_in(&registry.user, &registry.machine, &changes, || Err(
+            apply_in(&registry.user, &registry.machine, &changes, || Err(
                 io::Error::other("Other preference failed")
             ))
             .is_err()
@@ -1045,12 +1001,12 @@ mod tests {
             current_in(&registry.user, &registry.machine).unwrap(),
             Some(sort)
         );
-        apply_recommended_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
+        apply_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
         let custom_sort = FolderSort {
             column: SortColumn::Name,
             descending: false,
         };
-        apply_in(&registry.user, &registry.machine, custom_sort).unwrap();
+        apply_sort(&registry.user, &registry.machine, custom_sort).unwrap();
         let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
         assert_eq!(changes.len(), 1);
         assert!(restore_in(&registry.user).unwrap());
@@ -1111,9 +1067,9 @@ mod tests {
                         .as_ref(),
                     &[3, 2, 1]
                 );
-                apply_in(&registry.user, &registry.machine, sort).unwrap();
+                apply_sort(&registry.user, &registry.machine, sort).unwrap();
             } else {
-                apply_in(&registry.user, &registry.machine, sort).unwrap();
+                apply_sort(&registry.user, &registry.machine, sort).unwrap();
                 assert_ne!(
                     current_grouping_in(&registry.user, &registry.machine).unwrap(),
                     Some(FolderGrouping::None)
@@ -1205,7 +1161,7 @@ mod tests {
             column: SortColumn::DateModified,
             descending: true,
         };
-        apply_in(&registry.user, &registry.machine, sort).unwrap();
+        apply_sort(&registry.user, &registry.machine, sort).unwrap();
         assert_eq!(
             current_in(&registry.user, &registry.machine).unwrap(),
             Some(sort)
@@ -1246,7 +1202,7 @@ mod tests {
             all_folders.get_raw_value("Sort").unwrap_err().kind(),
             io::ErrorKind::NotFound
         );
-        apply_in(
+        apply_sort(
             &registry.user,
             &registry.machine,
             FolderSort {
@@ -1341,7 +1297,7 @@ mod tests {
     fn incomplete_backup_is_replaced_before_applying() {
         let registry = Registry::new();
         registry.user.create_subkey(BACKUP).unwrap();
-        apply_in(
+        apply_sort(
             &registry.user,
             &registry.machine,
             FolderSort {
@@ -1365,7 +1321,7 @@ mod tests {
             column: SortColumn::Size,
             descending: true,
         };
-        apply_in(&registry.user, &registry.machine, sort).unwrap();
+        apply_sort(&registry.user, &registry.machine, sort).unwrap();
         let key = registry
             .user
             .open_subkey_with_flags(
