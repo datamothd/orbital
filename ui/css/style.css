@@ -57,7 +57,7 @@ body {
 
 main {
   max-width: 640px;
-  padding: var(--space-4);
+  padding: var(--panel-padding);
   margin: 0;
 }
 
@@ -461,7 +461,13 @@ button:disabled {
   margin-bottom: 12px;
 }
 
-#settings-panel > section > h2 + .preference {
+.settings-divider {
+  display: block;
+  margin-bottom: 12px;
+  color: #777;
+}
+
+#settings-panel > section > .settings-divider + .preference {
   padding-top: 0;
 }
 
@@ -598,7 +604,7 @@ dialog {
   color: #fff;
   border: 1px solid #555;
   border-radius: 12px;
-  padding: var(--space-6);
+  padding: var(--panel-padding);
   max-width: 380px;
   width: calc(100% - 40px);
   max-height: calc(100vh - 32px);
@@ -1038,10 +1044,6 @@ button.primary:hover:not(:disabled) {
 }
 
 @media (max-width: 440px) {
-  :root {
-    --panel-padding: 16px;
-  }
-
   .system-content {
     grid-template-columns: minmax(0, 1fr);
   }
