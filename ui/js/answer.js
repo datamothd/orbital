@@ -376,6 +376,15 @@ const answer = (() => {
     let hash = 2166136261; for (const character of new XMLSerializer().serializeToString(copy)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
     return (hash >>> 0).toString(16);
   }
+  function indentGeneratedXml(element, depth = 0) {
+    const children = [...element.children];
+    if (!children.length || [...element.childNodes].some(child => child.nodeType !== Node.ELEMENT_NODE)) return;
+    for (const child of children) {
+      element.insertBefore(element.ownerDocument.createTextNode("\n" + "  ".repeat(depth + 1)), child);
+      indentGeneratedXml(child, depth + 1);
+    }
+    element.append(element.ownerDocument.createTextNode("\n" + "  ".repeat(depth)));
+  }
   function serialize(xml) {
     const text = '<?xml version="1.0" encoding="utf-8"?>\n' + new XMLSerializer().serializeToString(xml.documentElement);
     if (utf8.encode(text).length > 1048576) throw new Error("The generated answer file exceeds 1 MiB. Reduce embedded content.");
@@ -547,7 +556,8 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     for (const pass of passes) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
     if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of value("edition").startsWith("Windows 10 ") ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
     for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
-    const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.setAttribute("hash", fingerprint(root)); metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
+    const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
+    indentGeneratedXml(root); metadata.setAttribute("hash", fingerprint(root));
     return serialize(xml);
   }
   function show(open) {
@@ -613,10 +623,10 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     else await upload(true);
   }));
   for (const button of document.querySelectorAll("[data-answer-save]")) button.addEventListener("click", () => attempt(async () => {
-    const kind = button.dataset.answerSave, content = kind === "json" ? JSON.stringify(capture(), null, 2) : build();
+    const content = build();
     if (utf8.encode(content).length > 1048576) throw new Error("Reduce the configuration to less than 1 MiB.");
-    if (invoke) { if (await invoke("answer_document", { content, kind }) !== null) status("File saved."); }
-    else { const link = element("a"), url = URL.createObjectURL(new Blob([content], { type: kind === "json" ? "application/json" : "application/xml" })); link.href = url; link.download = kind === "json" ? "orbital-answer.json" : "autounattend.xml"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status("File downloaded."); }
+    if (invoke) { if (await invoke("answer_document", { content, kind: "xml" }) !== null) status("File saved."); }
+    else { const link = element("a"), url = URL.createObjectURL(new Blob([content], { type: "application/xml" })); link.href = url; link.download = "autounattend.xml"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status("File downloaded."); }
   }));
   byId("answer-form").addEventListener("submit", event => { event.preventDefault(); attempt(async () => { const xml = build(); const file = invoke ? await invoke("set_answer_file", { xml }) : { name: "Orbital answer file.xml", xml }; setInjectFile("xml", file); show(false); }); });
   return { choose };
