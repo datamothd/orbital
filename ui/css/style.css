@@ -848,8 +848,8 @@ button.primary:hover:not(:disabled) {
   cursor: pointer;
 }
 
-.inject-file:hover,
-.inject-file:focus-within {
+.inject-file:not([aria-busy="true"]):hover,
+.inject-file:not([aria-busy="true"]):focus-within {
   background: #111;
   border-color: #b3b3b3;
 }
@@ -861,6 +861,16 @@ button.primary:hover:not(:disabled) {
 
 .inject-file.selected {
   border-style: solid;
+}
+
+.inject-file[aria-busy="true"] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.inject-file > .answer-picker:disabled {
+  opacity: 0;
 }
 
 .inject-file > .inject-kicker {

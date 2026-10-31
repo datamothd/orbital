@@ -2,6 +2,8 @@
 
 const injectFiles = { iso: null, xml: null };
 let injectBusy = false;
+let injectSelecting = null;
+let injectWriting = false;
 
 function drawPixelCircle(context, center, radius) {
   for (let y = 0; y < radius / Math.SQRT2; y++) {
@@ -46,14 +48,26 @@ function drawIsoDisc() {
 
 drawIsoDisc();
 
-function setInjectBusy(value) {
+function setInjectBusy(value, selecting = null) {
   injectBusy = value;
+  injectSelecting = value ? selecting : null;
+  if (!value) injectWriting = false;
+  updateInjectControls();
+}
+
+function updateInjectControls() {
   for (const kind of Object.keys(injectFiles)) {
-    byId(`inject-${kind}`).disabled = value;
-    byId(`inject-${kind}-remove`).disabled = value;
+    const input = byId(`inject-${kind}`);
+    const card = input.closest(".inject-file");
+    const dimmed = injectWriting || injectSelecting === kind;
+    input.disabled = injectBusy;
+    byId(`inject-${kind}-remove`).disabled = injectBusy;
+    card.inert = injectBusy;
+    card.setAttribute("aria-busy", String(dimmed));
   }
-  byId("inject-start").disabled = value || !invoke || !injectFiles.iso || !injectFiles.xml;
-  document.querySelector(".inject-inputs").setAttribute("aria-busy", String(value));
+  byId("inject-iso").title = injectWriting || injectSelecting === "iso" ? "" : injectFiles.iso?.name || "No image selected";
+  byId("inject-start").disabled = injectBusy || !invoke || !injectFiles.iso || !injectFiles.xml;
+  document.querySelector(".inject-inputs").setAttribute("aria-busy", String(injectWriting));
 }
 
 function setInjectStatus(message, error = false) {
@@ -72,7 +86,7 @@ function setInjectFile(kind, file = null) {
 
 async function changeInjectFile(kind, clear = false) {
   if (injectBusy) return;
-  setInjectBusy(true);
+  setInjectBusy(true, kind);
   try {
     const file = invoke ? await invoke(clear ? "clear_injection_file" : "select_injection_file", { kind }) : null;
     if (clear || file) setInjectFile(kind, file || null);
@@ -102,7 +116,7 @@ function renderInject() {
     ? invoke ? "Both files are ready. Choose Inject ISO to continue." : "Open Orbital to write your ISO."
     : count ? `Choose ${injectFiles.iso ? "an answer file" : "a source ISO"} to complete the image plan.`
     : "Select an ISO and an answer file to prepare your image.");
-  setInjectBusy(injectBusy);
+  updateInjectControls();
 }
 
 for (const kind of Object.keys(injectFiles)) {
@@ -138,15 +152,18 @@ byId("inject-start").addEventListener("click", async () => {
   try {
     const mode = await showDialog(byId("inject-confirm"));
     if (mode !== "copy" && mode !== "original") return;
-    indicator.hidden = false;
-    indicator.removeAttribute("value");
-    cancel.hidden = false;
-    cancel.disabled = false;
-    start.textContent = "Injecting…";
     setInjectStatus(mode === "copy" ? "Choose where to save the injected copy…" : "Preparing the selected ISO…");
     const progress = new window.__TAURI__.core.Channel();
     progress.onmessage = ({ message, percent }) => {
       if (!receivingProgress) return;
+      if (!injectWriting) {
+        injectWriting = true;
+        updateInjectControls();
+        indicator.hidden = false;
+        cancel.hidden = false;
+        cancel.disabled = false;
+        start.textContent = "Injecting…";
+      }
       if (percent == null) indicator.removeAttribute("value");
       else indicator.value = percent;
       setInjectStatus(percent == null ? message : `${message} ${percent}%`);
