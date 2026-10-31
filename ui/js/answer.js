@@ -424,7 +424,14 @@ try {
   Write-Output "Installer exit code: $($result.ExitCode)"
   if ($result.ExitCode -notin @(0, 3010)) { throw "VirtualBox Guest Additions installer failed with exit code $($result.ExitCode)." }
   if (!(Get-Service -Name VBoxService -ErrorAction SilentlyContinue)) { throw 'The installer returned success, but the VirtualBox Guest Additions service was not found.' }
-  Write-Output 'VirtualBox Guest Additions is installed. Restart Windows to finish installation.'
+  Set-Service -Name VBoxService -StartupType Automatic
+  Start-Service -Name VBoxService
+  $service = Get-Service -Name VBoxService
+  $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(30))
+  $service.Refresh()
+  if ($service.Status -ne 'Running') { throw 'VirtualBox Guest Additions service did not remain running. Check the Windows System event log.' }
+  Write-Output "VirtualBox Guest Additions service: $($service.Status); startup: Automatic"
+  Write-Output 'VirtualBox Guest Additions is installed and its service is running. Restart Windows to finish driver installation.'
   Unregister-ScheduledTask -TaskName ${quote(task)} -Confirm:$false
 } catch {
   Write-Warning $_.Exception.Message
