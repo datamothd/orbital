@@ -282,6 +282,14 @@
           </div>
           <button id="smooth-scroll-toggle" type="button" role="switch" aria-checked="true" aria-labelledby="smooth-scroll-label" aria-describedby="smooth-scroll-description">Toggle</button>
         </div>
+        <div class="preference">
+          <div>
+            <h3 id="debug-mode-label">Debug mode</h3>
+            <p id="debug-mode-description" class="preference-description">Show the debug preset in the installation configurator.</p>
+            <p id="debug-mode-value" class="preference-value" data-state="disabled">Disabled</p>
+          </div>
+          <button id="debug-mode-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="debug-mode-label" aria-describedby="debug-mode-description">Toggle</button>
+        </div>
       </section>
     </div>
     <section id="answer-page" aria-labelledby="answer-title" hidden>
@@ -293,12 +301,13 @@
         </button>
       </header>
       <h1 id="answer-title">Configure your installation.</h1>
-      <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords.</p>
+      <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords. Presets are available.</p>
       <div class="answer-actions answer-files">
         <button id="answer-import" type="button">Import settings / XML</button>
         <button type="button" data-answer-save="xml">Download XML</button>
+        <button id="answer-preset-picker" class="folder-view-picker" type="button" role="combobox" aria-labelledby="answer-preset-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="answer-preset-options"><span id="answer-preset-selection">Choose a preset</span><span class="picker-arrow" aria-hidden="true"></span></button>
       </div>
-      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"><button id="answer-collapse" type="button">Collapse all</button></div>
+      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"><button id="answer-collapse" type="button" aria-label="Collapse all" title="Collapse all"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M2 2h10v10H2zm1 1v8h8V3zM5 7h4v1H5zM13 4h1v10H4v-1h9z"/></svg></button></div>
       <form id="answer-form" novalidate autocomplete="off">
         <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
         <div id="answer-groups"></div>
@@ -323,6 +332,7 @@
   </template>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
   <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
+  <div id="answer-preset-options" class="folder-view-options" role="listbox" aria-label="Presets" tabindex="-1" hidden></div>
   <dialog id="inject-confirm" aria-labelledby="inject-confirm-title" aria-describedby="inject-confirm-description inject-replace-note">
     <h2 id="inject-confirm-title">How do you want to inject?</h2>
     <p id="inject-confirm-description" class="note">Choose whether to update the selected ISO or save an injected copy.</p>

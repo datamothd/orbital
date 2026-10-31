@@ -11,7 +11,7 @@ const answer = (() => {
   const options = values => values.map(value => Array.isArray(value) ? value : [value, value]);
   const choice = (values, config = {}) => ({ choices: options(values), toggle: values === yesNo, ...config });
   const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
-  const languages = [["", "Windows default"], ..."ar-SA bg-BG cs-CZ da-DK de-DE el-GR en-GB en-US es-ES es-MX et-EE fi-FI fr-CA fr-FR he-IL hr-HR hu-HU it-IT ja-JP ko-KR lt-LT lv-LV nb-NO nl-NL pl-PL pt-BR pt-PT ro-RO ru-RU sk-SK sl-SI sr-Latn-RS sv-SE th-TH tr-TR uk-UA zh-CN zh-TW".split(" ").map(code => [code, languageNames.of(code)])];
+  const languages = [["", "Windows default"], ..."en-US en-GB ar-SA bg-BG cs-CZ da-DK de-DE el-GR es-ES es-MX et-EE fi-FI fr-CA fr-FR he-IL hr-HR hu-HU it-IT ja-JP ko-KR lt-LT lv-LV nb-NO nl-NL pl-PL pt-BR pt-PT ro-RO ru-RU sk-SK sl-SI sr-Latn-RS sv-SE th-TH tr-TR uk-UA zh-CN zh-TW".split(" ").map(code => [code, languageNames.of(code)])];
   const timezones = [["", "Windows default"], ...options(["UTC", "Pacific Standard Time", "Mountain Standard Time", "US Mountain Standard Time", "Central Standard Time", "Eastern Standard Time", "Atlantic Standard Time", "GMT Standard Time", "W. Europe Standard Time", "Romance Standard Time", "India Standard Time", "China Standard Time", "Tokyo Standard Time", "AUS Eastern Standard Time", "New Zealand Standard Time"])];
   const number = (value, min, max) => ({ type: "number", value, min, max, required: true });
   const groups = [
@@ -19,6 +19,7 @@ const answer = (() => {
       ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise"].map(edition => `Windows ${version} ${edition}`))])],
       ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
       ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
+      ["product-key-ui", "Show product key screen", choice([["", "Windows default (on error)"], ["Always", "Always"], ["Never", "Never"]], { help: "Controls the product-key screen during Windows Setup. The Windows default shows it if an error occurs." })],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
       ["dynamic-update", "Download updates during setup", choice(yesNo, { help: "Enabling setup updates may cause Windows installation to hang in virtual machines. Disabling them resolved a Windows 11 26H2 installation hang in VirtualBox. This workaround has not been tested on physical machines." })],
       ["compact", "Compress Windows system files", choice(yesNo, { help: "Compact OS saves disk space and may affect performance." })],
@@ -242,10 +243,43 @@ const answer = (() => {
       control.load(picker.value);
       control.setDisabled(picker.disabled);
     }
-    const term = byId("answer-search").value.trim().toLowerCase(), xmlMode = value("mode") === "xml";
-    for (const [id, section] of sections) { section.hidden = Boolean(term && !section.textContent.toLowerCase().includes(term)); if (term && !section.hidden || xmlMode && id === "advanced") section.open = true; }
-    if (term) for (const kind of Object.keys(rowFields)) for (const row of rows(kind)) if (row.textContent.toLowerCase().includes(term)) row.open = true;
+    filterSearch(byId("answer-search").value.trim().toLowerCase());
+    if (value("mode") === "xml") sections.get("advanced").open = true;
     renderIssues(validate());
+  }
+  function filterSearch(term) {
+    const matches = text => text.toLowerCase().includes(term);
+    for (const [id, title] of groups) {
+      const section = sections.get(id), categoryMatches = Boolean(term && matches(title));
+      let hasMatch = false;
+      for (const child of section.querySelector(":scope > .answer-grid").children) {
+        if (child.classList.contains("answer-list")) {
+          let listMatches = false;
+          for (const row of child.children) {
+            const rowMatches = categoryMatches || matches(row.querySelector(".answer-row-title").textContent);
+            let fieldMatches = false;
+            for (const field of row.querySelectorAll(":scope > .answer-grid > .answer-field")) {
+              const match = rowMatches || matches(field.querySelector("[data-label]").dataset.label);
+              field.classList.toggle("answer-search-hidden", Boolean(term && !match));
+              if (match && !field.hidden) fieldMatches = true;
+            }
+            const match = rowMatches || fieldMatches;
+            row.classList.toggle("answer-search-hidden", Boolean(term && !match));
+            if (term && match) row.open = true;
+            if (match) listMatches = true;
+          }
+          child.classList.toggle("answer-search-hidden", Boolean(term && !listMatches));
+          if (listMatches) hasMatch = true;
+        } else {
+          const label = child.classList.contains("answer-field") ? child.querySelector("[data-label]").dataset.label : child.textContent;
+          const match = categoryMatches || matches(label);
+          child.classList.toggle("answer-search-hidden", Boolean(term && !match));
+          if (match && !child.hidden) hasMatch = true;
+        }
+      }
+      section.hidden = Boolean(term && !categoryMatches && !hasMatch);
+      if (term && !section.hidden) section.open = true;
+    }
   }
   function parse(source, root = "unattend", namespace = ns) {
     const xml = new DOMParser().parseFromString(source, "application/xml");
@@ -311,7 +345,7 @@ const answer = (() => {
     summary.replaceChildren(element("h2", "", `${issues.length} ${issues.length === 1 ? "issue prevents" : "issues prevent"} creating this answer file`), list); summary.hidden = !issues.length;
     for (const issue of issues) {
       const item = element("li"), button = actionButton("", issue.message);
-      button.addEventListener("click", () => { byId("answer-search").value = ""; for (const section of sections.values()) section.hidden = false; const control = focusControl(issue.controls[0]); for (let section = control.closest("details"); section; section = section.parentElement.closest("details")) section.open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
+      button.addEventListener("click", () => { byId("answer-search").value = ""; update(); const control = focusControl(issue.controls[0]); for (let section = control.closest("details"); section; section = section.parentElement.closest("details")) section.open = true; control.scrollIntoView({ block: "center" }); control.focus({ preventScroll: true }); });
       item.append(button); list.append(item);
       const affected = new Set();
       for (const control of issue.controls) {
@@ -362,6 +396,7 @@ const answer = (() => {
     if (logon && !(logon === "@Administrator" && profile.values["builtin-admin"] === "true") && !profile.accounts.some(row => row.name === logon)) throw new Error("Automatic sign-in must refer to an enabled account in these settings.");
     byId("answer-form").reset();
     for (const [key, text] of Object.entries(profile.values)) if (key !== "autologon") controls.get(key).value = text;
+    if (!Object.hasOwn(profile.values, "product-key-ui")) controls.get("product-key-ui").value = "Never";
     for (const kind of Object.keys(rowFields)) for (const row of profile[kind]) addRow(kind, row);
     update(); controls.get("autologon").value = logon || ""; controls.get("disk-confirm").value = ""; update();
   }
@@ -473,11 +508,10 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     }
     const setting = (pass, name, path, text) => node(component(pass, name), path, text);
     for (const [id, pass, name, path] of [
-      ["product-key", "windowsPE", "setup", "UserData/ProductKey/Key"], ["accept-eula", "windowsPE", "setup", "UserData/AcceptEula"], ["dynamic-update", "windowsPE", "setup", "DynamicUpdate/Enable"], ["compact", "windowsPE", "setup", "ImageInstall/OSImage/Compact"],
+      ["product-key", "windowsPE", "setup", "UserData/ProductKey/Key"], ["product-key-ui", "windowsPE", "setup", "UserData/ProductKey/WillShowUI"], ["accept-eula", "windowsPE", "setup", "UserData/AcceptEula"], ["dynamic-update", "windowsPE", "setup", "DynamicUpdate/Enable"], ["compact", "windowsPE", "setup", "ImageInstall/OSImage/Compact"],
       ["setup-language", "windowsPE", "winpe", "SetupUILanguage/UILanguage"], ["timezone", "oobeSystem", "shell", "TimeZone"], ["computer", "specialize", "shell", "ComputerName"], ["owner", "specialize", "shell", "RegisteredOwner"], ["organization", "specialize", "shell", "RegisteredOrganization"], ["activation-key", "specialize", "shell", "ProductKey"],
       ["hide-license", "oobeSystem", "shell", "OOBE/HideEULAPage"], ["hide-oem", "oobeSystem", "shell", "OOBE/HideOEMRegistrationScreen"], ["hide-online", "oobeSystem", "shell", "OOBE/HideOnlineAccountScreens"], ["hide-wireless", "oobeSystem", "shell", "OOBE/HideWirelessSetupInOOBE"], ["protection", "oobeSystem", "shell", "OOBE/ProtectYourPC"]
     ]) if (value(id)) setting(pass, name, path, value(id));
-    setting("windowsPE", "setup", "UserData/ProductKey/WillShowUI", "Never");
     for (const [id, path] of [["language", "UILanguage"], ["user-locale", "UserLocale"], ["keyboard", "InputLocale"], ["fallback", "UILanguageFallback"], ["system-locale", "SystemLocale"]]) if (value(id)) for (const [pass, name] of [["windowsPE", "winpe"], ["oobeSystem", "locale"]]) setting(pass, name, path, value(id));
     if (value("edition")) { const metadata = node(component("windowsPE", "setup"), "ImageInstall/OSImage/InstallFrom/MetaData", undefined, true); node(metadata, "Key", "/IMAGE/NAME"); node(metadata, "Value", value("edition")); }
     if (value("encryption")) setting("specialize", "Microsoft-Windows-SecureStartup-FilterDriver", "PreventDeviceEncryption", String(value("encryption") === "false"));
@@ -580,6 +614,44 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       sections.get(id).open = changed || Boolean(lists.get(id)?.children.length);
     }
   }
+  const presetPicker = createChoicePicker(
+    byId("answer-preset-picker"), byId("answer-preset-options"), byId("answer-preset-selection"),
+    () => [{ value: "defaults", label: "Windows defaults" }, ...(debugMode.enabled ? [{ value: "debug", label: "All preferences (debug)" }] : [])],
+    "Choose a preset", choice => {
+      initialize();
+      if (choice.value === "defaults") {
+        byId("answer-form").reset();
+        showImportedChanges();
+        status("Windows defaults restored.");
+      } else {
+        restore({
+          format: "orbital-answer", version: 1,
+          values: {
+            edition: "Windows 11 Pro", architecture: "all", "product-key-ui": "Never", "accept-eula": "true", "dynamic-update": "false", compact: "true", encryption: "false",
+            "disk-mode": "erase", disk: "1", layout: "gpt", "system-size": "512", recovery: "true", "recovery-size": "3072",
+            language: "en-US", "setup-language": "en-US", "user-locale": "en-US", keyboard: "en-US", fallback: "en-GB", "system-locale": "en-US", timezone: "UTC",
+            computer: "ORBITAL-DEBUG", owner: "Orbital Debug", organization: "Orbital Debug",
+            "builtin-admin": "true", "builtin-password": "DebugOnly123!", "builtin-name": "Administrator", autologon: "OrbitalDebug", "logon-count": "2", obscure: "true",
+            "hide-license": "true", "hide-oem": "true", "hide-online": "true", "hide-wireless": "true", protection: "3",
+            "join-mode": "domain", "join-name": "example.invalid", "join-user": "debug", "join-password": "DebugOnly123!", "join-domain": "example.invalid", "join-ou": "OU=Debug,DC=example,DC=invalid",
+            "wifi-mode": "personal", ssid: "Orbital-Debug", "wifi-auth": "WPA2PSK", "wifi-password": "DebugOnly123!", "wifi-hidden": "true",
+            drivers: "D:\\Drivers", "guest-tools": "virtualbox", payload: "C:\\OrbitalDebug\\Orbital\\Setup", logging: "false", windows: "visible", mode: "guided"
+          },
+          accounts: [{ name: "OrbitalDebug", display: "Orbital Debug", group: "Custom", groups: "Administrators;Users", "password-mode": "custom", password: "DebugOnly123!", description: "Example debug account" }],
+          commands: [{ pass: "specialize", description: "Example debug command", path: "cmd.exe /c echo Orbital debug", reboot: "Never" }],
+          scripts: [{ type: "ps1", label: "Example debug script", content: "Write-Output 'Orbital debug'" }]
+        });
+        showImportedChanges();
+        status("Debug preset loaded with example values. Review all settings; disk erasure still requires confirmation.");
+      }
+      byId("answer-preset-picker").title = `${choice.label} (preset)`;
+    }
+  );
+  presetPicker.load(null);
+  document.addEventListener("orbital-debug-mode-change", () => {
+    presetPicker.load(presetPicker.selected);
+    if (presetPicker.selected !== null) byId("answer-preset-picker").title = `${presetPicker.label} preset`;
+  });
   function importText(source) {
     initialize();
     if (utf8.encode(source).length > 1048576) throw new Error("Choose a file under 1 MiB.");

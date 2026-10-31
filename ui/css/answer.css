@@ -43,6 +43,10 @@
   display: none;
 }
 
+#answer-page .answer-search-hidden {
+  display: none;
+}
+
 #answer-page {
   margin-bottom: 0;
 }
@@ -70,6 +74,11 @@
   margin: var(--space-5) 0;
 }
 
+#answer-preset-picker {
+  width: 180px;
+  max-width: 100%;
+}
+
 #answer-reset {
   display: inline-flex;
   align-items: center;
@@ -88,6 +97,13 @@
 
 .answer-search input {
   flex: 1;
+}
+
+#answer-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px;
 }
 
 #answer-page input, #answer-page textarea {

@@ -29,6 +29,7 @@ function createSettingToggle(id, key, defaultValue, onChange) {
 }
 
 const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
+const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
   { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", supported: "windows11_supported", visual: true },
