@@ -353,7 +353,7 @@
       <button class="primary" autofocus>OK</button>
     </form>
   </dialog>
-  <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description">
+  <dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description confirm-note">
     <h2 id="confirm-title">Change preference?</h2>
     <p id="confirm-description"></p>
     <details id="recommended-options" class="changes-options" hidden open>
@@ -365,7 +365,7 @@
         <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
       </div>
     </details>
-    <p class="note">Windows Explorer will restart to apply this change.</p>
+    <p id="confirm-note" class="note">Windows Explorer will restart to apply this change.</p>
     <form method="dialog" class="confirmation-footer">
       <p id="confirm-admin-note" class="note selection-note" role="status" hidden></p>
       <span class="confirmation-buttons">

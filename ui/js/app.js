@@ -335,11 +335,12 @@ function updateRecommendedSelection() {
   byId("confirm-apply").disabled = !selected.length || count > 0;
 }
 
-function confirmChange(description, title = "Change preference?", recommendations = []) {
+function confirmChange(description, title = "Change preference?", recommendations = [], note = "Windows Explorer will restart to apply this change.") {
   const dialog = byId("confirmation");
   dialog.classList.toggle("changes-dialog", recommendations.length > 0);
   byId("confirm-title").textContent = title;
   byId("confirm-description").textContent = description;
+  byId("confirm-note").textContent = note;
   byId("recommended-options").hidden = !recommendations.length;
   byId("recommended-options").open = true;
   byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
@@ -403,6 +404,7 @@ async function savePreferences(command, args) {
 async function applyChange(command, args, description, skipConfirmation = false, success = "Preference saved. Explorer restarted.") {
   if (busy || !settings) return;
   const recommended = command === "apply_recommended_settings";
+  const reverting = command === "restore_original_settings";
   let skip = skipPrompts.enabled || skipConfirmation;
   const preference = explorerPreferences.find(preference => preference.field === args.preference);
   if (preference?.requiresAdmin && !settings.is_administrator) {
@@ -424,7 +426,8 @@ async function applyChange(command, args, description, skipConfirmation = false,
       description = "Uncheck any settings you want to keep.";
       if (missingAdminCount(recommendations)) skip = false;
     }
-    if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : undefined, recommendations)) return;
+    if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : reverting ? "Revert preferences?" : undefined, recommendations,
+      reverting ? "If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved. Windows Explorer will restart to apply this change." : undefined)) return;
     if (recommended) {
       args.selected = skip ? recommendations : selectedValues("recommendation-list");
       if (!args.selected.length || missingAdminCount(args.selected)) return;
@@ -453,7 +456,7 @@ byId("apply-recommended").addEventListener("click", (event) => applyChange(
   "apply_recommended_settings", {}, "", event.shiftKey,
 ));
 byId("restore-original").addEventListener("click", () => applyChange(
-  "restore_original_settings", {}, "Restore your original settings? If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved.", false, "Original settings restored. Explorer restarted.",
+  "restore_original_settings", {}, "Revert your original settings?", false, "Original settings restored. Explorer restarted.",
 ));
 for (const view of folderViews) {
   view.row = byId(`${view.id}-label`).closest(".preference");

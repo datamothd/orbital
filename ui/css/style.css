@@ -661,7 +661,13 @@ dialog > :not([hidden]) ~ :not([hidden]) {
 
 .changes-dialog {
   --list-space: 252px;
+  --list-max-height: 300px;
   max-width: 460px;
+}
+
+#batch-dialog {
+  --list-space: 360px;
+  --list-max-height: 240px;
 }
 
 dialog > :first-child {
@@ -717,7 +723,7 @@ dialog > :last-child {
 }
 
 .changes-scroll {
-  max-height: clamp(48px, calc(100vh - var(--list-space)), 300px);
+  max-height: clamp(48px, calc(100vh - var(--list-space)), var(--list-max-height));
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
