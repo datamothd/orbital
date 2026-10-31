@@ -584,8 +584,40 @@ button:disabled {
   margin: 6px 0;
 }
 
+.tweaks-output {
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #0a0a0a;
+}
+
+.tweaks-output-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #333;
+  color: #b3b3b3;
+  font-size: 11px;
+}
+
+.tweaks-output-icon,
+.tweaks-output-prompt {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.tweaks-output-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
 #status {
+  min-width: 0;
   margin: 0;
+  color: #fff;
   font-size: 12px;
   line-height: 1.5;
   min-height: 18px;
@@ -593,8 +625,7 @@ button:disabled {
 }
 
 #status.error {
-  border-left: 2px solid currentColor;
-  padding-left: 10px;
+  color: #f87171;
   font-weight: 700;
 }
 
