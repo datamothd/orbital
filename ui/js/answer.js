@@ -20,7 +20,7 @@ const answer = (() => {
       ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
       ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
-      ["dynamic-update", "Download updates during setup", choice(yesNo)],
+      ["dynamic-update", "Download updates during setup", choice(yesNo, { help: "Enabling setup updates may cause Windows installation to hang in virtual machines. Disabling them resolved a Windows 11 26H2 installation hang in VirtualBox. This workaround has not been tested on physical machines." })],
       ["compact", "Compress Windows system files", choice(yesNo, { help: "Compact OS saves disk space and may affect performance." })],
       ["encryption", "Allow automatic device encryption", choice(yesNo, { help: "N prevents automatic encryption during setup. It does not decrypt an existing drive." })]
     ]],
@@ -554,6 +554,22 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open; document.querySelector(".top-bar").hidden = open;
     if (typeof stopScrolling === "function") stopScrolling(); window.scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
   }
+  function showImportedChanges() {
+    byId("answer-search").value = "";
+    update();
+    for (const detail of byId("answer-groups").querySelectorAll("details")) detail.open = false;
+    if (value("mode") === "xml") {
+      sections.get("advanced").open = true;
+      return;
+    }
+    for (const [id, , fields] of groups) {
+      const changed = fields.some(([key, , config]) => {
+        const control = controls.get(key), defaultValue = config.value ?? (config.toggle ? "" : config.choices?.[0]?.[0] ?? "");
+        return !control.disabled && read(control) !== defaultValue;
+      });
+      sections.get(id).open = changed || Boolean(lists.get(id)?.children.length);
+    }
+  }
   function importText(source) {
     initialize();
     if (utf8.encode(source).length > 1048576) throw new Error("Choose a file under 1 MiB.");
@@ -563,6 +579,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       if (metadata && metadata.getAttribute("hash") === fingerprint(xml.documentElement)) restore(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(atob(metadata.textContent), character => character.charCodeAt(0)))));
       else { controls.get("xml").value = serialize(xml); controls.get("mode").value = "xml"; update(); }
     }
+    showImportedChanges();
     status("Settings imported. Confirm disk erasure again if applicable.");
   }
   async function upload(settings) {
