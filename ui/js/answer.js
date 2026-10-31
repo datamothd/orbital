@@ -99,20 +99,20 @@ const answer = (() => {
       ["partition-mode", "Disk layout configuration", choice([["", "Use Storage settings"], ["custom", "Custom disk and partition operations"]], { help: "Advanced layouts must match the target computer's firmware and disk style. Wipes run first, then partition creation, then modification; each list keeps its order per disk. Choose the Windows destination under Storage. Do not combine this with Erase and partition a disk." })]
     ]],
     ["setup-behavior", "Setup behavior & diagnostics", [
-      ["diagnostics", "Send installation diagnostics to Microsoft", choice(yesNo, { toggle: false, help: "Sends installation statistics and failures. This setting applies to Setup diagnostics." })],
+      ["diagnostics", "Send installation diagnostics to Microsoft", choice(yesNo, { help: "Sends installation statistics and failures. This setting applies to Setup diagnostics." })],
       ["compliance-ui", "Show compatibility report", choice([["", "Windows default"], ["OnError", "Only on error"], ["Never", "Never"]], { help: "Controls the report screen, not hardware requirements. Never logs errors and stops installation when checks fail." })],
       ["dynamic-update-ui", "Show setup update screen", choice(setupUI)],
       ["image-ui", "Show image installation screen", choice(setupUI, { when: () => value("deployment-mode") !== "wds" })],
       ["disk-ui", "Show disk configuration screen", choice(setupUI)],
-      ["disable-disk-encryption", "Block hardware encrypted-disk provisioning", choice(yesNo, { toggle: false, help: "Prevents Setup from activating hardware encryption on blank capable drives. Automatic Windows device encryption has a separate installation setting." })],
-      ["configuration-set", "Use a Windows SIM configuration set", choice(yesNo, { toggle: false, help: "Use an existing configuration set created in Windows System Image Manager. Supply its files on the installation media separately." })],
+      ["disable-disk-encryption", "Block hardware encrypted-disk provisioning", choice(yesNo, { help: "Prevents Setup from activating hardware encryption on blank capable drives. Automatic Windows device encryption has a separate installation setting." })],
+      ["configuration-set", "Use a Windows SIM configuration set", choice(yesNo, { help: "Use an existing configuration set created in Windows System Image Manager. Supply its files on the installation media separately." })],
       ["pe-restart", "After Windows PE completes", choice([["", "Windows default"], ["Restart", "Restart"], ["Shutdown", "Shut down"]], { help: "For standalone Windows PE workflows. Windows ignores this once image-based installation starts." })],
       ["setup-owner", "Setup user full name", { maxLength: 63 }],
       ["setup-organization", "Setup organization", { maxLength: 63 }]
     ]],
     ["winpe-network", "Windows PE networking & firewall", [
-      ["pe-network", "Enable Windows PE networking", choice(yesNo, { toggle: false, help: "Applies to the temporary setup environment. N skips network initialization and ignores Windows PE network settings." })],
-      ["pe-firewall", "Enable Windows PE firewall", choice(yesNo, { toggle: false, help: "Applies to the temporary setup environment. The installed Windows firewall is configured separately." })]
+      ["pe-network", "Enable Windows PE networking", choice(yesNo, { help: "Applies to the temporary setup environment. N skips network initialization and ignores Windows PE network settings." })],
+      ["pe-firewall", "Enable Windows PE firewall", choice(yesNo, { help: "Applies to the temporary setup environment. The installed Windows firewall is configured separately." })]
     ]],
     ["winpe-logs", "Windows PE log location", [
       ["pe-log-path", "Windows PE log directory", { wide: true, maxLength: 259, placeholder: "C:\\SetupLogs", help: "Full directory path on a local fixed disk available during Windows PE. Network shares and removable drives are unsupported. Regular Windows installation logs remain in their usual locations." }]
@@ -156,6 +156,18 @@ const answer = (() => {
     scripts: [["type", "Script type", choice(["ps1", "cmd", "reg"], { value: "ps1" })], ["label", "Description", {}], ["content", "Installation script", { type: "textarea", required: true, wide: true, help: "Runs as SYSTEM during device setup. Supply any external programs separately. Do not restart Windows from the script." }]]
   };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
+  const fieldLayout = new ResizeObserver(entries => requestAnimationFrame(() => {
+    for (const { target: grid } of entries) {
+      if (!grid.clientWidth) continue;
+      const gap = parseFloat(getComputedStyle(grid).columnGap) || 0, columnWidth = (grid.clientWidth - gap) / 2;
+      for (const field of grid.querySelectorAll(":scope > .answer-field:not(.answer-wide)")) {
+        if (!field.getClientRects().length) continue;
+        const title = field.querySelector(".answer-field-label"), children = [...title.children];
+        const width = children.reduce((total, child) => total + child.getBoundingClientRect().width, 0) + (children.length - 1) * (parseFloat(getComputedStyle(title).columnGap) || 0);
+        field.classList.toggle("answer-auto-wide", width > columnWidth);
+      }
+    }
+  }));
   let rowId = 0, initialized = false;
   const read = control => control.type === "password" || control.dataset.key === "ssid" ? control.value : control.value.trim();
   const value = id => controls.get(id)?.disabled ? "" : read(controls.get(id));
@@ -184,8 +196,9 @@ const answer = (() => {
     }));
   }
   function field(parent, id, label, config) {
-    const wrapper = element(config.choices || config.suggestions ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "", label);
-    if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) title.append(element("small", "answer-optional", "(optional)"));
+    const wrapper = element(config.choices || config.suggestions ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "answer-field-label"), caption = element("span", "", label);
+    title.append(caption);
+    if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) caption.append(element("small", "answer-optional", "(optional)"));
     if (config.help) {
       const help = element("span", "answer-info");
       help.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M5 2h2v2H5zM5 5h2v5H5z"/></svg>';
@@ -223,6 +236,7 @@ const answer = (() => {
     }
     for (const picker of wrapper.querySelectorAll("select")) dropdown(picker, label);
     parent.append(wrapper);
+    fieldLayout.observe(parent);
     return input;
   }
   function addRow(kind, values = {}) {
