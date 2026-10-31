@@ -246,6 +246,7 @@ const answer = (() => {
     for (const [id, title, fields] of groups) {
       const section = element("details"), summary = element("summary", "", title), count = element("span", "answer-count");
       section.id = `answer-group-${id}`; section.open = id === "installation";
+      if (advancedGroups.has(id)) summary.insertAdjacentHTML("afterbegin", '<svg class="answer-branch" viewBox="0 0 20 14" width="20" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M0 0h2v6h2v4h4v2h12v2H8v-2H4v-2H2V6H0z"/></svg>');
       count.append(element("span")); count.hidden = true; summary.append(count); section.append(summary);
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
