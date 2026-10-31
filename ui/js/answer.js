@@ -14,20 +14,25 @@ const answer = (() => {
   const languages = [["", "Windows default"], ..."en-US en-GB ar-SA bg-BG cs-CZ da-DK de-DE el-GR es-ES es-MX et-EE fi-FI fr-CA fr-FR he-IL hr-HR hu-HU it-IT ja-JP ko-KR lt-LT lv-LV nb-NO nl-NL pl-PL pt-BR pt-PT ro-RO ru-RU sk-SK sl-SI sr-Latn-RS sv-SE th-TH tr-TR uk-UA zh-CN zh-TW".split(" ").map(code => [code, languageNames.of(code)])];
   const timezones = [["", "Windows default"], ...options(["UTC", "Pacific Standard Time", "Mountain Standard Time", "US Mountain Standard Time", "Central Standard Time", "Eastern Standard Time", "Atlantic Standard Time", "GMT Standard Time", "W. Europe Standard Time", "Romance Standard Time", "India Standard Time", "China Standard Time", "Tokyo Standard Time", "AUS Eastern Standard Time", "New Zealand Standard Time"])];
   const number = (value, min, max) => ({ type: "number", value, min, max, required: true });
+  const setupUI = [["", "Windows default"], ["Always", "Always"], ["OnError", "Only on error"], ["Never", "Never"]];
+  const imageKeys = [["/IMAGE/INDEX", "Image index"], ["/IMAGE/NAME", "Image name"], ["/IMAGE/DESCRIPTION", "Image description"]];
+  const advancedGroups = new Set(["drivers", "virtual-machine", "image-source", "partitions", "setup-behavior", "winpe-network", "winpe-logs", "winpe-pagefile", "winpe-display", "data-images", "deployment", "commands", "scripts", "advanced"]);
+  const isWindows10 = () => controls.get("deployment-mode").value === "wds" || (controls.get("image-selection").value ? controls.get("image-version").value === "10" : controls.get("edition").value.startsWith("Windows 10 "));
   const groups = [
     ["installation", "Installation", [
-      ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise"].map(edition => `Windows ${version} ${edition}`))])],
+      ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise"].map(edition => `Windows ${version} ${edition}`))], { when: () => !value("image-selection") && value("deployment-mode") !== "wds" })],
       ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
       ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["product-key-ui", "Show product key screen", choice([["", "Windows default (on error)"], ["Always", "Always"], ["Never", "Never"]], { help: "Controls the product-key screen during Windows Setup. The Windows default shows it if an error occurs." })],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
       ["dynamic-update", "Download updates during setup", choice(yesNo, { help: "Enabling setup updates may cause Windows installation to hang in virtual machines. Disabling them resolved a Windows 11 26H2 installation hang in VirtualBox. This workaround has not been tested on physical machines." })],
-      ["compact", "Compress Windows system files", choice(yesNo, { help: "Compact OS saves disk space and may affect performance." })],
+      ["compact", "Compress Windows system files", choice(yesNo, { when: () => value("deployment-mode") !== "wds", help: "Compact OS saves disk space and may affect performance." })],
       ["encryption", "Allow automatic device encryption", choice(yesNo, { help: "N prevents automatic encryption during setup. It does not decrypt an existing drive." })]
     ]],
     ["storage", "Storage", [
-      ["disk-mode", "Installation disk", choice([["", "Choose during Setup"], ["erase", "Erase and partition a disk"]])],
-      ["disk", "Target disk number", { ...number("0", 0, 999), when: () => value("disk-mode") === "erase" }],
+      ["disk-mode", "Installation disk", choice([["", "Choose during Setup"], ["erase", "Erase and partition a disk"], ["existing", "Use an existing partition"], ["available", "First suitable partition across all disks"]], { help: "Automatic selection starts at disk 0, partition 1 and searches all disks for enough space and no existing Windows installation. It does not create or format partitions. Existing-partition installation writes Windows to the selected destination; back up its files first." })],
+      ["disk", "Target disk number", { ...number("0", 0, 999), when: () => ["erase", "existing"].includes(value("disk-mode")) }],
+      ["partition", "Target partition number", { ...number("1", 1, 999), when: () => value("disk-mode") === "existing", help: "Partition numbers start at 1. The partition must already be prepared for Windows Setup or created by your custom disk layout." }],
       ["disk-confirm", "Confirm disk number to erase", { required: true, when: () => value("disk-mode") === "erase", help: "Every partition and file on this disk will be erased during the Windows installation. Type its number again." }],
       ["layout", "Boot layout", choice([["gpt", "UEFI / GPT"], ["mbr", "BIOS / MBR (Windows 10)"]], { value: "gpt", when: () => value("disk-mode") === "erase" })],
       ["system-size", "System partition size (MB)", { ...number("300", 300, 32768), when: () => value("disk-mode") === "erase" }],
@@ -75,9 +80,62 @@ const answer = (() => {
       ["wifi-hidden", "Hidden network", choice(yesNo, { value: "false", when: () => value("wifi-mode") === "personal" })],
       ["wifi-xml", "WLAN profile XML", { type: "textarea", required: true, wide: true, when: () => value("wifi-mode") === "xml", help: "Enterprise profiles may require certificates supplied separately." }]
     ]],
+    ["advanced-settings", "Advanced settings", []],
     ["drivers", "Installation drivers", [["drivers", "Driver folders", { type: "textarea", wide: true, placeholder: "D:\\Drivers", help: "One full folder path per line, available to Windows PE. Include only drivers needed to boot or install Windows." }]]],
     ["virtual-machine", "Virtual machine", [
       ["guest-tools", "Guest integration software", choice([["", "None"], ["virtualbox", "VirtualBox Guest Additions"]], { help: "Add the Guest Additions ISO through VirtualBox. Attach it to a second virtual optical drive and leave it attached through the first Windows sign-in. Orbital does not include the ISO, and can typically be found included in your VirtualBox installation. Installation runs automatically at sign-in and restarts Windows afterward. If installation fails, it retries at the next sign-in. Logs are kept in ProgramData\\Orbital\\Logs unless disabled." })]
+    ]],
+    ["image-source", "Custom image selection", [
+      ["image-selection", "Select Windows image by", choice([["", "Standard Windows edition list"], ...imageKeys], { when: () => value("deployment-mode") !== "wds" })],
+      ["image-version", "Custom image Windows version", choice([["11", "Windows 11"], ["10", "Windows 10"]], { value: "11", when: () => Boolean(value("image-selection")), help: "Used to offer compatible architectures and installation options. This does not change the image." })],
+      ["image-index", "Windows image index", { ...number("1", 1, 2147483647), when: () => value("image-selection") === "/IMAGE/INDEX" }],
+      ["image-value", "Windows image name or description", { required: true, maxLength: 259, when: () => ["/IMAGE/NAME", "/IMAGE/DESCRIPTION"].includes(value("image-selection")), help: "Enter the exact name or description recorded in the WIM image." }],
+      ["image-location", "Windows image source", choice([["", "Installation media"], ["custom", "Custom WIM file"]], { when: () => value("deployment-mode") !== "wds" })],
+      ["image-path", "Windows WIM path", { required: true, maxLength: 259, placeholder: "\\\\server\\share\\install.wim", when: () => value("image-location") === "custom", help: "Local, network or relative path accessible during Windows PE. Relative paths start where Setup is run. Use %configsetroot% with a configuration set. The file is not bundled into the ISO." }],
+      ["image-auth", "Image share authentication", choice([["", "No credentials"], ["credentials", "Supply credentials"]], { when: () => value("image-location") === "custom" })],
+      ...[["image-user", "Image share user", "text"], ["image-password", "Image share password", "password"], ["image-domain", "Image share domain", "text"]].map(([id, label, type]) => [id, label, { type, required: id !== "image-domain", when: () => value("image-auth") === "credentials", help: type === "password" ? "Stored as readable text in the answer file." : undefined }])
+    ]],
+    ["partitions", "Custom disk & partition layouts", [
+      ["partition-mode", "Disk layout configuration", choice([["", "Use Storage settings"], ["custom", "Custom disk and partition operations"]], { help: "Advanced layouts must match the target computer's firmware and disk style. Wipes run first, then partition creation, then modification; each list keeps its order per disk. Choose the Windows destination under Storage. Do not combine this with Erase and partition a disk." })]
+    ]],
+    ["setup-behavior", "Setup behavior & diagnostics", [
+      ["diagnostics", "Send installation diagnostics to Microsoft", choice(yesNo, { toggle: false, help: "Sends installation statistics and failures. This setting applies to Setup diagnostics." })],
+      ["compliance-ui", "Show compatibility report", choice([["", "Windows default"], ["OnError", "Only on error"], ["Never", "Never"]], { help: "Controls the report screen, not hardware requirements. Never logs errors and stops installation when checks fail." })],
+      ["dynamic-update-ui", "Show setup update screen", choice(setupUI)],
+      ["image-ui", "Show image installation screen", choice(setupUI, { when: () => value("deployment-mode") !== "wds" })],
+      ["disk-ui", "Show disk configuration screen", choice(setupUI)],
+      ["disable-disk-encryption", "Block hardware encrypted-disk provisioning", choice(yesNo, { toggle: false, help: "Prevents Setup from activating hardware encryption on blank capable drives. Automatic Windows device encryption has a separate installation setting." })],
+      ["configuration-set", "Use a Windows SIM configuration set", choice(yesNo, { toggle: false, help: "Use an existing configuration set created in Windows System Image Manager. Supply its files on the installation media separately." })],
+      ["pe-restart", "After Windows PE completes", choice([["", "Windows default"], ["Restart", "Restart"], ["Shutdown", "Shut down"]], { help: "For standalone Windows PE workflows. Windows ignores this once image-based installation starts." })],
+      ["setup-owner", "Setup user full name", { maxLength: 63 }],
+      ["setup-organization", "Setup organization", { maxLength: 63 }]
+    ]],
+    ["winpe-network", "Windows PE networking & firewall", [
+      ["pe-network", "Enable Windows PE networking", choice(yesNo, { toggle: false, help: "Applies to the temporary setup environment. N skips network initialization and ignores Windows PE network settings." })],
+      ["pe-firewall", "Enable Windows PE firewall", choice(yesNo, { toggle: false, help: "Applies to the temporary setup environment. The installed Windows firewall is configured separately." })]
+    ]],
+    ["winpe-logs", "Windows PE log location", [
+      ["pe-log-path", "Windows PE log directory", { wide: true, maxLength: 259, placeholder: "C:\\SetupLogs", help: "Full directory path on a local fixed disk available during Windows PE. Network shares and removable drives are unsupported. Regular Windows installation logs remain in their usual locations." }]
+    ]],
+    ["winpe-pagefile", "Windows PE page file", [
+      ["pe-pagefile", "Windows PE paging", choice([["", "Windows default"], ["custom", "Custom page file"]], { help: "Only changes the page file used by Windows PE." })],
+      ["pe-pagefile-path", "Windows PE page file path", { maxLength: 259, placeholder: "%WINDIR%\\pagefile.sys", when: () => value("pe-pagefile") === "custom", help: "Full file path on a fixed disk; Windows environment variables are allowed. Leave blank to use the default page file." }],
+      ["pe-pagefile-size", "Windows PE page file size (MB)", { ...number("512", 1, 4294967295), when: () => value("pe-pagefile") === "custom" }]
+    ]],
+    ["winpe-display", "Windows PE display settings", [
+      ["pe-display", "Setup display configuration", choice([["", "Windows default (recommended)"], ["custom", "Custom display settings"]], { help: "Unsupported values can leave a blank screen. UEFI generally ignores these settings unless a graphics driver is added to boot.wim. These settings only affect Windows PE." })],
+      ["pe-width", "Horizontal resolution (pixels)", { ...number("1024", 1, 4294967295), when: () => value("pe-display") === "custom" }],
+      ["pe-height", "Vertical resolution (pixels)", { ...number("768", 1, 4294967295), when: () => value("pe-display") === "custom" }],
+      ["pe-depth", "Color depth", choice([["", "Windows default"], ["8", "8 bit"], ["16", "16 bit"], ["24", "24 bit"], ["32", "32 bit"]], { when: () => value("pe-display") === "custom" })],
+      ["pe-refresh", "Refresh rate (Hz)", { type: "number", min: 1, max: 4294967295, placeholder: "60", when: () => value("pe-display") === "custom" }]
+    ]],
+    ["data-images", "Secondary data images", []],
+    ["deployment", "Deployment & upgrades", [
+      ["deployment-mode", "Installation workflow", choice([["", "Standard installation"], ["upgrade", "Upgrade existing Windows (upgrade settings only)"], ["wds", "Windows Deployment Services (Windows 10)"]], { help: "Upgrade exports only UpgradeData settings and must run from the existing Windows installation. Other configuration choices are excluded. WDS requires its network deployment client and does not apply to Windows 11." })],
+      ["upgrade-ui", "Show upgrade screen", choice(setupUI, { when: () => value("deployment-mode") === "upgrade" })],
+      ["wds-login-ui", "Show WDS sign-in screen", choice(setupUI, { when: () => value("deployment-mode") === "wds" })],
+      ["wds-image-ui", "Show WDS image selection screen", choice(setupUI, { when: () => value("deployment-mode") === "wds" })],
+      ...[["wds-user", "WDS user", "text"], ["wds-password", "WDS password", "password"], ["wds-domain", "WDS domain", "text"], ["wds-image", "WDS image name", "text"], ["wds-group", "WDS image group", "text"], ["wds-file", "WDS image file name", "text"]].map(([id, label, type]) => [id, label, { type, maxLength: 259, when: () => value("deployment-mode") === "wds" }])
     ]],
     ["commands", "Setup commands", []],
     ["scripts", "Embedded installation scripts", [
@@ -92,7 +150,9 @@ const answer = (() => {
   ];
   const rowFields = {
     accounts: [["name", "User name", { required: true }], ["display", "Display name", {}], ["group", "Account group", choice(["Administrators", "Users", "Custom"], { value: "Administrators" })], ["groups", "Custom groups", { help: "Separate existing Windows group names with semicolons." }], ["password-mode", "Password", choice([["", "Do not set"], ["custom", "Set password"], ["blank", "Explicitly empty"]])], ["password", "Account password", { type: "password" }], ["description", "Description", { wide: true }]],
-    commands: [["pass", "Run during", choice(["specialize", "windowsPE", "auditUser"], { value: "specialize" })], ["description", "Description", { maxLength: 259 }], ["path", "Command line", { required: true, wide: true }], ["reboot", "Restart after command", choice([["", "Windows default"], ["Never", "Never"], ["OnRequest", "If requested"], ["Always", "Always"]])]],
+    commands: [["pass", "Run during", choice(["specialize", "windowsPE", "auditUser"], { value: "specialize" })], ["execution", "Command execution", choice([["", "Wait for completion (synchronous)"], ["async", "Start without waiting (Windows PE)"]], { help: "Asynchronous commands can overlap. Use synchronous commands when later steps depend on earlier ones." })], ["description", "Description", { maxLength: 259 }], ["path", "Command line", { required: true, wide: true }], ["reboot", "Restart after command", choice([["", "Windows default"], ["Never", "Never"], ["OnRequest", "If requested"], ["Always", "Always"]])], ["auth", "Windows PE command share authentication", choice([["", "No credentials"], ["credentials", "Supply credentials"]])], ["user", "Command share user", {}], ["password", "Command share password", { type: "password" }], ["domain", "Command share domain", {}]],
+    "data-images": [["path", "Data WIM path", { required: true, maxLength: 259, wide: true, help: "Local, network or relative path available during Windows PE. Use %configsetroot% with a configuration set. Data images add files; do not overwrite Windows system files. Images are applied in the order listed after the operating system image." }], ["key", "Select data image by", choice(imageKeys, { value: "/IMAGE/INDEX" })], ["value", "Data image index, name or description", { value: "1", required: true, maxLength: 259 }], ["disk", "Data destination disk number", number("0", 0, 999)], ["partition", "Data destination partition number", number("1", 1, 999)], ["auth", "Data image share authentication", choice([["", "No credentials"], ["credentials", "Supply credentials"]])], ["user", "Data image share user", {}], ["password", "Data image share password", { type: "password" }], ["domain", "Data image share domain", {}]],
+    partitions: [["action", "Disk operation", choice([["create", "Create partition"], ["modify", "Modify partition"], ["wipe", "Erase every partition on a disk"]], { value: "create" })], ["disk", "Operation disk number", number("0", 0, 999)], ["type", "Partition type", choice([["Primary", "Primary"], ["EFI", "EFI system (GPT)"], ["MSR", "Microsoft reserved (GPT)"], ["Extended", "Extended (MBR)"], ["Logical", "Logical (MBR)"]], { value: "Primary" })], ["extend", "Extend partition to fill available space", choice(yesNo, { toggle: false })], ["size", "Partition size (MB)", number("1024", 1, 4294967295)], ["partition", "Partition number to modify", number("1", 1, 999)], ["format", "Partition file system", choice([["", "Do not format"], ["NTFS", "Format as NTFS"], ["FAT32", "Format as FAT32"]])], ["label", "Partition label", { maxLength: 32 }], ["letter", "Partition drive letter", choice([["", "Windows default"], ...options("CDEFGHIJKLMNOPQRSTUVWXYZ".split(""))])], ["active", "Mark partition active (MBR)", choice(yesNo, { toggle: false })], ["type-id", "Custom partition type ID", { placeholder: "0x27 or de94bba4-06d1-4d40-a16a-bfd50179d6ac", pattern: "0[xX][0-9a-fA-F]{2}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", maxLength: 36 }], ["confirm", "Confirm disk number to erase or format", { help: "Wiping deletes every partition on this disk. Formatting erases the selected partition. Type the operation's disk number again. Imported settings always require a new confirmation." }]],
     scripts: [["type", "Script type", choice(["ps1", "cmd", "reg"], { value: "ps1" })], ["label", "Description", {}], ["content", "Installation script", { type: "textarea", required: true, wide: true, help: "Runs as SYSTEM during device setup. Supply any external programs separately. Do not restart Windows from the script." }]]
   };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
@@ -190,10 +250,12 @@ const answer = (() => {
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
       if (rowFields[id]) {
-        const list = element("div", "answer-wide answer-list"), add = actionButton("answer-add answer-wide", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : "installation script"}`);
+        const list = element("div", "answer-wide answer-list"), add = actionButton("answer-add answer-wide", `Add ${id === "accounts" ? "local account" : id === "commands" ? "setup command" : id === "data-images" ? "data image" : id === "partitions" ? "disk operation" : "installation script"}`);
         add.addEventListener("click", () => addRow(id)); lists.set(id, list); grid.append(list, add);
       }
-      section.append(grid); sections.set(id, section); byId("answer-groups").append(section);
+      section.append(grid); sections.set(id, section);
+      if (id === "advanced-settings") grid.className = "answer-subgroups";
+      (advancedGroups.has(id) ? sections.get("advanced-settings").querySelector(".answer-subgroups") : byId("answer-groups")).append(section);
     }
     const copy = actionButton("answer-add answer-wide", "Copy settings to XML");
     copy.addEventListener("click", () => attempt(() => { const xml = build("guided"); controls.get("xml").value = xml; controls.get("mode").value = "xml"; update(); status("Installation settings copied to XML."); }));
@@ -206,18 +268,21 @@ const answer = (() => {
   }
   function update() {
     closeChoicePicker();
-    const windows10 = value("edition").startsWith("Windows 10 "), home = / Home(?: N)?$/.test(value("edition"));
+    const windows10 = isWindows10(), home = !value("image-selection") && / Home(?: N)?$/.test(value("edition")), upgrade = value("deployment-mode") === "upgrade";
     for (const [id, blocked] of [["architecture", windows10 ? "" : "x86"], ["layout", windows10 ? "" : "mbr"], ["join-mode", home ? "domain" : ""]]) {
       const control = controls.get(id);
       for (const option of control.options) option.hidden = option.disabled = Boolean(blocked && option.value === blocked);
       if (control.selectedOptions[0]?.disabled) control.value = control.options[0].value;
     }
+    const diskMode = controls.get("disk-mode"), automatic = [...diskMode.options].find(option => option.value === "available");
+    automatic.hidden = automatic.disabled = value("deployment-mode") === "wds";
+    if (diskMode.selectedOptions[0]?.disabled) diskMode.value = "";
     const logon = controls.get("autologon"), selected = logon.value;
     logon.replaceChildren(new Option("Disabled", ""), ...rows("accounts").map(row => rowValue(row, "name")).filter(Boolean).map(name => new Option(name, name)));
-    if (value("builtin-admin") === "true") logon.add(new Option("Built-in Administrator", "@Administrator"));
+    if (controls.get("builtin-admin").value === "true") logon.add(new Option("Built-in Administrator", "@Administrator"));
     logon.value = [...logon.options].some(option => option.value === selected) ? selected : "";
-    for (const [, , fields] of groups) for (const [id, , config] of fields) {
-      const control = controls.get(id), visible = !config.when || config.when();
+    for (let pass = 0; pass < 2; pass++) for (const [, , fields] of groups) for (const [id, , config] of fields) {
+      const control = controls.get(id), visible = (!upgrade || ["architecture", "deployment-mode", "upgrade-ui", "mode", "xml"].includes(id)) && (!config.when || config.when());
       control.closest(".answer-field").hidden = control.disabled = !visible;
       if (config.suggestions) {
         const picker = control.closest(".answer-field").querySelector("select"), custom = picker.value === "@custom" && !control.hidden;
@@ -233,8 +298,36 @@ const answer = (() => {
       const control = rowControl(row, key); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible;
       control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", visible);
     }
-    for (const [kind, key, label] of [["accounts", "name", "Local account"], ["commands", "description", "Setup command"], ["scripts", "label", "Installation script"]]) rows(kind).forEach((row, index) => {
-      const title = rowValue(row, key) || `${label} ${index + 1}`;
+    for (const kind of ["commands", "data-images"]) for (const row of rows(kind)) {
+      const pe = kind === "commands" && rowValue(row, "pass") === "windowsPE";
+      if (kind === "commands") {
+        const execution = rowControl(row, "execution"), async = [...execution.options].find(option => option.value === "async");
+        async.hidden = async.disabled = !pe;
+        if (!pe) execution.value = "";
+      }
+      const credentials = (kind === "data-images" || pe) && rowValue(row, "auth") === "credentials";
+      for (const [key, visible, required] of [["auth", kind === "data-images" || pe, false], ["user", credentials, credentials], ["password", credentials, credentials], ["domain", credentials, false], ...(kind === "commands" ? [["reboot", !pe, false]] : [])]) {
+        const control = rowControl(row, key);
+        control.closest(".answer-field").hidden = !visible; control.disabled = !visible; control.required = required;
+        control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", required);
+      }
+    }
+    for (const row of rows("partitions")) {
+      const action = rowValue(row, "action"), create = action === "create", modify = action === "modify", destructive = action === "wipe" || modify && Boolean(rowValue(row, "format"));
+      for (const [key, visible, required] of [["type", create, false], ["extend", create || modify, false], ["size", create && rowValue(row, "extend") !== "true", true], ["partition", modify, true], ["format", modify, false], ["label", modify, false], ["letter", modify, false], ["active", modify, false], ["type-id", modify, false], ["confirm", destructive, true]]) {
+        const control = rowControl(row, key); control.closest(".answer-field").hidden = control.disabled = !visible; control.required = visible && required;
+        control.closest(".answer-field").querySelector(".answer-optional")?.toggleAttribute("hidden", control.required);
+      }
+    }
+    for (const [kind, list] of lists) {
+      const disabled = upgrade || kind === "data-images" && value("deployment-mode") === "wds" || kind === "partitions" && value("partition-mode") !== "custom";
+      list.closest(".answer-grid").querySelector(".answer-add").disabled = disabled || list.children.length >= 500;
+      list.hidden = disabled;
+      for (const control of list.querySelectorAll("input, select, textarea")) if (disabled) control.disabled = true;
+      else if (!control.closest(".answer-field").hidden) control.disabled = false;
+    }
+    for (const [kind, key, label] of [["accounts", "name", "Local account"], ["commands", "description", "Setup command"], ["scripts", "label", "Installation script"], ["data-images", "path", "Data image"], ["partitions", "action", "Disk operation"]]) rows(kind).forEach((row, index) => {
+      const title = kind === "partitions" ? `${rowControl(row, "action").selectedOptions[0].textContent} · disk ${rowValue(row, "disk")}` : rowValue(row, key) || `${label} ${index + 1}`;
       row.querySelector(".answer-row-title").textContent = title;
       row.querySelector(".answer-row-remove").setAttribute("aria-label", `Remove ${title}`);
     });
@@ -244,13 +337,14 @@ const answer = (() => {
       control.setDisabled(picker.disabled);
     }
     filterSearch(byId("answer-search").value.trim().toLowerCase());
-    if (value("mode") === "xml") sections.get("advanced").open = true;
+    if (value("mode") === "xml") sections.get("advanced").open = sections.get("advanced-settings").open = true;
     renderIssues(validate());
   }
   function filterSearch(term) {
     const matches = text => text.toLowerCase().includes(term);
     for (const [id, title] of groups) {
-      const section = sections.get(id), categoryMatches = Boolean(term && matches(title));
+      if (id === "advanced-settings") continue;
+      const section = sections.get(id), categoryMatches = Boolean(term && (matches(title) || advancedGroups.has(id) && matches("Advanced settings")));
       let hasMatch = false;
       for (const child of section.querySelector(":scope > .answer-grid").children) {
         if (child.classList.contains("answer-list")) {
@@ -277,9 +371,12 @@ const answer = (() => {
           if (match && !child.hidden) hasMatch = true;
         }
       }
-      section.hidden = Boolean(term && !categoryMatches && !hasMatch);
+      section.hidden = value("deployment-mode") === "upgrade" && !["installation", "deployment", "advanced"].includes(id) || value("deployment-mode") === "wds" && id === "data-images" || Boolean(term && !categoryMatches && !hasMatch);
       if (term && !section.hidden) section.open = true;
     }
+    const advanced = sections.get("advanced-settings");
+    advanced.hidden = Boolean(term && [...advancedGroups].every(id => sections.get(id).hidden));
+    if (term && !advanced.hidden) advanced.open = true;
   }
   function parse(source, root = "unattend", namespace = ns) {
     const xml = new DOMParser().parseFromString(source, "application/xml");
@@ -306,6 +403,44 @@ const answer = (() => {
       if (control.maxLength >= 0 && read(control).length > control.maxLength) add(control, `${control.dataset.label} must be at most ${control.maxLength} characters.`);
       if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(read(control))) add(control, "Remove characters that XML does not support.");
     }
+    if (value("deployment-mode") === "upgrade") return issues;
+    if (value("disk-ui") === "Never" && value("partition-mode") !== "custom" && !["erase", "existing"].includes(value("disk-mode"))) add(["disk-ui", "disk-mode"], "Choose a specific installation disk before hiding the disk configuration screen completely.");
+    if (value("partition-mode") === "custom") {
+      const operations = rows("partitions"), wiped = new Map(), extended = new Map();
+      if (!operations.length) add("partition-mode", "Add at least one operation for the custom disk layout.");
+      if (value("disk-mode") === "erase") add(["partition-mode", "disk-mode"], "Choose an existing, automatic or interactive destination with a custom disk layout. The preset erase flow cannot run at the same time.");
+      for (const row of operations) {
+        const action = rowValue(row, "action"), disk = String(Number(rowValue(row, "disk")));
+        if ((action === "wipe" || action === "modify" && rowValue(row, "format")) && rowValue(row, "confirm") && rowValue(row, "confirm") !== disk) add(rowControl(row, "confirm"), "Confirm this wipe or format operation by typing its disk number again.");
+        if (action === "wipe") {
+          if (wiped.has(disk)) add([rowControl(wiped.get(disk), "disk"), rowControl(row, "disk")], "Only one wipe operation is allowed per disk.");
+          wiped.set(disk, row);
+        }
+        if (action === "create") {
+          if (extended.has(disk) && (rowValue(extended.get(disk), "type") !== "Extended" || rowValue(row, "type") !== "Logical")) add([rowControl(extended.get(disk), "extend"), rowControl(row, "disk")], "A partition extended to fill a disk must be its final creation operation, except for logical partitions inside an extended partition.");
+          if (rowValue(row, "extend") === "true") extended.set(disk, row);
+        }
+        if (action === "modify" && rowValue(row, "format") === "FAT32" && rowValue(row, "label").length > 11) add(rowControl(row, "label"), "FAT32 partition labels must be at most 11 characters.");
+      }
+    }
+    const fullPath = (path, variables = false, network = false) => ( /^[a-z]:\\/i.test(path) || variables && /^%[a-z_][a-z_0-9]*%\\/i.test(path) || network && /^\\\\[^\\]+\\[^\\]+\\/.test(path)) && !/["<>|?*]/.test(path) && !path.slice(2).includes(":") && !path.split("\\").some(part => [".", ".."].includes(part));
+    const wimPath = path => /\.wim$/i.test(path) && !/["<>|?*]/.test(path) && !path.replace(/^[a-z]:\\/i, "").includes(":") && (!path.startsWith("\\\\") || /^\\\\[^\\]+\\[^\\]+\\/.test(path)) && (!path.includes("%") || /^%configsetroot%\\[^%]+$/i.test(path));
+    if (value("pe-log-path") && !fullPath(value("pe-log-path"))) add("pe-log-path", "Use a full local fixed-disk directory, such as C:\\SetupLogs. Network paths and environment variables are unsupported.");
+    if (value("pe-pagefile-path") && (!fullPath(value("pe-pagefile-path"), true) || value("pe-pagefile-path").endsWith("\\"))) add("pe-pagefile-path", "Use a full fixed-disk file path, optionally starting with a Windows environment variable.");
+    if (value("image-path") && !wimPath(value("image-path"))) add("image-path", "Use a local, network or relative path ending in .wim.");
+    if (/%configsetroot%/i.test(value("image-path")) && value("configuration-set") !== "true") add(["image-path", "configuration-set"], "Enable Use a Windows SIM configuration set when an image path uses %configsetroot%.");
+    const networkSources = [value("image-path"), ...nonEmptyLines(value("drivers"))];
+    if (value("deployment-mode") === "wds") {
+      if (value("pe-network") === "false") add(["deployment-mode", "pe-network"], "Windows Deployment Services requires Windows PE networking.");
+      if (["wds-user", "wds-password", "wds-domain"].some(id => value(id)) && (!value("wds-user") || !value("wds-password"))) add(["wds-user", "wds-password"], "Supply both a WDS user and password, or leave WDS credentials empty.");
+    }
+    for (const row of rows("data-images")) {
+      if (rowControl(row, "path").disabled) continue;
+      const path = rowValue(row, "path"); networkSources.push(path);
+      if (path && !wimPath(path)) add(rowControl(row, "path"), "Use a local, network or relative data image path ending in .wim.");
+      if (/%configsetroot%/i.test(path) && value("configuration-set") !== "true") add([rowControl(row, "path"), "configuration-set"], "Enable Use a Windows SIM configuration set when a data image path uses %configsetroot%.");
+      if (rowValue(row, "key") === "/IMAGE/INDEX" && !/^[1-9]\d*$/.test(rowValue(row, "value"))) add(rowControl(row, "value"), "Use a positive whole number for the data image index.");
+    }
     const name = value("computer");
     if (name && name !== "*" && (utf8.encode(name).length > 15 || !/^[\p{L}\p{M}\p{N}_-]+$/u.test(name) || /^\d+$/.test(name))) add("computer", "Use a computer name up to 15 bytes with letters, numbers, underscores or hyphens; it cannot contain only numbers.");
     if (value("disk-mode") === "erase" && value("disk-confirm") && value("disk-confirm") !== String(Number(value("disk")))) add(["disk", "disk-confirm"], "Confirm disk erasure by typing the target disk number again.");
@@ -330,12 +465,21 @@ const answer = (() => {
     if (nonEmptyLines(value("drivers")).some(path => path.length > 259 || !/^(?:[a-z]:\\|\\\\|%[a-z_]+%\\)/i.test(path))) add("drivers", "Use one full driver-folder path per line, at most 259 characters each.");
     if (!/^[a-z]:\\(?:[^\\]+\\)*Orbital\\Setup$/i.test(value("payload")) || /["<>|?*]/.test(value("payload")) || value("payload").split("\\").some(part => [".", ".."].includes(part))) add("payload", "Use a dedicated full path ending in \\Orbital\\Setup.");
     const commands = rows("commands");
-    for (const row of commands) if (rowValue(row, "path").length > (rowValue(row, "pass") === "windowsPE" ? 1024 : 259)) add(rowControl(row, "path"), "This command is too long for its configuration pass. Use an embedded script.");
+    for (const row of commands) {
+      if (rowValue(row, "path").length > (rowValue(row, "pass") === "windowsPE" ? 1024 : 259)) add(rowControl(row, "path"), "This command is too long for its configuration pass. Use an embedded script.");
+      if (rowValue(row, "pass") === "windowsPE" && /^"?\\\\/.test(rowValue(row, "path"))) {
+        networkSources.push(rowValue(row, "path").replace(/^"/, ""));
+        if (rowValue(row, "auth") !== "credentials") add(rowControl(row, "auth"), "Supply credentials for a Windows PE command on a network share.");
+      }
+    }
+    if (value("pe-network") === "false" && networkSources.some(path => path.startsWith("\\\\"))) add("pe-network", "Enable Windows PE networking to access the configured network paths.");
     const setupScripts = Boolean(value("wifi-mode") || value("builtin-admin") || value("guest-tools") || rows("scripts").length || value("disk-mode") === "erase" && value("recovery") === "false");
+    const asynchronous = commands.filter(row => rowValue(row, "execution") === "async");
+    if (asynchronous.length > 500) add(rowControl(asynchronous[0], "execution"), "Windows PE supports up to 500 asynchronous commands.");
     for (const pass of ["windowsPE", "specialize", "auditUser"]) {
-      const selected = commands.filter(row => rowValue(row, "pass") === pass);
+      const selected = commands.filter(row => rowValue(row, "pass") === pass && rowValue(row, "execution") !== "async");
       const generated = pass === "specialize" && setupScripts ? 2 : pass === "windowsPE" && value("disk-mode") === "erase" ? 1 : 0;
-      if (selected.length + generated > 500) add(rowControl(selected[0], "pass"), `${pass} supports up to 500 commands, including generated setup steps.`);
+      if (selected.length + generated > 500) add(rowControl(selected[0], "pass"), `${pass} supports up to 500 synchronous commands, including generated setup steps.`);
     }
     return issues;
   }
@@ -389,15 +533,17 @@ const answer = (() => {
     };
     check(profile.values, groups.flatMap(([, , fields]) => fields));
     for (const [kind, fields] of Object.entries(rowFields)) {
-      if (!Array.isArray(profile[kind]) || profile[kind].length > 500) throw new Error(`Invalid ${kind} entries.`);
-      for (const row of profile[kind]) check(row, fields);
+      const entries = profile[kind] ?? (["data-images", "partitions"].includes(kind) ? [] : null);
+      if (!Array.isArray(entries) || entries.length > 500) throw new Error(`Invalid ${kind} entries.`);
+      for (const row of entries) check(row, fields);
     }
     const logon = profile.values.autologon;
     if (logon && !(logon === "@Administrator" && profile.values["builtin-admin"] === "true") && !profile.accounts.some(row => row.name === logon)) throw new Error("Automatic sign-in must refer to an enabled account in these settings.");
     byId("answer-form").reset();
     for (const [key, text] of Object.entries(profile.values)) if (key !== "autologon") controls.get(key).value = text;
     if (!Object.hasOwn(profile.values, "product-key-ui")) controls.get("product-key-ui").value = "Never";
-    for (const kind of Object.keys(rowFields)) for (const row of profile[kind]) addRow(kind, row);
+    for (const kind of Object.keys(rowFields)) for (const row of profile[kind] || []) addRow(kind, row);
+    for (const row of rows("partitions")) rowControl(row, "confirm").value = "";
     update(); controls.get("autologon").value = logon || ""; controls.get("disk-confirm").value = ""; update();
   }
   function base64(text, utf16 = false) {
@@ -507,13 +653,70 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       return result;
     }
     const setting = (pass, name, path, text) => node(component(pass, name), path, text);
+    const finish = () => {
+      for (const pass of passes) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
+      if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of isWindows10() ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
+      for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
+      const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
+      indentGeneratedXml(root); metadata.setAttribute("hash", fingerprint(root));
+      return serialize(xml);
+    };
+    if (value("deployment-mode") === "upgrade") {
+      setting("windowsPE", "setup", "UpgradeData/Upgrade", "true");
+      if (value("upgrade-ui")) setting("windowsPE", "setup", "UpgradeData/WillShowUI", value("upgrade-ui"));
+      return finish();
+    }
     for (const [id, pass, name, path] of [
       ["product-key", "windowsPE", "setup", "UserData/ProductKey/Key"], ["product-key-ui", "windowsPE", "setup", "UserData/ProductKey/WillShowUI"], ["accept-eula", "windowsPE", "setup", "UserData/AcceptEula"], ["dynamic-update", "windowsPE", "setup", "DynamicUpdate/Enable"], ["compact", "windowsPE", "setup", "ImageInstall/OSImage/Compact"],
+      ...[["diagnostics", "Diagnostics/OptIn"], ["compliance-ui", "ComplianceCheck/DisplayReport"], ["dynamic-update-ui", "DynamicUpdate/WillShowUI"], ["image-ui", "ImageInstall/OSImage/WillShowUI"], ["disk-ui", "DiskConfiguration/WillShowUI"], ["disable-disk-encryption", "DiskConfiguration/DisableEncryptedDiskProvisioning"], ["configuration-set", "UseConfigurationSet"], ["pe-restart", "Restart"], ["setup-owner", "UserData/FullName"], ["setup-organization", "UserData/Organization"], ["pe-network", "EnableNetwork"], ["pe-firewall", "EnableFirewall"], ["pe-log-path", "LogPath"], ["pe-pagefile-path", "PageFile/Path"], ["pe-pagefile-size", "PageFile/Size"], ["pe-width", "Display/HorizontalResolution"], ["pe-height", "Display/VerticalResolution"], ["pe-depth", "Display/ColorDepth"], ["pe-refresh", "Display/RefreshRate"], ["image-path", "ImageInstall/OSImage/InstallFrom/Path"], ["image-user", "ImageInstall/OSImage/InstallFrom/Credentials/Username"], ["image-password", "ImageInstall/OSImage/InstallFrom/Credentials/Password"], ["image-domain", "ImageInstall/OSImage/InstallFrom/Credentials/Domain"]].map(([id, path]) => [id, "windowsPE", "setup", path]),
       ["setup-language", "windowsPE", "winpe", "SetupUILanguage/UILanguage"], ["timezone", "oobeSystem", "shell", "TimeZone"], ["computer", "specialize", "shell", "ComputerName"], ["owner", "specialize", "shell", "RegisteredOwner"], ["organization", "specialize", "shell", "RegisteredOrganization"], ["activation-key", "specialize", "shell", "ProductKey"],
       ["hide-license", "oobeSystem", "shell", "OOBE/HideEULAPage"], ["hide-oem", "oobeSystem", "shell", "OOBE/HideOEMRegistrationScreen"], ["hide-online", "oobeSystem", "shell", "OOBE/HideOnlineAccountScreens"], ["hide-wireless", "oobeSystem", "shell", "OOBE/HideWirelessSetupInOOBE"], ["protection", "oobeSystem", "shell", "OOBE/ProtectYourPC"]
-    ]) if (value(id)) setting(pass, name, path, value(id));
+    ]) if (value(id)) setting(pass, name, path, controls.get(id).type === "number" ? Number(value(id)) : value(id));
     for (const [id, path] of [["language", "UILanguage"], ["user-locale", "UserLocale"], ["keyboard", "InputLocale"], ["fallback", "UILanguageFallback"], ["system-locale", "SystemLocale"]]) if (value(id)) for (const [pass, name] of [["windowsPE", "winpe"], ["oobeSystem", "locale"]]) setting(pass, name, path, value(id));
-    if (value("edition")) { const metadata = node(component("windowsPE", "setup"), "ImageInstall/OSImage/InstallFrom/MetaData", undefined, true); node(metadata, "Key", "/IMAGE/NAME"); node(metadata, "Value", value("edition")); }
+    const imageKey = value("image-selection") || "/IMAGE/NAME", imageValue = value("image-selection") === "/IMAGE/INDEX" ? String(Number(value("image-index"))) : value("image-selection") ? value("image-value") : value("edition");
+    if (imageValue) { const metadata = node(component("windowsPE", "setup"), "ImageInstall/OSImage/InstallFrom/MetaData", undefined, true); node(metadata, "Key", imageKey); node(metadata, "Value", imageValue); }
+    const destination = value("deployment-mode") === "wds" ? "WindowsDeploymentServices/ImageSelection/InstallTo" : "ImageInstall/OSImage/InstallTo";
+    if (value("disk-mode") === "existing") for (const [id, path] of [["disk", "DiskID"], ["partition", "PartitionID"]]) setting("windowsPE", "setup", `${destination}/${path}`, Number(value(id)));
+    if (value("disk-mode") === "available") setting("windowsPE", "setup", "ImageInstall/OSImage/InstallToAvailablePartition", "true");
+    if (value("disk-ui") === "Never" && value("partition-mode") !== "custom") {
+      const disk = node(component("windowsPE", "setup"), "DiskConfiguration/Disk", undefined, true);
+      node(disk, "DiskID", Number(value("disk"))); node(disk, "WillWipeDisk", "false");
+    }
+    if (value("partition-mode") === "custom") {
+      const disks = new Map(), orders = new Map();
+      for (const row of rows("partitions")) {
+        const id = Number(rowValue(row, "disk")), action = rowValue(row, "action");
+        if (!disks.has(id)) {
+          const disk = node(component("windowsPE", "setup"), "DiskConfiguration/Disk", undefined, true);
+          node(disk, "DiskID", id); node(disk, "WillWipeDisk", "false"); disks.set(id, disk);
+        }
+        const disk = disks.get(id);
+        if (action === "wipe") { node(disk, "WillWipeDisk", "true"); continue; }
+        const create = action === "create", kind = create ? "Create" : "Modify", orderKey = `${id}/${kind}`, order = (orders.get(orderKey) || 0) + 1;
+        orders.set(orderKey, order);
+        const partition = node(disk, `${kind}Partitions/${kind}Partition`, undefined, true); node(partition, "Order", order);
+        if (create) {
+          node(partition, "Type", rowValue(row, "type"));
+          if (rowValue(row, "extend") === "true") node(partition, "Extend", "true");
+          else node(partition, "Size", Number(rowValue(row, "size")));
+        } else {
+          node(partition, "PartitionID", Number(rowValue(row, "partition")));
+          for (const [key, path] of [["extend", "Extend"], ["format", "Format"], ["label", "Label"], ["letter", "Letter"], ["active", "Active"], ["type-id", "TypeID"]]) if (rowValue(row, key)) node(partition, path, rowValue(row, key));
+        }
+      }
+    }
+    if (value("deployment-mode") === "wds") for (const [id, path] of [["wds-login-ui", "Login/WillShowUI"], ["wds-user", "Login/Credentials/Username"], ["wds-password", "Login/Credentials/Password"], ["wds-domain", "Login/Credentials/Domain"], ["wds-image-ui", "ImageSelection/WillShowUI"], ["wds-image", "ImageSelection/InstallImage/ImageName"], ["wds-group", "ImageSelection/InstallImage/ImageGroup"], ["wds-file", "ImageSelection/InstallImage/Filename"]]) if (value(id)) setting("windowsPE", "setup", `WindowsDeploymentServices/${path}`, value(id));
+    if (value("deployment-mode") === "wds") for (const [id, path] of [["wds-login-ui", "Login/WillShowUI"], ["wds-image-ui", "ImageSelection/WillShowUI"]]) if (!value(id)) setting("windowsPE", "setup", `WindowsDeploymentServices/${path}`, "OnError");
+    for (const [index, row] of rows("data-images").entries()) {
+      if (rowControl(row, "path").disabled) continue;
+      const image = node(component("windowsPE", "setup"), "ImageInstall/DataImage", undefined, true);
+      node(image, "Order", index + 1); node(image, "InstallFrom/Path", rowValue(row, "path"));
+      const metadata = node(image, "InstallFrom/MetaData", undefined, true);
+      node(metadata, "Key", rowValue(row, "key")); node(metadata, "Value", rowValue(row, "value"));
+      for (const [key, path] of [["disk", "DiskID"], ["partition", "PartitionID"]]) node(image, `InstallTo/${path}`, Number(rowValue(row, key)));
+      if (rowValue(row, "auth") === "credentials") for (const [key, path] of [["user", "Username"], ["password", "Password"], ["domain", "Domain"]]) if (rowValue(row, key)) node(image, `InstallFrom/Credentials/${path}`, rowValue(row, key));
+    }
+    if (!value("pe-network") && (value("deployment-mode") === "wds" || [value("image-path"), ...nonEmptyLines(value("drivers")), ...rows("data-images").filter(row => !rowControl(row, "path").disabled).map(row => rowValue(row, "path")), ...rows("commands").filter(row => rowValue(row, "pass") === "windowsPE").map(row => rowValue(row, "path").replace(/^"/, ""))].some(path => path.startsWith("\\\\")))) setting("windowsPE", "setup", "EnableNetwork", "true");
     if (value("encryption")) setting("specialize", "Microsoft-Windows-SecureStartup-FilterDriver", "PreventDeviceEncryption", String(value("encryption") === "false"));
     const password = (parent, path, text) => { node(parent, `${path}/Value`, value("obscure") === "true" ? base64(text + path, true) : text); node(parent, `${path}/PlainText`, value("obscure") === "true" ? "false" : "true"); };
     for (const row of rows("accounts")) {
@@ -540,8 +743,9 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       if (recovery) lines.push(`shrink desired=${Number(value("recovery-size"))} minimum=${Number(value("recovery-size"))}`, "create partition primary", "format quick fs=ntfs label=Recovery", `set id=${gpt ? "de94bba4-06d1-4d40-a16a-bfd50179d6ac" : "27"}`, ...(gpt ? ["gpt attributes=0x8000000000000001"] : []));
       lines.push("exit");
       commands.push(["windowsPE", `cmd.exe /d /c "wpeutil.exe UpdateBootInfo && (reg.exe query HKLM\\SYSTEM\\CurrentControlSet\\Control /v PEFirmwareType | findstr.exe /c:0x${gpt ? "2" : "1"} >nul) && (${lines.map(line => `echo ${line}`).join("&")}) > \"%TEMP%\\OrbitalDisk.txt\" && diskpart.exe /s \"%TEMP%\\OrbitalDisk.txt\""`, "Verify firmware and partition the confirmed disk", ""]);
-      for (const [path, text] of [["DiskID", disk], ["PartitionID", gpt ? 3 : 2]]) setting("windowsPE", "setup", `ImageInstall/OSImage/InstallTo/${path}`, text);
-      setting("windowsPE", "setup", "ImageInstall/OSImage/WillShowUI", "OnError");
+      for (const [path, text] of [["DiskID", disk], ["PartitionID", gpt ? 3 : 2]]) setting("windowsPE", "setup", `${destination}/${path}`, text);
+      if (value("deployment-mode") === "wds") { if (!value("wds-image-ui")) setting("windowsPE", "setup", "WindowsDeploymentServices/ImageSelection/WillShowUI", "OnError"); }
+      else if (!value("image-ui")) setting("windowsPE", "setup", "ImageInstall/OSImage/WillShowUI", "OnError");
       if (!recovery) script("Disable Windows RE", "& reagentc.exe /disable\nif ($LASTEXITCODE -ne 0) { throw 'Could not disable Windows RE.' }");
     }
     if (value("builtin-admin")) script("Configure built-in Administrator", `$admin = Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | Where-Object { $_.SID -match '-500$' }\nif (!$admin) { throw 'Built-in Administrator was not found.' }\n& net.exe user $admin.Name /active:${value("builtin-admin") === "true" ? "yes" : "no"}\nif ($LASTEXITCODE -ne 0) { throw 'Could not configure built-in Administrator.' }`);
@@ -579,20 +783,17 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       root.append(extensions);
       commands.unshift(["specialize", `powershell.exe -NoProfile -ExecutionPolicy Bypass${hidden} -Command "$x=[xml]::new();$x.Load($env:WINDIR+'\\Panther\\unattend.xml');& ([scriptblock]::Create($x.unattend.Extensions.ExtractScript)) $x"`, "Extract Orbital installation files", "Never"]);
     }
-    for (const row of rows("commands")) commands.push([rowValue(row, "pass"), rowValue(row, "path"), rowValue(row, "description"), rowValue(row, "reboot")]);
-    for (const [pass, path, description, reboot] of commands) {
+    for (const row of rows("commands")) commands.push([rowValue(row, "pass"), rowValue(row, "path"), rowValue(row, "description"), rowValue(row, "reboot"), rowValue(row, "execution"), row]);
+    for (const [pass, path, description, reboot, execution, row] of commands) {
       if (path.length > (pass === "windowsPE" ? 1024 : 259)) throw new Error("An installation command exceeds the Windows limit. Shorten the setup folder or use an embedded script.");
-      const order = orders[pass] = (orders[pass] || 0) + 1;
+      const kind = execution === "async" ? "RunAsynchronous" : "RunSynchronous", orderKey = `${pass}/${kind}`;
+      const order = orders[orderKey] = (orders[orderKey] || 0) + 1;
       if (order > 500) throw new Error("Windows supports up to 500 commands per configuration pass.");
-      const command = node(component(pass, pass === "windowsPE" ? "setup" : "deployment"), "RunSynchronous/RunSynchronousCommand", undefined, true);
+      const command = node(component(pass, pass === "windowsPE" ? "setup" : "deployment"), `${kind}/${kind}Command`, undefined, true);
       node(command, "Order", order); node(command, "Path", path); if (description) node(command, "Description", description); if (reboot && pass !== "windowsPE") node(command, "WillReboot", reboot);
+      if (pass === "windowsPE" && row && rowValue(row, "auth") === "credentials") for (const [key, name] of [["user", execution === "async" ? "Username" : "UserName"], ["password", "Password"], ["domain", "Domain"]]) if (rowValue(row, key)) node(command, `Credentials/${name}`, rowValue(row, key));
     }
-    for (const pass of passes) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
-    if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of value("edition").startsWith("Windows 10 ") ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
-    for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
-    const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
-    indentGeneratedXml(root); metadata.setAttribute("hash", fingerprint(root));
-    return serialize(xml);
+    return finish();
   }
   function show(open) {
     closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open; document.querySelector(".top-bar").hidden = open;
@@ -603,7 +804,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     update();
     for (const detail of byId("answer-groups").querySelectorAll("details")) detail.open = false;
     if (value("mode") === "xml") {
-      sections.get("advanced").open = true;
+      sections.get("advanced").open = sections.get("advanced-settings").open = true;
       return;
     }
     for (const [id, , fields] of groups) {
@@ -613,6 +814,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       });
       sections.get(id).open = changed || Boolean(lists.get(id)?.children.length);
     }
+    sections.get("advanced-settings").open = [...advancedGroups].some(id => sections.get(id).open);
   }
   const presetPicker = createChoicePicker(
     byId("answer-preset-picker"), byId("answer-preset-options"), byId("answer-preset-selection"),
@@ -635,11 +837,15 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
             "hide-license": "true", "hide-oem": "true", "hide-online": "true", "hide-wireless": "true", protection: "3",
             "join-mode": "domain", "join-name": "example.invalid", "join-user": "debug", "join-password": "DebugOnly123!", "join-domain": "example.invalid", "join-ou": "OU=Debug,DC=example,DC=invalid",
             "wifi-mode": "personal", ssid: "Orbital-Debug", "wifi-auth": "WPA2PSK", "wifi-password": "DebugOnly123!", "wifi-hidden": "true",
-            drivers: "D:\\Drivers", "guest-tools": "virtualbox", payload: "C:\\OrbitalDebug\\Orbital\\Setup", logging: "false", windows: "visible", mode: "guided"
+            drivers: "D:\\Drivers", "guest-tools": "virtualbox", payload: "C:\\OrbitalDebug\\Orbital\\Setup", logging: "false", windows: "visible", mode: "guided",
+            "image-selection": "/IMAGE/INDEX", "image-version": "11", "image-index": "1", "image-location": "custom", "image-path": "D:\\sources\\install.wim",
+            diagnostics: "false", "compliance-ui": "OnError", "dynamic-update-ui": "Never", "image-ui": "OnError", "disk-ui": "OnError", "disable-disk-encryption": "true", "configuration-set": "false", "pe-restart": "Restart", "setup-owner": "Orbital Debug", "setup-organization": "Orbital Debug",
+            "pe-network": "true", "pe-firewall": "true", "pe-log-path": "C:\\SetupLogs", "pe-pagefile": "custom", "pe-pagefile-path": "C:\\pagefile.sys", "pe-pagefile-size": "512", "pe-display": "custom", "pe-width": "1024", "pe-height": "768", "pe-depth": "32", "pe-refresh": "60"
           },
           accounts: [{ name: "OrbitalDebug", display: "Orbital Debug", group: "Custom", groups: "Administrators;Users", "password-mode": "custom", password: "DebugOnly123!", description: "Example debug account" }],
-          commands: [{ pass: "specialize", description: "Example debug command", path: "cmd.exe /c echo Orbital debug", reboot: "Never" }],
-          scripts: [{ type: "ps1", label: "Example debug script", content: "Write-Output 'Orbital debug'" }]
+          commands: [{ pass: "specialize", description: "Example debug command", path: "cmd.exe /c echo Orbital debug", reboot: "Never" }, { pass: "windowsPE", execution: "async", description: "Example asynchronous command", path: "cmd.exe /c echo Orbital Windows PE debug" }],
+          scripts: [{ type: "ps1", label: "Example debug script", content: "Write-Output 'Orbital debug'" }],
+          "data-images": [{ path: "D:\\sources\\data.wim", key: "/IMAGE/INDEX", value: "1", disk: "1", partition: "3" }]
         });
         showImportedChanges();
         status("Debug preset loaded with example values. Review all settings; disk erasure still requires confirmation.");
@@ -662,7 +868,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       else { controls.get("xml").value = serialize(xml); controls.get("mode").value = "xml"; update(); }
     }
     showImportedChanges();
-    status("Settings imported. Confirm disk erasure again if applicable.");
+    status("Settings imported. Confirm disk erasure or formatting again if applicable.");
   }
   async function upload(settings) {
     const input = byId("answer-upload"); input.accept = settings ? ".xml,.json" : ".xml"; input.value = "";

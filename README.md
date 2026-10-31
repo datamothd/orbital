@@ -66,6 +66,8 @@ Leave the installation key blank to skip key entry. Disk erasure requires typing
 
 The configurator's preset menu can restore Windows defaults. Enable Debug mode in Settings to reveal the All preferences (debug) preset, which fills the configurator with example values for testing. It selects disk erasure but leaves the required disk confirmation empty; review the example values before using the result.
 
+Run `npm test` to check configurator controls, generated XML, validation and settings imports.
+
 Click Use answer file, then Inject ISO. Choose Duplicate & inject to save a new image, or Inject selected ISO to replace the selected file. Any existing autounattend.xml at the image root is replaced. Installation scripts run only when needed for initial Wi-Fi, built-in Administrator access, recovery handling, or custom deployment work. They run as SYSTEM during device setup and log to ProgramData\Orbital\Logs by default; the ordinary configuration needs no script runner.
 
 Orbital uses Windows' built-in image APIs, preserves the original BIOS/UEFI boot images, and compares every setup file with the rebuilt image before saving it. Failed or cancelled operations leave the source unchanged. Allow free space for the rebuilt image as well as temporary staging files. Eject an ISO mounted in File Explorer before choosing to replace it.

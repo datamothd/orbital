@@ -159,6 +159,18 @@
   padding-bottom: var(--panel-padding);
 }
 
+.answer-subgroups {
+  padding-left: var(--space-4);
+}
+
+#answer-page .answer-subgroups > details > summary {
+  font-size: 13px;
+}
+
+#answer-page .answer-subgroups > details {
+  border-top-color: #444;
+}
+
 .answer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
