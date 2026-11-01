@@ -445,6 +445,11 @@
   color: #f87171;
 }
 
+#answer-form footer button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .answer-grid {
     grid-template-columns: minmax(0, 1fr);

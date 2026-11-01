@@ -909,6 +909,10 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     }
   }
   byId("answer-back").addEventListener("click", () => { show(false); if (!injectFiles.xml) choose(); });
+  byId("answer-reset").addEventListener("click", () => {
+    presetPicker.load(null);
+    for (const section of byId("answer-groups").querySelectorAll("details")) section.open = false;
+  });
   byId("answer-search").addEventListener("input", update);
   byId("answer-collapse").addEventListener("click", () => { for (const section of byId("answer-groups").querySelectorAll("details")) section.open = false; });
   byId("answer-import").addEventListener("click", () => attempt(async () => {
