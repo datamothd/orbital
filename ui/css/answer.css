@@ -246,8 +246,12 @@
   white-space: nowrap;
 }
 
-.answer-wide, .answer-auto-wide {
+.answer-wide, .answer-auto-wide, .answer-stacked-dropdown {
   grid-column: 1 / -1;
+}
+
+.answer-auto-wide:not(.answer-stacked-dropdown) > .answer-dropdown {
+  width: calc((100% - var(--space-4)) / 2);
 }
 
 .answer-binary {
@@ -453,6 +457,10 @@
 @media (max-width: 480px) {
   .answer-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .answer-auto-wide:not(.answer-stacked-dropdown) > .answer-dropdown {
+    width: 100%;
   }
 
   .answer-actions {

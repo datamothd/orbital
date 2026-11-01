@@ -156,18 +156,37 @@ const answer = (() => {
     scripts: [["type", "Script type", choice(["ps1", "cmd", "reg"], { value: "ps1" })], ["label", "Description", {}], ["content", "Installation script", { type: "textarea", required: true, wide: true, help: "Runs as SYSTEM during device setup. Supply any external programs separately. Do not restart Windows from the script." }]]
   };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
-  const fieldLayout = new ResizeObserver(entries => requestAnimationFrame(() => {
-    for (const { target: grid } of entries) {
+  function layoutFields(grids) {
+    for (const grid of grids) {
       if (!grid.clientWidth) continue;
-      const gap = parseFloat(getComputedStyle(grid).columnGap) || 0, columnWidth = (grid.clientWidth - gap) / 2;
+      const style = getComputedStyle(grid), gap = parseFloat(style.columnGap) || 0;
+      const columnWidth = (grid.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0) - gap) / 2;
       for (const field of grid.querySelectorAll(":scope > .answer-field:not(.answer-wide)")) {
         if (!field.getClientRects().length) continue;
         const title = field.querySelector(".answer-field-label"), children = [...title.children];
         const width = children.reduce((total, child) => total + child.getBoundingClientRect().width, 0) + (children.length - 1) * (parseFloat(getComputedStyle(title).columnGap) || 0);
         field.classList.toggle("answer-auto-wide", width > columnWidth);
       }
+      const children = [...grid.children];
+      for (const child of children) child.classList.remove("answer-stacked-dropdown");
+      if (getComputedStyle(grid).gridTemplateColumns.split(" ").length !== 2) continue;
+      const layoutRows = [];
+      for (const child of children) {
+        if (!child.getClientRects().length) continue;
+        const wide = child.classList.contains("answer-wide") || child.classList.contains("answer-auto-wide");
+        const last = layoutRows.at(-1);
+        if (!wide && last?.length === 1 && !last[0].classList.contains("answer-wide") && !last[0].classList.contains("answer-auto-wide")) last.push(child);
+        else layoutRows.push([child]);
+      }
+      for (let index = 0; index < layoutRows.length - 1; index++) {
+        const first = layoutRows[index], second = layoutRows[index + 1];
+        if (first.length === 1 && second.length === 1 && first[0].classList.contains("answer-field") && second[0].classList.contains("answer-field")) {
+          for (const field of [first[0], second[0]]) if (field.querySelector(":scope > .answer-dropdown")) field.classList.add("answer-stacked-dropdown");
+        }
+      }
     }
-  }));
+  }
+  const fieldLayout = new ResizeObserver(entries => requestAnimationFrame(() => layoutFields(entries.map(entry => entry.target))));
   let rowId = 0, initialized = false;
   const read = control => control.type === "password" || control.dataset.key === "ssid" ? control.value : control.value.trim();
   const value = id => controls.get(id)?.disabled ? "" : read(controls.get(id));
@@ -352,6 +371,7 @@ const answer = (() => {
       control.setDisabled(picker.disabled);
     }
     filterSearch(byId("answer-search").value.trim().toLowerCase());
+    requestAnimationFrame(() => layoutFields(byId("answer-groups").querySelectorAll(".answer-grid")));
     if (value("mode") === "xml") sections.get("advanced").open = sections.get("advanced-settings").open = true;
     renderIssues(validate());
   }
