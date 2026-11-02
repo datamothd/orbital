@@ -64,12 +64,22 @@ mod tests {
     #[test]
     fn json_round_trip_preserves_non_recommended_folder_choices() {
         let json = r#"{"format":"orbital-tweaks","version":1,"tweaks":["disable_taskbar_centering","hide_recent_files"],"folder_sort":{"column":"size","descending":true},"folder_grouping":"date_created"}"#;
-        let profile: TweakProfile = serde_json::from_str(json).unwrap();
-        profile.validate().unwrap();
+        let mut profile: TweakProfile = serde_json::from_str(json).unwrap();
+        profile.normalize().unwrap();
         let serialized = serde_json::to_value(&profile).unwrap();
+        assert_eq!(serialized["version"], 4);
         assert_eq!(
-            serialized,
-            serde_json::from_str::<serde_json::Value>(json).unwrap()
+            serialized["folder_sort"],
+            serde_json::json!({"column":"size","descending":true})
+        );
+        assert_eq!(serialized["folder_grouping"], "date_created");
+        assert_eq!(
+            serialized["disabled_tweaks"],
+            serde_json::json!([
+                "center_taskbar_icons",
+                "show_recent_files",
+                "show_recommendations"
+            ])
         );
     }
 
@@ -88,14 +98,68 @@ mod tests {
     }
 
     #[test]
-    fn version_two_round_trip_preserves_false_values() {
+    fn version_two_import_preserves_enabled_and_disabled_intent() {
         let json = r#"{"format":"orbital-tweaks","version":2,"tweaks":["hide_recent_files"],"disabled_tweaks":["disable_explorer_spacing","hide_gallery"],"folder_sort":null,"folder_grouping":null}"#;
+        let mut profile: TweakProfile = serde_json::from_str(json).unwrap();
+        profile.normalize().unwrap();
+        let serialized = serde_json::to_value(profile).unwrap();
+        assert_eq!(serialized["version"], 4);
+        assert_eq!(serialized["tweaks"], serde_json::json!(["show_gallery"]));
+        assert_eq!(
+            serialized["disabled_tweaks"],
+            serde_json::json!([
+                "show_recent_files",
+                "show_recommendations",
+                "use_compact_mode"
+            ])
+        );
+    }
+
+    #[test]
+    fn legacy_inverse_names_keep_their_effect_and_normalize_once() {
+        for (old, new) in [
+            ("disable_taskbar_centering", "center_taskbar_icons"),
+            ("hide_task_view", "show_task_view"),
+            ("disable_widgets", "allow_widgets"),
+            ("hide_recent_files", "show_recent_files"),
+            ("hide_recommendations", "show_recommendations"),
+            ("hide_frequent_folders", "show_frequent_folders"),
+            ("hide_office_files", "show_cloud_files"),
+            ("hide_home_folder", "show_home_folder"),
+            ("hide_gallery", "show_gallery"),
+            ("show_file_extensions", "hide_file_extensions"),
+            ("single_click_open", "double_click_open"),
+            ("show_empty_drives", "hide_empty_drives"),
+            ("hide_info_tips", "show_info_tips"),
+        ] {
+            for enabled in [true, false] {
+                let mut json = serde_json::json!({"format":"orbital-tweaks", "version":3, "tweaks":[], "disabled_tweaks":[]});
+                json[if enabled { "tweaks" } else { "disabled_tweaks" }] = serde_json::json!([old]);
+                let mut profile: TweakProfile = serde_json::from_value(json).unwrap();
+                profile.normalize().unwrap();
+                let normalized = serde_json::to_value(&profile).unwrap();
+                assert_eq!(
+                    normalized[if enabled { "disabled_tweaks" } else { "tweaks" }],
+                    serde_json::json!([new])
+                );
+                profile.normalize().unwrap();
+                assert_eq!(normalized, serde_json::to_value(profile).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn explorer_options_and_starting_location_round_trip() {
+        let json = r#"{"format":"orbital-tweaks","version":4,"tweaks":["hide_file_extensions","double_click_open"],"disabled_tweaks":["show_system_files"],"folder_sort":null,"folder_grouping":null,"open_explorer_to":"downloads"}"#;
         let profile: TweakProfile = serde_json::from_str(json).unwrap();
         profile.validate().unwrap();
-        assert_eq!(profile.disabled_tweaks.len(), 2);
         assert_eq!(
             serde_json::to_value(profile).unwrap(),
             serde_json::from_str::<serde_json::Value>(json).unwrap()
+        );
+        assert!(
+            serde_json::from_str::<TweakProfile>(&json.replace("downloads", "arbitrary_path"))
+                .is_err()
         );
     }
 }

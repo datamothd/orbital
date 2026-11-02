@@ -32,25 +32,45 @@ const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
-  { id: "taskbar-centering", field: "disable_taskbar_centering", enabledLabel: "Left", disabledLabel: "Centered", apply: "Move taskbar icons to the left?", restore: "Center taskbar icons?", supported: "windows11_supported", visual: true },
-  { id: "task-view", field: "hide_task_view", apply: "Hide the Task View button? Win+Tab will still work.", restore: "Show the Task View button?", visual: true },
-  { id: "widgets", field: "disable_widgets", apply: "Disable Widgets, including the widgets board and taskbar content?", restore: "Allow Widgets again?", supported: "windows11_supported", requiresAdmin: true },
+  { id: "taskbar-centering", field: "center_taskbar_icons", apply: "Center taskbar icons?", restore: "Align taskbar icons to the left?", supported: "windows11_supported" },
+  { id: "task-view", field: "show_task_view", apply: "Show the Task View button?", restore: "Hide the Task View button? Win+Tab will still work." },
+  { id: "widgets", field: "allow_widgets", apply: "Allow Widgets, including the widgets board and taskbar content?", restore: "Disable Widgets?", supported: "windows11_supported", requiresAdmin: true },
   { id: "taskbar-end-task", field: "enable_taskbar_end_task", apply: "Add End task to app menus on the taskbar? It force-closes apps and can discard unsaved work.", restore: "Remove End task from app menus on the taskbar?", supported: "taskbar_end_task_supported" },
-  { id: "explorer-spacing", field: "disable_explorer_spacing", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
-  { id: "modern-context-menu", field: "disable_modern_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
-  { id: "recent-files", field: "hide_recent_files", apply: "Hide recently used files in File Explorer Home?", restore: "Show recently used files in File Explorer Home?" },
-  { id: "recommendations", field: "hide_recommendations", apply: "Hide the Recommended section in File Explorer Home?", restore: "Show the Recommended section in File Explorer Home?", supported: "windows11_supported" },
-  { id: "frequent-folders", field: "hide_frequent_folders", apply: "Hide frequently used folders in Quick Access?", restore: "Show frequently used folders in Quick Access?" },
-  { id: "office-files", field: "hide_office_files", apply: "Hide cloud files and account-based recommendations in File Explorer?", restore: "Allow cloud files and account-based recommendations in File Explorer?", supported: "windows11_supported" },
-  { id: "home-folder", field: "hide_home_folder", apply: "Hide Home in the navigation pane?", restore: "Show Home in the navigation pane?", supported: "home_supported", requiresAdmin: true, visual: true },
-  { id: "gallery", field: "hide_gallery", apply: "Hide Gallery in the navigation pane?", restore: "Show Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true, visual: true },
-  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true, visual: true },
+  { id: "explorer-spacing", field: "use_compact_mode", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
+  { id: "modern-context-menu", field: "use_classic_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
+  { id: "recent-files", field: "show_recent_files", apply: "Show recently used files in File Explorer Home?", restore: "Hide recently used files in File Explorer Home?" },
+  { id: "recommendations", field: "show_recommendations", apply: "Show the Recommended section in File Explorer Home?", restore: "Hide the Recommended section in File Explorer Home?", supported: "windows11_supported" },
+  { id: "frequent-folders", field: "show_frequent_folders", apply: "Show frequently used folders in Quick access?", restore: "Hide frequently used folders in Quick access?" },
+  { id: "office-files", field: "show_cloud_files", apply: "Allow cloud files and account-based recommendations in File Explorer?", restore: "Hide cloud files and account-based recommendations in File Explorer?", supported: "windows11_supported" },
+  { id: "home-folder", field: "show_home_folder", apply: "Show Home in the navigation pane?", restore: "Hide Home in the navigation pane?", supported: "home_supported", requiresAdmin: true },
+  { id: "gallery", field: "show_gallery", apply: "Show Gallery in the navigation pane?", restore: "Hide Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true },
+  { id: "file-extensions", field: "hide_file_extensions", apply: "Hide known file extensions?", restore: "Show file extensions?" },
+  { id: "hidden-files", field: "show_hidden_files", apply: "Show hidden files, folders and drives?", restore: "Hide hidden files, folders and drives?" },
+  { id: "item-checkboxes", field: "show_item_checkboxes", apply: "Show selection checkboxes?", restore: "Hide selection checkboxes?" },
+  { id: "libraries", field: "show_libraries", apply: "Show Libraries in the navigation pane?", restore: "Hide Libraries in the navigation pane?" },
+  { id: "full-path", field: "show_full_path", apply: "Show the full folder path in the title bar?", restore: "Hide the full folder path in the title bar?" },
+  { id: "single-click", field: "double_click_open", apply: "Require a double-click to open files and folders?", restore: "Open files and folders with a single click?" },
+  { id: "empty-drives", field: "hide_empty_drives", apply: "Hide drives with no media?", restore: "Show empty drives?" },
+  { id: "confirm-delete", field: "confirm_file_delete", apply: "Confirm before moving items to the Recycle Bin?", restore: "Stop asking before moving items to the Recycle Bin?", supported: "confirm_file_delete_supported" },
+  { id: "icons-only", field: "icons_only", apply: "Show icons instead of thumbnails?", restore: "Allow file thumbnails?" },
+  { id: "info-tips", field: "show_info_tips", apply: "Show file and folder hover descriptions?", restore: "Hide file and folder hover descriptions?" },
+  { id: "system-files", field: "show_system_files", apply: "Show protected operating system files? Show hidden files must also be enabled.", restore: "Hide protected operating system files?" },
+  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true },
 ];
 
-const folderViews = [
-  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", recommendation: "Sort folders by Type · A to Z" },
-  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", recommendation: "Set folder grouping to None" },
+const explorerChoices = [
+  { id: "explorer-launch", picker: explorerLaunch, field: "open_explorer_to", command: "set_explorer_launch", argument: "target", label: "starting location", recommendedValue: "downloads", recommendation: "Open Explorer to Downloads" },
+  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
+  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", recommendedValue: "none", recommendation: "Set folder grouping to None" },
 ];
+
+function preferenceRecommendation(preference) {
+  return settings?.recommended_preferences?.find(([field]) => field === preference.field)?.[1];
+}
+
+function preferenceRecommended(preference) {
+  return preferenceRecommendation(preference) !== undefined;
+}
 
 function preferenceAvailable(preference) {
   return Boolean(settings) && (!preference.supported || settings[preference.supported]);
@@ -86,7 +106,7 @@ function setBusy(value) {
   for (const id of ["apply-recommended", "restore-original", "batch-changes", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
-  for (const view of folderViews) view.picker.setDisabled(busy || !settings);
+  for (const view of explorerChoices) view.picker.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !preferenceAvailable(preference);
   }
@@ -111,12 +131,20 @@ function bohrPixelCircle(radius) {
 
 function renderBohr() {
   if (!settings) return;
-  const available = explorerPreferences.filter(preference => !preference.visual && preferenceAvailable(preference));
-  const changes = available.filter(preference => settings[preference.field] === true);
+  const available = [
+    ...explorerPreferences.filter(preference => preferenceRecommended(preference) && preferenceAvailable(preference))
+      .map(preference => ({ ...preference, label: `${preference.label} · ${preferenceValue(preference, preferenceRecommendation(preference))}`, enabled: settings[preference.field] === preferenceRecommendation(preference) })),
+    ...explorerChoices.filter(choice => choice.recommendedValue !== undefined && choice.picker.choices.some(option => choice.picker.matches(option.value, choice.recommendedValue)))
+      .map(choice => ({ ...choice, label: choice.recommendation, enabled: choice.picker.matches(choice.recommendedValue, settings[choice.field]) })),
+  ];
+  const changes = available.filter(preference => preference.enabled);
   const count = byId("preferences-made");
-  if (count) count.textContent = `${changes.length} / ${available.length}`;
+  if (count) {
+    count.textContent = `${changes.length} / ${available.length}`;
+    count.title = "Recommended preferences applied";
+  }
   const diagram = byId("bohr");
-  diagram.setAttribute("aria-label", `${changes.length} preferences differ from Windows defaults`);
+  diagram.setAttribute("aria-label", `${changes.length} of ${available.length} recommended preferences applied`);
   const signature = changes.map(preference => preference.field).join("|");
   if (diagram.dataset.changes === signature) return;
   diagram.dataset.changes = signature;
@@ -180,11 +208,18 @@ function renderSettings() {
   document.querySelectorAll(".admin-requirement").forEach(note => {
     note.dataset.state = settings?.is_administrator === true ? "granted" : settings?.is_administrator === false ? "missing" : "unknown";
   });
-  for (const view of folderViews) view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
+  for (const view of explorerChoices) {
+    view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
+    byId(`${view.id}-value`).dataset.state = view.recommendedValue === undefined ? "visual" : !settings ? "other"
+      : view.picker.matches(view.recommendedValue, settings[view.field]) ? "enabled" : "disabled";
+  }
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, preferenceAvailable(preference)
       ? preferenceValue(preference, settings[preference.field]) : "Unavailable",
-      preference.visual);
+      !preferenceRecommended(preference));
+    if (preferenceAvailable(preference) && preferenceRecommended(preference) && settings[preference.field] !== null) {
+      byId(preference.id).dataset.state = settings[preference.field] === preferenceRecommendation(preference) ? "enabled" : "disabled";
+    }
   }
   renderBohr();
 }
@@ -235,12 +270,12 @@ async function loadSystem() {
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
     ["CPU", info.cpu], ["Threads", info.threads],
     ["Memory", `${info.used_memory_gib.toFixed(1)} / ${info.total_memory_gib.toFixed(1)} GiB`],
-    ["Changes:", "…"],
+    ["Recommended:", "…"],
   ];
   byId("system").replaceChildren(...rows.flatMap(([label, value]) => {
     const term = element("dt", "", label);
     const description = element("dd", "", value);
-    if (label === "Changes:") {
+    if (label === "Recommended:") {
       description.className = "changes-count";
       description.replaceChildren(byId("changes-count").content.cloneNode(true));
     }
@@ -345,12 +380,12 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("recommended-options").open = true;
   byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
     const preference = explorerPreferences.find(preference => preference.field === id);
-    const view = folderViews.find(view => view.field === id);
-    const { row, text } = createChangeRow(id, preference?.label || view.recommendation,
-      (preference || view).description, preference?.visual || Boolean(view));
+    const view = explorerChoices.find(view => view.field === id);
+    const { row, text } = createChangeRow(id, preference ? `${preference.label} · ${preferenceValue(preference, preferenceRecommendation(preference))}` : view.recommendation,
+      (preference || view).description);
     if (preference?.requiresAdmin) text.append(adminWarning());
     return row;
-  }).sort((a, b) => Number(b.classList.contains("visual-preference")) - Number(a.classList.contains("visual-preference"))));
+  }));
   if (recommendations.length) {
     updateRecommendedSelection();
   } else {
@@ -374,8 +409,8 @@ function showResult(title, description, error = "", replaceIcon = false) {
 
 function showApplyResult(count, error) {
   const completed = typeof count === "number";
-  showResult(completed ? "Recommended settings applied" : "Could not complete recommendations", completed
-    ? count === 0 ? "0 changes are made. All recommended settings are already enabled."
+  showResult(completed ? "Recommended preferences applied" : "Could not complete recommendations", completed
+    ? count === 0 ? "Your settings already match all recommended values."
       : `${count} ${count === 1 ? "change" : "changes"} made. Explorer restarted.`
     : "The number of changes could not be confirmed.", error || "");
 }
@@ -426,8 +461,10 @@ async function applyChange(command, args, description, skipConfirmation = false,
       description = "Uncheck any settings you want to keep.";
       if (missingAdminCount(recommendations)) skip = false;
     }
-    if (!skip && !await confirmChange(description, recommended ? "Recommended settings" : reverting ? "Revert preferences?" : undefined, recommendations,
-      reverting ? "If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved. Windows Explorer will restart to apply this change." : undefined)) return;
+    if (!skip && !await confirmChange(description, recommended ? "Recommended preferences" : reverting ? "Revert preferences?" : undefined, recommendations,
+      reverting ? "If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved. Windows Explorer will restart to apply this change."
+        : recommendations.some(field => field === "folder_sort" || field === "folder_grouping")
+          ? "Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Windows Explorer will restart to apply these changes." : undefined)) return;
     if (recommended) {
       args.selected = skip ? recommendations : selectedValues("recommendation-list");
       if (!args.selected.length || missingAdminCount(args.selected)) return;
@@ -458,17 +495,20 @@ byId("apply-recommended").addEventListener("click", (event) => applyChange(
 byId("restore-original").addEventListener("click", () => applyChange(
   "restore_original_settings", {}, "Revert your original settings?", false, "Original settings restored. Explorer restarted.",
 ));
-for (const view of folderViews) {
+for (const view of explorerChoices) {
   view.row = byId(`${view.id}-label`).closest(".preference");
+  view.title = byId(`${view.id}-label`).textContent.trim();
   view.description = view.row.querySelector(".preference-description").textContent.trim();
   byId(`${view.id}-apply`).addEventListener("click", (event) => {
     const selected = view.picker.selected;
     if (selected !== null) applyChange(
       view.command,
       { [view.argument]: selected },
-      `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset. Desktop icon layouts are preserved.`,
+      view.field === "open_explorer_to" ? `Open new File Explorer windows to ${view.picker.label}?`
+        : `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset. Desktop icon layouts are preserved.`,
       event.shiftKey,
-      `Default folder ${view.label} saved. Explorer restarted.`,
+      view.field === "open_explorer_to" ? "Explorer starting location saved. Explorer restarted."
+        : `${view.title} saved. Explorer restarted.`,
     );
   });
 }

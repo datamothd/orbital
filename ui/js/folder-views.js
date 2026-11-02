@@ -122,10 +122,11 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
 function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
   const picker = byId(`${id}-picker`), apply = byId(`${id}-apply`);
   const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder, () => { apply.disabled = picker.disabled || control.selected === null; }, matches);
+  const availableChoices = () => typeof choices === "function" ? choices() : choices;
   return {
     matches,
-    choices,
-    labelFor: value => choices.find(choice => matches(choice.value, value))?.label || fallback,
+    get choices() { return availableChoices(); },
+    labelFor: value => availableChoices().find(choice => matches(choice.value, value))?.label || fallback,
     load(current, available = true) {
       control.load(current);
       byId(`${id}-value`).textContent = !available ? "Unavailable" : control.label || fallback;
@@ -161,3 +162,10 @@ const folderGrouping = createFolderPicker("folder-grouping", [
   ["size", "Size"],
 ].map(([value, label]) => ({ value, label })),
 "Choose grouping", "Windows defaults or mixed grouping");
+
+const explorerLaunchLabels = () => ({ home: settings?.windows11_supported ? "Home" : "Quick access", this_pc: "This PC", downloads: "Downloads", one_drive: "OneDrive" });
+const explorerLaunch = createFolderPicker("explorer-launch", () => {
+  const labels = explorerLaunchLabels();
+  return (settings?.explorer_launch_options || []).map(value => ({ value, label: labels[value] }));
+}, "Choose a location", "Custom or unavailable location");
+explorerLaunch.labelFor = value => explorerLaunchLabels()[value] || "Custom or unavailable location";

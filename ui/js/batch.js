@@ -2,14 +2,14 @@
 
 function batchSelection() {
   const profile = {
-    format: "orbital-tweaks", version: 3,
-    tweaks: [], disabled_tweaks: [], folder_sort: null, folder_grouping: null,
+    format: "orbital-tweaks", version: 4,
+    tweaks: [], disabled_tweaks: [], folder_sort: null, folder_grouping: null, open_explorer_to: null,
   };
   for (const checkbox of byId("batch-list").querySelectorAll("input:enabled")) {
     if (checkbox.indeterminate || checkbox.checked === settings[checkbox.value]) continue;
     profile[checkbox.checked ? "tweaks" : "disabled_tweaks"].push(checkbox.value);
   }
-  for (const view of folderViews) {
+  for (const view of explorerChoices) {
     const select = byId(`batch-${view.id}`);
     if (select.value === "") continue;
     const value = view.picker.choices[Number(select.value)].value;
@@ -28,7 +28,7 @@ function updateBatchSelection() {
 
 function batchChangeCount(profile) {
   return profile.tweaks.length + profile.disabled_tweaks.length
-    + Number(profile.folder_sort !== null) + Number(profile.folder_grouping !== null);
+    + explorerChoices.filter(view => profile[view.field] != null).length;
 }
 
 function prepareBatchDialog() {
@@ -36,8 +36,8 @@ function prepareBatchDialog() {
   const rows = new Map();
   for (const preference of explorerPreferences) {
     const { row, checkbox, text } = createChangeRow(preference.field,
-      preference.id === "taskbar-centering" ? "Left-align taskbar icons" : preference.label,
-      preference.description, preference.visual);
+      preference.label,
+      preference.description, !preferenceRecommended(preference));
     checkbox.checked = settings[preference.field] === true;
     checkbox.indeterminate = settings[preference.field] === null;
     const blocked = preferenceRestriction(preference);
@@ -50,9 +50,9 @@ function prepareBatchDialog() {
     }
     rows.set(preference.row, row);
   }
-  for (const view of folderViews) {
-    const row = element("div", "batch-folder-view visual-preference");
-    const label = element("span", "", `Default folder ${view.label}`);
+  for (const view of explorerChoices) {
+    const row = element("div", view.recommendedValue === undefined ? "batch-folder-view visual-preference" : "batch-folder-view");
+    const label = element("span", "", view.title);
     label.id = `batch-${view.id}-label`;
     const select = document.createElement("select");
     select.id = `batch-${view.id}`;

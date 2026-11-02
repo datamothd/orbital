@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use orbital::{explorer, sysinfo};
+use tauri::Manager;
 use windows_sys::{Win32::UI::Shell::ShellExecuteW, core::w};
 mod files;
 mod inject;
@@ -43,6 +44,11 @@ async fn explorer_settings() -> Result<explorer::ExplorerSettings, String> {
 #[tauri::command]
 async fn set_desktop_layout_safe_mode(enabled: bool) -> Result<(), String> {
     explorer::set_desktop_layout_safe_mode(enabled).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn set_explorer_launch(target: explorer::ExplorerLaunch) -> Result<(), String> {
+    explorer::set_explorer_launch(target).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -103,11 +109,25 @@ async fn open_windows_download() -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            app.get_webview_window("main")
+                .ok_or("Main window is unavailable")?
+                .with_webview(|webview| unsafe {
+                    webview
+                        .controller()
+                        .CoreWebView2()
+                        .and_then(|view| view.Settings())
+                        .and_then(|settings| settings.SetAreDefaultContextMenusEnabled(false))
+                        .expect("Could not disable the default context menu");
+                })?;
+            Ok(())
+        })
         .manage(inject::InjectionState::default())
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
             set_desktop_layout_safe_mode,
+            set_explorer_launch,
             set_folder_sort,
             set_folder_grouping,
             apply_recommended_settings,

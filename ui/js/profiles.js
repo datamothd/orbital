@@ -15,17 +15,17 @@ function importedRows(profile) {
       matching, blocked,
     };
   });
-  for (const { field, picker, label } of folderViews) {
+  for (const { field, picker, title } of explorerChoices) {
     const value = profile[field];
     if (value == null) continue;
     const current = settings[field];
     rows.push({
       field,
-      label: `Default folder ${label}`,
+      label: title,
       current: picker.labelFor(current),
       imported: picker.labelFor(value),
       matching: picker.matches(value, current),
-      blocked: "",
+      blocked: picker.choices.some(choice => picker.matches(choice.value, value)) ? "" : "Unavailable",
     });
   }
   const priority = row => row.matching ? 2 : row.blocked ? 1 : 0;
@@ -74,7 +74,7 @@ byId("export-tweaks").addEventListener("click", async () => {
   if (busy || !settings) return;
   setBusy(true);
   try {
-    if (await invoke("export_tweaks")) showResult("Tweaks exported", "Your enabled and disabled tweaks and current folder sorting and grouping were saved as JSON.");
+    if (await invoke("export_tweaks")) showResult("Tweaks exported", "Your enabled and disabled tweaks, folder views and Explorer starting location were saved as JSON.");
   } catch (error) {
     showResult("Could not export tweaks", String(error));
   } finally {
@@ -100,6 +100,7 @@ byId("import-tweaks").addEventListener("click", async () => {
       disabled_tweaks: (profile.disabled_tweaks || []).filter(field => selected.has(field)),
       folder_sort: selected.has("folder_sort") ? profile.folder_sort : null,
       folder_grouping: selected.has("folder_grouping") ? profile.folder_grouping : null,
+      open_explorer_to: selected.has("open_explorer_to") ? profile.open_explorer_to : null,
     };
     setStatus("Importing tweaks and restarting Explorer…");
     const { changed: count, error, cancelled } = await savePreferences("apply_imported_tweaks", { profile: selection });

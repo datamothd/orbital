@@ -56,7 +56,7 @@
         </div>
       </section>
       <div class="settings-actions" role="group" aria-label="Settings actions">
-        <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Enable recommended settings</button>
+        <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Apply recommended preferences</button>
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
         <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
       </div>
@@ -68,24 +68,24 @@
           </h2>
         </summary>
         <hr class="preferences-divider" aria-hidden="true">
-        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
+        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <h3 class="preference-group">Taskbar</h3>
         <div class="preference" data-preference="taskbar-centering">
           <div>
-            <h3>Taskbar alignment</h3>
-            <p class="preference-description">Choose left or centered taskbar icons.</p>
+            <h3>Center taskbar icons</h3>
+            <p class="preference-description">Centers taskbar icons. Disable to align them to the left.</p>
           </div>
         </div>
         <div class="preference" data-preference="task-view">
           <div>
-            <h3>Hide Task View button</h3>
-            <p class="preference-description">Hides the Task View button on the taskbar. Win+Tab still works.</p>
+            <h3>Show Task View button</h3>
+            <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
           </div>
         </div>
         <div class="preference" data-preference="widgets">
           <div>
-            <h3>Disable Widgets</h3>
-            <p class="preference-description">Disables the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
+            <h3>Allow Widgets</h3>
+            <p class="preference-description">Allows the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
           </div>
         </div>
         <div class="preference" data-preference="taskbar-end-task">
@@ -99,6 +99,39 @@
           <div>
             <h3>Hide shortcut arrow icon</h3>
             <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
+          </div>
+        </div>
+        <h3 class="preference-group">File Explorer · Behavior</h3>
+        <div class="preference folder-view-preference">
+          <div>
+            <h3 id="explorer-launch-label">Open Explorer to</h3>
+            <p class="preference-description">Choose the starting location for new File Explorer windows.</p>
+            <p id="explorer-launch-value" class="preference-value">Loading…</p>
+          </div>
+          <div class="folder-view-controls">
+            <button id="explorer-launch-picker" class="folder-view-picker" role="combobox" aria-labelledby="explorer-launch-label explorer-launch-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="explorer-launch-options" disabled>
+              <span id="explorer-launch-selection">Choose a location</span>
+              <span class="picker-arrow" aria-hidden="true"></span>
+            </button>
+            <button id="explorer-launch-apply" disabled>Apply</button>
+          </div>
+        </div>
+        <div class="preference" data-preference="item-checkboxes">
+          <div>
+            <h3>Show selection checkboxes</h3>
+            <p class="preference-description">Adds checkboxes for selecting files and folders.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="single-click">
+          <div>
+            <h3>Double-click to open items</h3>
+            <p class="preference-description">Requires two clicks to open files and folders. Disable to open with one click.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="confirm-delete">
+          <div>
+            <h3>Confirm before recycling files</h3>
+            <p class="preference-description">Asks for confirmation before moving items to the Recycle Bin.</p>
           </div>
         </div>
         <h3 class="preference-group">File Explorer · Folder views</h3>
@@ -130,54 +163,104 @@
             <button id="folder-grouping-apply" disabled>Apply</button>
           </div>
         </div>
+        <h3 class="preference-group">File Explorer · File visibility</h3>
+        <div class="preference" data-preference="file-extensions">
+          <div>
+            <h3>Hide known file extensions</h3>
+            <p class="preference-description">Hides extensions for known file types, such as .exe, .txt and .png.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="hidden-files">
+          <div>
+            <h3>Show hidden files</h3>
+            <p class="preference-description">Shows hidden files, folders and drives.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="empty-drives">
+          <div>
+            <h3>Hide empty drives</h3>
+            <p class="preference-description">Hides drives when no media is inserted.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="system-files">
+          <div>
+            <h3>Show protected operating system files</h3>
+            <p class="preference-description">Reveals protected system files when Show hidden files is also enabled.</p>
+          </div>
+        </div>
         <h3 class="preference-group">File Explorer · Appearance</h3>
         <div class="preference" data-preference="explorer-spacing">
           <div>
-            <h3>Disable extra spacing</h3>
+            <h3>Use compact spacing</h3>
             <p class="preference-description">Uses compact spacing in File Explorer.</p>
           </div>
         </div>
         <div class="preference" data-preference="modern-context-menu">
           <div>
-            <h3>Disable Windows 11 context menu</h3>
+            <h3>Use classic context menu</h3>
             <p class="preference-description">Requests the classic Windows 10-style right-click menu.</p>
           </div>
         </div>
+        <div class="preference" data-preference="full-path">
+          <div>
+            <h3>Show full path in title bar</h3>
+            <p class="preference-description">Displays the complete folder path in the window title bar.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="icons-only">
+          <div>
+            <h3>Show icons instead of thumbnails</h3>
+            <p class="preference-description">Uses file icons instead of image and video thumbnails.</p>
+          </div>
+        </div>
+        <div class="preference" data-preference="info-tips">
+          <div>
+            <h3>Show hover descriptions</h3>
+            <p class="preference-description">Shows pop-up descriptions when pointing at files and folders.</p>
+          </div>
+        </div>
         <h3 class="preference-group">File Explorer · Navigation pane</h3>
+        <div class="preference" data-preference="libraries">
+          <div>
+            <h3>Show Libraries</h3>
+            <p class="preference-description">Shows Libraries in the navigation pane.</p>
+          </div>
+        </div>
         <div class="preference" data-preference="home-folder">
           <div>
-            <h3>Hide Home folder</h3>
-            <p class="preference-description">Hides Home from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+            <h3>Show Home folder</h3>
+            <p class="preference-description">Shows Home in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
           </div>
         </div>
         <div class="preference" data-preference="gallery">
           <div>
-            <h3>Hide Gallery</h3>
-            <p class="preference-description">Hides Gallery from the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+            <h3>Show Gallery</h3>
+            <p class="preference-description">Shows Gallery in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
           </div>
         </div>
+        <h3 class="preference-group">File Explorer · Home and privacy</h3>
         <div class="preference" data-preference="recent-files">
           <div>
-            <h3>Hide recently used files</h3>
-            <p class="preference-description">Hides recently used files in File Explorer Home or Quick Access.</p>
+            <h3>Show recently used files</h3>
+            <p class="preference-description">Shows recently used files in File Explorer Home or Quick access.</p>
           </div>
         </div>
         <div class="preference" data-preference="recommendations">
           <div>
-            <h3>Hide recommendations</h3>
-            <p class="preference-description">Hides the Recommended section in File Explorer Home.</p>
+            <h3>Show recommendations</h3>
+            <p class="preference-description">Shows the Recommended section in File Explorer Home.</p>
           </div>
         </div>
         <div class="preference" data-preference="frequent-folders">
           <div>
-            <h3>Hide frequently used folders</h3>
-            <p class="preference-description">Hides your most accessed folders in Quick Access.</p>
+            <h3>Show frequently used folders</h3>
+            <p class="preference-description">Shows your most accessed folders in Quick access.</p>
           </div>
         </div>
         <div class="preference" data-preference="office-files">
           <div>
-            <h3>Hide cloud files and account-based recommendations</h3>
-            <p class="preference-description">Hides account and cloud-provider content in File Explorer. Availability depends on your account.</p>
+            <h3>Show cloud files in Quick access</h3>
+            <p class="preference-description">Shows account and cloud-provider content in File Explorer. Availability depends on your account.</p>
           </div>
         </div>
       </details>
@@ -333,6 +416,7 @@
       <circle class="bohr-electron" cx="3" cy="3" r="2"/>
     </svg>
   </template>
+  <div id="explorer-launch-options" class="folder-view-options" role="listbox" aria-labelledby="explorer-launch-label" tabindex="-1" hidden></div>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
   <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
   <div id="answer-preset-options" class="folder-view-options" role="listbox" aria-label="Presets" tabindex="-1" hidden></div>
@@ -359,7 +443,7 @@
     <details id="recommended-options" class="changes-options" hidden open>
       <summary>List of changes</summary>
       <div class="changes-scroll recommendation-scroll">
-        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
+        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
         <div id="recommendation-list" class="changes-list recommendation-list" role="group" aria-label="Recommended changes"></div>
         <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
@@ -389,7 +473,7 @@
     <details id="batch-options" class="changes-options" open>
       <summary>List of changes</summary>
       <div class="changes-scroll recommendation-scroll">
-        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Visual preference</span></p>
+        <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
         <div id="batch-list" class="changes-list recommendation-list" role="group" aria-label="Preference states"></div>
         <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>

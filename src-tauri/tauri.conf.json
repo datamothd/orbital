@@ -3,7 +3,7 @@
   "productName": "Orbital",
   "version": "0.3.1",
   "identifier": "dev.orbital.desktop",
-  "build": { "frontendDist": "../ui" },
+  "build": { "frontendDist": "../ui", "additionalWatchFolders": ["../src", "../Cargo.toml"] },
   "app": {
     "withGlobalTauri": true,
     "windows": [{

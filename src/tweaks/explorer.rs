@@ -2,13 +2,18 @@
 mod desktop_layout;
 #[path = "explorer/folder_views.rs"]
 mod folder_views;
+#[path = "explorer/options.rs"]
+mod options;
 #[path = "explorer/profiles.rs"]
 mod profiles;
+
+pub use options::ExplorerLaunch;
+use options::*;
 
 pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
 pub use profiles::{
     SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
-    toggle_preference,
+    set_explorer_launch, toggle_preference,
 };
 
 use std::os::windows::{
@@ -132,23 +137,38 @@ pub struct ExplorerSettings {
     pub desktop_layout_safe_mode: bool,
     pub folder_sort: Option<FolderSort>,
     pub folder_grouping: Option<FolderGrouping>,
-    pub disable_taskbar_centering: bool,
-    pub hide_task_view: bool,
-    pub disable_widgets: bool,
+    pub center_taskbar_icons: bool,
+    pub show_task_view: bool,
+    pub allow_widgets: bool,
     pub enable_taskbar_end_task: bool,
     pub taskbar_end_task_supported: bool,
-    pub disable_explorer_spacing: bool,
-    pub disable_modern_context_menu: bool,
+    pub use_compact_mode: bool,
+    pub use_classic_context_menu: bool,
     pub windows11_supported: bool,
-    pub hide_recent_files: bool,
-    pub hide_recommendations: bool,
-    pub hide_frequent_folders: bool,
-    pub hide_office_files: bool,
-    pub hide_home_folder: bool,
+    pub show_recent_files: bool,
+    pub show_recommendations: bool,
+    pub show_frequent_folders: bool,
+    pub show_cloud_files: bool,
+    pub show_home_folder: bool,
     pub home_supported: bool,
-    pub hide_gallery: bool,
+    pub show_gallery: bool,
     pub gallery_supported: bool,
     pub hide_shortcut_arrow: Option<bool>,
+    pub hide_file_extensions: bool,
+    pub show_hidden_files: bool,
+    pub show_item_checkboxes: bool,
+    pub show_libraries: bool,
+    pub show_full_path: bool,
+    pub double_click_open: bool,
+    pub hide_empty_drives: bool,
+    pub confirm_file_delete: bool,
+    pub confirm_file_delete_supported: bool,
+    pub icons_only: bool,
+    pub show_info_tips: bool,
+    pub show_system_files: bool,
+    pub open_explorer_to: Option<ExplorerLaunch>,
+    pub explorer_launch_options: Vec<ExplorerLaunch>,
+    pub recommended_preferences: Vec<(Preference, bool)>,
 }
 
 pub fn settings() -> io::Result<ExplorerSettings> {
@@ -162,25 +182,47 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         desktop_layout_safe_mode: desktop_layout_safe_mode_in(HKCU)?,
         folder_sort: folder_views::current_in(HKCU, HKLM)?,
         folder_grouping: folder_views::current_grouping_in(HKCU, HKLM)?,
-        disable_taskbar_centering: DISABLE_TASKBAR_CENTERING.enabled_in(HKCU)?,
-        hide_task_view: HIDE_TASK_VIEW.enabled_in(HKCU)?,
-        disable_widgets: windows11_supported && DISABLE_WIDGETS.enabled_in(HKLM)?,
+        center_taskbar_icons: CENTER_TASKBAR_ICONS.enabled_in(HKCU)?,
+        show_task_view: SHOW_TASK_VIEW.enabled_in(HKCU)?,
+        allow_widgets: windows11_supported && ALLOW_WIDGETS.enabled_in(HKLM)?,
         enable_taskbar_end_task: taskbar_end_task_supported
             && ENABLE_TASKBAR_END_TASK.enabled_in(HKCU)?,
         taskbar_end_task_supported,
-        disable_explorer_spacing: windows11_supported
-            && DISABLE_EXPLORER_SPACING.enabled_in(HKCU)?,
-        disable_modern_context_menu: windows11_supported && classic_context_menu_enabled()?,
+        use_compact_mode: windows11_supported && USE_COMPACT_MODE.enabled_in(HKCU)?,
+        use_classic_context_menu: windows11_supported && classic_context_menu_enabled()?,
         windows11_supported,
-        hide_recent_files: HIDE_RECENT_FILES.enabled_in(HKCU)?,
-        hide_recommendations: windows11_supported && HIDE_RECOMMENDATIONS.enabled_in(HKCU)?,
-        hide_frequent_folders: HIDE_FREQUENT_FOLDERS.enabled_in(HKCU)?,
-        hide_office_files: windows11_supported && HIDE_OFFICE_FILES.enabled_in(HKCU)?,
-        hide_home_folder: home_supported && !namespace_visible_in(HKCU, HKLM, HOME_CLSID)?,
+        show_recent_files: SHOW_RECENT_FILES.enabled_in(HKCU)?,
+        show_recommendations: windows11_supported && SHOW_RECOMMENDATIONS.enabled_in(HKCU)?,
+        show_frequent_folders: SHOW_FREQUENT_FOLDERS.enabled_in(HKCU)?,
+        show_cloud_files: windows11_supported && SHOW_CLOUD_FILES.enabled_in(HKCU)?,
+        show_home_folder: home_supported && namespace_visible_in(HKCU, HKLM, HOME_CLSID)?,
         home_supported,
-        hide_gallery: gallery_supported && !namespace_visible_in(HKCU, HKLM, GALLERY_CLSID)?,
+        show_gallery: gallery_supported && namespace_visible_in(HKCU, HKLM, GALLERY_CLSID)?,
         gallery_supported,
         hide_shortcut_arrow: shortcut_arrows_hidden_in(HKLM, &blank_icon_path()?)?,
+        hide_file_extensions: HIDE_FILE_EXTENSIONS.enabled_in(HKCU)?,
+        show_hidden_files: hidden_files_in(HKCU)?,
+        show_item_checkboxes: SHOW_ITEM_CHECKBOXES.enabled_in(HKCU)?,
+        show_libraries: SHOW_LIBRARIES.enabled_in(HKCU)?,
+        show_full_path: SHOW_FULL_PATH.enabled_in(HKCU)?,
+        double_click_open: shell_state_in(HKCU)?.bytes[4] & 0x20 != 0,
+        hide_empty_drives: HIDE_EMPTY_DRIVES.enabled_in(HKCU)?,
+        confirm_file_delete: confirm_delete_in(HKCU, HKLM)?,
+        confirm_file_delete_supported: read_original(HKLM, POLICIES_KEY, "ConfirmFileDelete")?
+            .is_none(),
+        icons_only: ICONS_ONLY.enabled_in(HKCU)?,
+        show_info_tips: SHOW_INFO_TIPS.enabled_in(HKCU)?,
+        show_system_files: SHOW_SYSTEM_FILES.enabled_in(HKCU)?,
+        open_explorer_to: explorer_launch_in(HKCU)?,
+        explorer_launch_options: launch_options_in(HKCU, build)?,
+        recommended_preferences: Preference::ALL
+            .into_iter()
+            .filter_map(|preference| {
+                preference
+                    .recommended_value()
+                    .map(|enabled| (preference, enabled))
+            })
+            .collect(),
     })
 }
 
@@ -205,19 +247,60 @@ fn confirm(prompt: &str) -> io::Result<bool> {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum Preference {
-    DisableTaskbarCentering,
-    HideTaskView,
-    DisableWidgets,
+    #[serde(alias = "disable_taskbar_centering")]
+    #[command(alias = "disable-taskbar-centering")]
+    CenterTaskbarIcons,
+    #[serde(alias = "hide_task_view")]
+    #[command(alias = "hide-task-view")]
+    ShowTaskView,
+    #[serde(alias = "disable_widgets")]
+    #[command(alias = "disable-widgets")]
+    AllowWidgets,
     EnableTaskbarEndTask,
-    DisableExplorerSpacing,
-    DisableModernContextMenu,
-    HideRecentFiles,
-    HideRecommendations,
-    HideFrequentFolders,
-    HideOfficeFiles,
-    HideHomeFolder,
-    HideGallery,
+    #[serde(alias = "disable_explorer_spacing")]
+    #[command(alias = "disable-explorer-spacing")]
+    UseCompactMode,
+    #[serde(alias = "disable_modern_context_menu")]
+    #[command(alias = "disable-modern-context-menu")]
+    UseClassicContextMenu,
+    #[serde(alias = "hide_recent_files")]
+    #[command(alias = "hide-recent-files")]
+    ShowRecentFiles,
+    #[serde(alias = "hide_recommendations")]
+    #[command(alias = "hide-recommendations")]
+    ShowRecommendations,
+    #[serde(alias = "hide_frequent_folders")]
+    #[command(alias = "hide-frequent-folders")]
+    ShowFrequentFolders,
+    #[serde(alias = "hide_office_files")]
+    #[command(alias = "hide-office-files")]
+    ShowCloudFiles,
+    #[serde(alias = "hide_home_folder")]
+    #[command(alias = "hide-home-folder")]
+    ShowHomeFolder,
+    #[serde(alias = "hide_gallery")]
+    #[command(alias = "hide-gallery")]
+    ShowGallery,
     HideShortcutArrow,
+    #[serde(alias = "show_file_extensions")]
+    #[command(alias = "show-file-extensions")]
+    HideFileExtensions,
+    ShowHiddenFiles,
+    ShowItemCheckboxes,
+    ShowLibraries,
+    ShowFullPath,
+    #[serde(alias = "single_click_open")]
+    #[command(alias = "single-click-open")]
+    DoubleClickOpen,
+    #[serde(alias = "show_empty_drives")]
+    #[command(alias = "show-empty-drives")]
+    HideEmptyDrives,
+    ConfirmFileDelete,
+    IconsOnly,
+    #[serde(alias = "hide_info_tips")]
+    #[command(alias = "hide-info-tips")]
+    ShowInfoTips,
+    ShowSystemFiles,
 }
 
 fn read_toggle(root: &RegKey, path: &str, name: &str, default: bool) -> io::Result<bool> {
@@ -372,82 +455,82 @@ struct DwordPreference {
     name: &'static str,
     path: &'static str,
     value: &'static str,
-    enabled_value: bool,
-    delete_when_disabled: bool,
+    default_value: bool,
+    delete_when_default: bool,
 }
 
-const DISABLE_TASKBAR_CENTERING: DwordPreference = DwordPreference {
-    name: "Disable centered taskbar icons",
+const CENTER_TASKBAR_ICONS: DwordPreference = DwordPreference {
+    name: "Center taskbar icons",
     path: ADVANCED_KEY,
     value: "TaskbarAl",
-    enabled_value: false,
-    delete_when_disabled: false,
+    default_value: true,
+    delete_when_default: false,
 };
-const HIDE_TASK_VIEW: DwordPreference = DwordPreference {
-    name: "Hide Task View button",
+const SHOW_TASK_VIEW: DwordPreference = DwordPreference {
+    name: "Show Task View button",
     path: ADVANCED_KEY,
     value: "ShowTaskViewButton",
-    enabled_value: false,
-    delete_when_disabled: false,
+    default_value: true,
+    delete_when_default: false,
 };
-const DISABLE_WIDGETS: DwordPreference = DwordPreference {
-    name: "Disable Widgets",
+const ALLOW_WIDGETS: DwordPreference = DwordPreference {
+    name: "Allow Widgets",
     path: WIDGETS_KEY,
     value: "AllowNewsAndInterests",
-    enabled_value: false,
-    delete_when_disabled: true,
+    default_value: true,
+    delete_when_default: true,
 };
 const ENABLE_TASKBAR_END_TASK: DwordPreference = DwordPreference {
     name: "Enable taskbar End task",
     path: TASKBAR_DEVELOPER_KEY,
     value: "TaskbarEndTask",
-    enabled_value: true,
-    delete_when_disabled: false,
+    default_value: false,
+    delete_when_default: false,
 };
-const DISABLE_EXPLORER_SPACING: DwordPreference = DwordPreference {
-    name: "Disable extra spacing",
+const USE_COMPACT_MODE: DwordPreference = DwordPreference {
+    name: "Use compact spacing",
     path: ADVANCED_KEY,
     value: "UseCompactMode",
-    enabled_value: true,
-    delete_when_disabled: false,
+    default_value: false,
+    delete_when_default: false,
 };
-const HIDE_RECENT_FILES: DwordPreference = DwordPreference {
-    name: "Hide recently used files",
+const SHOW_RECENT_FILES: DwordPreference = DwordPreference {
+    name: "Show recently used files",
     path: EXPLORER_KEY,
     value: "ShowRecent",
-    enabled_value: false,
-    delete_when_disabled: false,
+    default_value: true,
+    delete_when_default: false,
 };
-const HIDE_RECOMMENDATIONS: DwordPreference = DwordPreference {
-    name: "Hide recommendations",
+const SHOW_RECOMMENDATIONS: DwordPreference = DwordPreference {
+    name: "Show recommendations",
     path: EXPLORER_KEY,
     value: "ShowRecommendations",
-    enabled_value: false,
-    delete_when_disabled: false,
+    default_value: true,
+    delete_when_default: false,
 };
-const HIDE_FREQUENT_FOLDERS: DwordPreference = DwordPreference {
-    name: "Hide frequently used folders",
+const SHOW_FREQUENT_FOLDERS: DwordPreference = DwordPreference {
+    name: "Show frequently used folders",
     path: EXPLORER_KEY,
     value: "ShowFrequent",
-    enabled_value: false,
-    delete_when_disabled: false,
+    default_value: true,
+    delete_when_default: false,
 };
-const HIDE_OFFICE_FILES: DwordPreference = DwordPreference {
-    name: "Hide files from Office.com",
+const SHOW_CLOUD_FILES: DwordPreference = DwordPreference {
+    name: "Show cloud files in Quick access",
     path: EXPLORER_KEY,
     value: "ShowCloudFilesInQuickAccess",
-    enabled_value: false,
-    delete_when_disabled: true,
+    default_value: true,
+    delete_when_default: true,
 };
 
 impl DwordPreference {
     fn enabled_in(&self, root: &RegKey) -> io::Result<bool> {
-        Ok(read_toggle(root, self.path, self.value, !self.enabled_value)? == self.enabled_value)
+        read_toggle(root, self.path, self.value, self.default_value)
     }
 
     fn change_in<'a>(&self, root: &'a RegKey, enabled: bool) -> RegistryChange<'a> {
-        let next_value = u32::from(enabled == self.enabled_value);
-        let value = if !enabled && self.delete_when_disabled {
+        let next_value = u32::from(enabled);
+        let value = if enabled == self.default_value && self.delete_when_default {
             None
         } else {
             Some(next_value.to_reg_value())
@@ -491,17 +574,17 @@ fn settings_changes<'a>(
     windows11: bool,
 ) -> Vec<RegistryChange<'a>> {
     let mut changes: Vec<_> = [
-        &DISABLE_TASKBAR_CENTERING,
-        &DISABLE_EXPLORER_SPACING,
-        &HIDE_RECENT_FILES,
-        &HIDE_RECOMMENDATIONS,
-        &HIDE_FREQUENT_FOLDERS,
+        &CENTER_TASKBAR_ICONS,
+        &USE_COMPACT_MODE,
+        &SHOW_RECENT_FILES,
+        &SHOW_RECOMMENDATIONS,
+        &SHOW_FREQUENT_FOLDERS,
     ]
     .into_iter()
     .map(|preference| preference.change_in(user, true))
     .collect();
     if windows11 {
-        changes.push(HIDE_OFFICE_FILES.change_in(user, true));
+        changes.push(SHOW_CLOUD_FILES.change_in(user, true));
         changes.push(RegistryChange::new(
             user,
             CLASSIC_CONTEXT_MENU_KEY,
@@ -513,11 +596,24 @@ fn settings_changes<'a>(
         }
     }
     changes.push(RegistryChange::new(machine, SHELL_ICONS_KEY, "29", None));
-    changes.push(HIDE_TASK_VIEW.change_in(user, true));
+    changes.push(SHOW_TASK_VIEW.change_in(user, true));
     if windows11 {
-        changes.push(DISABLE_WIDGETS.change_in(machine, true));
+        changes.push(ALLOW_WIDGETS.change_in(machine, true));
         changes.push(ENABLE_TASKBAR_END_TASK.change_in(user, true));
     }
+    changes.extend(
+        OPTIONS
+            .iter()
+            .map(|preference| preference.change_in(user, true)),
+    );
+    changes.push(RegistryChange::new(user, ADVANCED_KEY, "Hidden", None));
+    changes.push(RegistryChange::new(user, EXPLORER_KEY, "ShellState", None));
+    changes.push(RegistryChange::new(
+        user,
+        ADVANCED_KEY,
+        "LaunchTo",
+        Some(ExplorerLaunch::Downloads.value().to_reg_value()),
+    ));
     changes
 }
 
@@ -529,9 +625,22 @@ fn recommended_changes<'a>(
 ) -> io::Result<Vec<RegistryChange<'a>>> {
     let mut changes = settings_changes(user, machine, windows11);
     changes.retain(|change| {
-        !(change.path == ADVANCED_KEY && change.name == "TaskbarAl"
-            || change.path == SHELL_ICONS_KEY && change.name == "29")
+        recommendation(change).is_some() && !(change.path == SHELL_ICONS_KEY && change.name == "29")
     });
+    for change in &mut changes {
+        if matches!(
+            change.name.as_str(),
+            "ShowTaskViewButton"
+                | "AllowNewsAndInterests"
+                | "ShowRecent"
+                | "ShowRecommendations"
+                | "ShowFrequent"
+                | "ShowCloudFilesInQuickAccess"
+                | "HideFileExt"
+        ) {
+            change.value = Some(0u32.to_reg_value());
+        }
+    }
     if windows11 {
         for clsid in [HOME_CLSID, GALLERY_CLSID] {
             if !namespace_supported_in(machine, clsid)?
@@ -545,7 +654,7 @@ fn recommended_changes<'a>(
         changes.retain(|change| {
             !matches!(
                 change.name.as_str(),
-                "UseCompactMode" | "ShowRecommendations"
+                "UseCompactMode" | "ShowRecommendations" | "LaunchTo"
             )
         });
     }
@@ -612,18 +721,22 @@ pub fn save_original_settings() -> io::Result<()> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Recommendation {
-    HideTaskView,
-    DisableWidgets,
+    ShowTaskView,
+    AllowWidgets,
     EnableTaskbarEndTask,
-    DisableExplorerSpacing,
-    DisableModernContextMenu,
-    HideRecentFiles,
-    HideRecommendations,
-    HideFrequentFolders,
-    HideOfficeFiles,
-    HideHomeFolder,
-    HideGallery,
+    UseCompactMode,
+    UseClassicContextMenu,
+    ShowRecentFiles,
+    ShowRecommendations,
+    ShowFrequentFolders,
+    ShowCloudFiles,
+    ShowHomeFolder,
+    ShowGallery,
     HideShortcutArrow,
+    HideFileExtensions,
+    OpenExplorerTo,
+    ShowItemCheckboxes,
+    ShowFullPath,
     FolderSort,
     FolderGrouping,
 }
@@ -640,6 +753,9 @@ pub fn apply_recommended_settings(
     let mut changes = pending_changes(recommended_changes(HKCU, HKLM, windows11, &icon)?)?;
     if !supports_taskbar_end_task(build)? {
         changes.retain(|change| change.name != "TaskbarEndTask");
+    }
+    if build < 22621 {
+        changes.retain(|change| change.name != "LaunchTo");
     }
     changes.retain(|change| recommendation(change).is_some_and(selected));
     let mut view_changes = folder_views::recommended_changes_in(HKCU, HKLM)?;
@@ -673,18 +789,21 @@ pub fn apply_recommended_settings(
 fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {
     use Recommendation::*;
     Some(match change.name.as_str() {
-        "ShowTaskViewButton" => HideTaskView,
-        "AllowNewsAndInterests" => DisableWidgets,
+        "ShowTaskViewButton" => ShowTaskView,
+        "AllowNewsAndInterests" => AllowWidgets,
         "TaskbarEndTask" => EnableTaskbarEndTask,
-        "UseCompactMode" => DisableExplorerSpacing,
-        "ShowRecent" => HideRecentFiles,
-        "ShowRecommendations" => HideRecommendations,
-        "ShowFrequent" => HideFrequentFolders,
-        "ShowCloudFilesInQuickAccess" => HideOfficeFiles,
-        "" if change.path == CLASSIC_CONTEXT_MENU_KEY => DisableModernContextMenu,
+        "UseCompactMode" => UseCompactMode,
+        "ShowRecent" => ShowRecentFiles,
+        "ShowRecommendations" => ShowRecommendations,
+        "ShowFrequent" => ShowFrequentFolders,
+        "ShowCloudFilesInQuickAccess" => ShowCloudFiles,
+        "HideFileExt" => HideFileExtensions,
+        "LaunchTo" => OpenExplorerTo,
+        "FullPath" => ShowFullPath,
+        "" if change.path == CLASSIC_CONTEXT_MENU_KEY => UseClassicContextMenu,
         "29" if change.path == SHELL_ICONS_KEY => HideShortcutArrow,
-        _ if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) => HideHomeFolder,
-        _ if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) => HideGallery,
+        _ if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) => ShowHomeFolder,
+        _ if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) => ShowGallery,
         _ => return None,
     })
 }
@@ -1241,18 +1360,22 @@ mod tests {
     fn dword_preferences_use_applied_polarity_and_restore_their_defaults() {
         let registry = TestRegistry::new();
         for preference in [
-            &DISABLE_TASKBAR_CENTERING,
-            &HIDE_TASK_VIEW,
-            &DISABLE_WIDGETS,
+            &CENTER_TASKBAR_ICONS,
+            &SHOW_TASK_VIEW,
+            &ALLOW_WIDGETS,
             &ENABLE_TASKBAR_END_TASK,
-            &DISABLE_EXPLORER_SPACING,
-            &HIDE_RECENT_FILES,
-            &HIDE_RECOMMENDATIONS,
-            &HIDE_FREQUENT_FOLDERS,
-            &HIDE_OFFICE_FILES,
-        ] {
-            assert!(
-                !preference.enabled_in(&registry.key).unwrap(),
+            &USE_COMPACT_MODE,
+            &SHOW_RECENT_FILES,
+            &SHOW_RECOMMENDATIONS,
+            &SHOW_FREQUENT_FOLDERS,
+            &SHOW_CLOUD_FILES,
+        ]
+        .into_iter()
+        .chain(OPTIONS)
+        {
+            assert_eq!(
+                preference.enabled_in(&registry.key).unwrap(),
+                preference.default_value,
                 "{} default",
                 preference.name
             );
@@ -1267,14 +1390,14 @@ mod tests {
                     preference.name
                 );
                 let key = registry.key.open_subkey(preference.path).unwrap();
-                if !enabled && preference.delete_when_disabled {
+                if enabled == (preference.default_value) && preference.delete_when_default {
                     assert_eq!(
                         key.get_raw_value(preference.value).unwrap_err().kind(),
                         io::ErrorKind::NotFound
                     );
                 } else {
                     let actual: u32 = key.get_value(preference.value).unwrap();
-                    assert_eq!(actual, u32::from(enabled == preference.enabled_value));
+                    assert_eq!(actual, u32::from(enabled));
                 }
             }
         }
@@ -1286,13 +1409,13 @@ mod tests {
         let (key, _) = registry.key.create_subkey(EXPLORER_KEY).unwrap();
         key.set_value("ShowRecent", &0u32).unwrap();
         key.set_value("ShowRecommendations", &1u32).unwrap();
-        assert!(HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
-        assert!(!HIDE_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
-        let changes = [HIDE_RECOMMENDATIONS.change_in(&registry.key, true)];
+        assert!(!SHOW_RECENT_FILES.enabled_in(&registry.key).unwrap());
+        assert!(SHOW_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
+        let changes = [SHOW_RECOMMENDATIONS.change_in(&registry.key, false)];
         let prepared = prepare_changes(&changes).unwrap();
         apply_changes(&changes, &prepared).unwrap();
-        assert!(HIDE_RECENT_FILES.enabled_in(&registry.key).unwrap());
-        assert!(HIDE_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
+        assert!(!SHOW_RECENT_FILES.enabled_in(&registry.key).unwrap());
+        assert!(!SHOW_RECOMMENDATIONS.enabled_in(&registry.key).unwrap());
     }
 
     #[test]
@@ -1313,7 +1436,7 @@ mod tests {
                 Path::new("test-blank.ico"),
             )
             .unwrap();
-            assert_eq!(changes.len(), if windows11 { 16 } else { 4 });
+            assert_eq!(changes.len(), if windows11 { 19 } else { 6 });
             let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
             for alignment in [None, Some(0u32), Some(1u32)] {
                 match alignment {
@@ -1325,13 +1448,13 @@ mod tests {
                 assert_eq!(key.get_value::<u32, _>("TaskbarAl").ok(), alignment);
                 let key = machine.key.open_subkey(SHELL_ICONS_KEY).unwrap();
                 assert_eq!(key.get_value::<String, _>("29").unwrap(), "test-blank.ico");
-                for preference in [&HIDE_RECENT_FILES, &HIDE_FREQUENT_FOLDERS] {
-                    assert!(preference.enabled_in(&user.key).unwrap());
+                for preference in [&SHOW_RECENT_FILES, &SHOW_FREQUENT_FOLDERS] {
+                    assert!(!preference.enabled_in(&user.key).unwrap());
                 }
                 if windows11 {
-                    assert!(DISABLE_EXPLORER_SPACING.enabled_in(&user.key).unwrap());
-                    assert!(HIDE_RECOMMENDATIONS.enabled_in(&user.key).unwrap());
-                    assert!(HIDE_OFFICE_FILES.enabled_in(&user.key).unwrap());
+                    assert!(USE_COMPACT_MODE.enabled_in(&user.key).unwrap());
+                    assert!(!SHOW_RECOMMENDATIONS.enabled_in(&user.key).unwrap());
+                    assert!(!SHOW_CLOUD_FILES.enabled_in(&user.key).unwrap());
                     let key = user.key.open_subkey(CLASSIC_CONTEXT_MENU_KEY).unwrap();
                     assert_eq!(key.get_value::<String, _>("").unwrap(), "");
                     for clsid in [HOME_CLSID, GALLERY_CLSID] {
@@ -1343,20 +1466,102 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_recommendations_preserve_manual_preferences() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let advanced = user.key.create_subkey(ADVANCED_KEY).unwrap().0;
+        advanced.set_value("HideFileExt", &1u32).unwrap();
+        advanced.set_value("LaunchTo", &3u32).unwrap();
+        for value in [0u32, 1] {
+            for name in ["AutoCheckSelect", "IconsOnly", "Hidden"] {
+                advanced.set_value(name, &value).unwrap();
+            }
+            user.key
+                .create_subkey(POLICIES_KEY)
+                .unwrap()
+                .0
+                .set_value("ConfirmFileDelete", &value)
+                .unwrap();
+            let selected = [
+                Recommendation::HideFileExtensions,
+                Recommendation::OpenExplorerTo,
+            ];
+            let mut changes =
+                recommended_changes(&user.key, &machine.key, true, Path::new("unused.ico"))
+                    .unwrap();
+            assert!(!changes.iter().any(|change| matches!(
+                change.name.as_str(),
+                "AutoCheckSelect" | "ConfirmFileDelete" | "IconsOnly" | "Hidden" | "ShellState"
+            )));
+            changes
+                .retain(|change| recommendation(change).is_some_and(|id| selected.contains(&id)));
+            let changes = pending_changes(changes).unwrap();
+            let prepared = prepare_changes(&changes).unwrap();
+            apply_changes(&changes, &prepared).unwrap();
+            assert_eq!(advanced.get_value::<u32, _>("HideFileExt").unwrap(), 0);
+            assert_eq!(
+                explorer_launch_in(&user.key).unwrap(),
+                Some(ExplorerLaunch::Downloads)
+            );
+            for name in ["AutoCheckSelect", "IconsOnly", "Hidden"] {
+                assert_eq!(advanced.get_value::<u32, _>(name).unwrap(), value);
+            }
+            assert!(pending_changes(changes).unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn recommended_dword_values_differ_from_windows_defaults() {
+        for (preference, setting) in [
+            (Preference::ShowTaskView, &SHOW_TASK_VIEW),
+            (Preference::AllowWidgets, &ALLOW_WIDGETS),
+            (Preference::EnableTaskbarEndTask, &ENABLE_TASKBAR_END_TASK),
+            (Preference::UseCompactMode, &USE_COMPACT_MODE),
+            (Preference::ShowRecentFiles, &SHOW_RECENT_FILES),
+            (Preference::ShowRecommendations, &SHOW_RECOMMENDATIONS),
+            (Preference::ShowFrequentFolders, &SHOW_FREQUENT_FOLDERS),
+            (Preference::ShowCloudFiles, &SHOW_CLOUD_FILES),
+            (Preference::HideFileExtensions, &HIDE_FILE_EXTENSIONS),
+            (Preference::ShowFullPath, &SHOW_FULL_PATH),
+        ] {
+            assert_ne!(
+                preference.recommended_value().unwrap(),
+                setting.default_value,
+                "{}",
+                setting.name
+            );
+        }
+        for preference in [
+            Preference::ShowLibraries,
+            Preference::ShowItemCheckboxes,
+            Preference::ConfirmFileDelete,
+            Preference::IconsOnly,
+            Preference::DoubleClickOpen,
+            Preference::HideEmptyDrives,
+            Preference::ShowHiddenFiles,
+            Preference::ShowSystemFiles,
+            Preference::ShowInfoTips,
+            Preference::CenterTaskbarIcons,
+        ] {
+            assert_eq!(preference.recommended_value(), None);
+        }
+    }
+
+    #[test]
     fn completion_counts_preferences_instead_of_registry_values() {
         let mut changes = settings_changes(HKCU, HKLM, true);
         changes.retain(|change| change.name != "TaskbarAl");
-        assert_eq!(changed_preferences(&changes, false).len(), 12);
-        assert_eq!(changed_preferences(&changes, true).len(), 12);
-        let recent = [HIDE_RECENT_FILES.change_in(HKCU, true)];
+        assert_eq!(changed_preferences(&changes, false).len(), 15);
+        assert_eq!(changed_preferences(&changes, true).len(), 15);
+        let recent = [SHOW_RECENT_FILES.change_in(HKCU, true)];
         assert_eq!(
             changed_preferences(&recent, false),
-            [Recommendation::HideRecentFiles]
+            [Recommendation::ShowRecentFiles]
         );
         let home = namespace_changes(HKCU, HKLM, HOME_CLSID, false);
         assert_eq!(
             changed_preferences(&home, false),
-            [Recommendation::HideHomeFolder]
+            [Recommendation::ShowHomeFolder]
         );
         assert!(changed_preferences(&[], false).is_empty());
         assert_eq!(
@@ -1369,6 +1574,7 @@ mod tests {
     fn splitting_recommendations_preserves_original_backup_indices() {
         let names: Vec<_> = settings_changes(HKCU, HKLM, true)
             .into_iter()
+            .take(17)
             .map(|change| change.name)
             .collect();
         assert_eq!(
@@ -1411,8 +1617,8 @@ mod tests {
             .map(|change| read_original(change.root, &change.path, &change.name).unwrap())
             .collect();
         let selected = [
-            Recommendation::HideRecentFiles,
-            Recommendation::HideHomeFolder,
+            Recommendation::ShowRecentFiles,
+            Recommendation::ShowHomeFolder,
         ];
         let mut selected_changes =
             recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
@@ -1422,7 +1628,7 @@ mod tests {
         let prepared = prepare_changes(&selected_changes).unwrap();
         apply_changes(&selected_changes, &prepared).unwrap();
         assert_eq!(changed_preferences(&selected_changes, false), selected);
-        assert!(HIDE_RECENT_FILES.enabled_in(&user.key).unwrap());
+        assert!(!SHOW_RECENT_FILES.enabled_in(&user.key).unwrap());
         assert!(!namespace_visible_in(&user.key, &machine.key, HOME_CLSID).unwrap());
         for (change, original) in changes.iter().zip(originals) {
             if !recommendation(change).is_some_and(|id| selected.contains(&id)) {
