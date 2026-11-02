@@ -270,10 +270,10 @@ async function loadSystem() {
   const info = await invoke("system_info");
   const windowsVersion = info.windows_version.trim().toUpperCase();
   const windows11 = /^Windows 11(?: |$)/i.test(info.os.trim());
-  const testedOs = /^Windows 11 Pro$/i.test(info.os.trim());
-  const testedVersion = windows11 && windowsVersion === "25H2";
-  const release = /^(\d{2})H([12])$/.exec(windowsVersion);
-  const newerWindows11 = windows11 && release !== null && Number(release[1]) > 25;
+  const supportedOs = /^Windows 11 Pro$/i.test(info.os.trim());
+  const supportedVersions = ["25H2", "26H2"];
+  const supportedVersion = windows11 && supportedVersions.includes(windowsVersion);
+  const release = /^\d{2}H[12]$/.test(windowsVersion);
   const rows = [
     ["Host", info.host], ["OS", info.os], ["Windows", info.windows_version],
     ["CPU", info.cpu], ["Threads", info.threads],
@@ -287,25 +287,23 @@ async function loadSystem() {
       description.className = "changes-count";
       description.replaceChildren(byId("changes-count").content.cloneNode(true));
     }
-    const greenCheck = (label === "OS" && testedOs) || (label === "Windows" && testedVersion);
-    const yellowDash = (label === "OS" && windows11 && !testedOs)
-      || (label === "Windows" && windows11 && release !== null && !testedVersion);
+    const greenCheck = (label === "OS" && supportedOs) || (label === "Windows" && supportedVersion);
+    const yellowDash = (label === "OS" && windows11 && !supportedOs)
+      || (label === "Windows" && windows11 && release && !supportedVersion);
     const redCross = label === "OS" && !windows11;
     if (greenCheck || yellowDash || redCross) {
       const check = document.createElement("span");
       check.className = greenCheck ? "tested-system-check" : yellowDash ? "older-system-dash" : "unsupported-system-cross";
       check.textContent = greenCheck ? "✓" : yellowDash ? "−" : "✕";
       check.title = label === "OS"
-        ? testedOs
-          ? "Matches the tested OS edition: Windows 11 Pro"
+        ? supportedOs
+          ? "Supported OS edition: Windows 11 Pro"
           : windows11
-            ? "Different Windows 11 edition! Features are tested on Windows 11 Pro"
-            : "Different Windows operating system! Features are tested on Windows 11 Pro"
+            ? "Different Windows 11 edition. Orbital supports Windows 11 Pro."
+            : "Unsupported Windows operating system. Orbital supports Windows 11 Pro."
         : greenCheck
-          ? "Matches the tested Windows version: 25H2"
-          : newerWindows11
-            ? "Windows version is newer than recommended. Features are tested on version 25H2"
-            : "Windows version is older than recommended. Features are tested on version 25H2";
+          ? `Supported Windows version: ${windowsVersion}`
+          : `Unsupported Windows version. Orbital supports ${supportedVersions.join(" and ")}.`;
       check.setAttribute("role", "img");
       check.setAttribute("aria-label", check.title);
       description.append(check);

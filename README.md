@@ -8,7 +8,7 @@ The idea comes from frustration with existing Windows configuration tools that r
 
 The Inject page adds an autounattend.xml answer file to a Windows installation ISO. Windows PE customization and bundling the Orbital CLI for post-install configuration are planned for a future update.
 
-Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the future.
+Supports Windows 11 Pro, versions 25H2 and 26H2.
 
 ## Current features
 
@@ -23,11 +23,10 @@ Intended for use on Windows 11 Pro on 25H2, with possible 26H2 support in the fu
 ## Planned features
 - Orbital CLI integration in installation images
 - More preferences, especially tailoring to security and performance
-- 26H2 support (as soon as I even get the update offered, thanks Windows).
 
 ## Basic setup
 
-Use Windows. The current code reads the Windows registry directly, and the taskbar tweak is intended for Windows 11 Pro on 25H2.
+Use Windows 11 Pro, version 25H2 or 26H2. The current code reads the Windows registry directly.
 
 1. [Install Rust using rustup](https://rust-lang.org/tools/install/). Follow the installer prompts, including the Visual Studio C++ Build Tools setup if needed.
 2. Download or clone this repository.
