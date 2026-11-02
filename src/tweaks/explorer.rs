@@ -10,7 +10,7 @@ mod profiles;
 pub use options::ExplorerLaunch;
 use options::*;
 
-pub use folder_views::{FolderGrouping, FolderSort, SortColumn};
+pub use folder_views::{FolderGrouping, FolderSort, FolderView, SortColumn};
 pub use profiles::{
     SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
     set_explorer_launch, toggle_preference,
@@ -136,9 +136,11 @@ pub struct ExplorerSettings {
     pub is_administrator: bool,
     pub desktop_layout_safe_mode: bool,
     pub folder_sort: Option<FolderSort>,
+    pub folder_view: Option<FolderView>,
     pub folder_grouping: Option<FolderGrouping>,
     pub center_taskbar_icons: bool,
     pub show_task_view: bool,
+    pub show_taskbar_flashing: bool,
     pub allow_widgets: bool,
     pub enable_taskbar_end_task: bool,
     pub taskbar_end_task_supported: bool,
@@ -166,6 +168,7 @@ pub struct ExplorerSettings {
     pub icons_only: bool,
     pub show_info_tips: bool,
     pub show_system_files: bool,
+    pub restore_folder_windows: bool,
     pub open_explorer_to: Option<ExplorerLaunch>,
     pub explorer_launch_options: Vec<ExplorerLaunch>,
     pub recommended_preferences: Vec<(Preference, bool)>,
@@ -181,9 +184,11 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         is_administrator: is_administrator()?,
         desktop_layout_safe_mode: desktop_layout_safe_mode_in(HKCU)?,
         folder_sort: folder_views::current_in(HKCU, HKLM)?,
+        folder_view: folder_views::current_mode_in(HKCU, HKLM)?,
         folder_grouping: folder_views::current_grouping_in(HKCU, HKLM)?,
         center_taskbar_icons: CENTER_TASKBAR_ICONS.enabled_in(HKCU)?,
         show_task_view: SHOW_TASK_VIEW.enabled_in(HKCU)?,
+        show_taskbar_flashing: SHOW_TASKBAR_FLASHING.enabled_in(HKCU)?,
         allow_widgets: windows11_supported && ALLOW_WIDGETS.enabled_in(HKLM)?,
         enable_taskbar_end_task: taskbar_end_task_supported
             && ENABLE_TASKBAR_END_TASK.enabled_in(HKCU)?,
@@ -213,6 +218,7 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         icons_only: ICONS_ONLY.enabled_in(HKCU)?,
         show_info_tips: SHOW_INFO_TIPS.enabled_in(HKCU)?,
         show_system_files: SHOW_SYSTEM_FILES.enabled_in(HKCU)?,
+        restore_folder_windows: RESTORE_FOLDER_WINDOWS.enabled_in(HKCU)?,
         open_explorer_to: explorer_launch_in(HKCU)?,
         explorer_launch_options: launch_options_in(HKCU, build)?,
         recommended_preferences: Preference::ALL
@@ -253,6 +259,7 @@ pub enum Preference {
     #[serde(alias = "hide_task_view")]
     #[command(alias = "hide-task-view")]
     ShowTaskView,
+    ShowTaskbarFlashing,
     #[serde(alias = "disable_widgets")]
     #[command(alias = "disable-widgets")]
     AllowWidgets,
@@ -301,6 +308,7 @@ pub enum Preference {
     #[command(alias = "hide-info-tips")]
     ShowInfoTips,
     ShowSystemFiles,
+    RestoreFolderWindows,
 }
 
 fn read_toggle(root: &RegKey, path: &str, name: &str, default: bool) -> io::Result<bool> {
@@ -473,6 +481,13 @@ const SHOW_TASK_VIEW: DwordPreference = DwordPreference {
     default_value: true,
     delete_when_default: false,
 };
+const SHOW_TASKBAR_FLASHING: DwordPreference = DwordPreference {
+    name: "Show flashing on taskbar apps",
+    path: ADVANCED_KEY,
+    value: "TaskbarFlashing",
+    default_value: true,
+    delete_when_default: false,
+};
 const ALLOW_WIDGETS: DwordPreference = DwordPreference {
     name: "Allow Widgets",
     path: WIDGETS_KEY,
@@ -604,6 +619,7 @@ fn settings_changes<'a>(
     changes.extend(
         OPTIONS
             .iter()
+            .filter(|preference| preference.value != "PersistBrowsers")
             .map(|preference| preference.change_in(user, true)),
     );
     changes.push(RegistryChange::new(user, ADVANCED_KEY, "Hidden", None));
@@ -614,6 +630,8 @@ fn settings_changes<'a>(
         "LaunchTo",
         Some(ExplorerLaunch::Downloads.value().to_reg_value()),
     ));
+    changes.push(RESTORE_FOLDER_WINDOWS.change_in(user, true));
+    changes.push(SHOW_TASKBAR_FLASHING.change_in(user, true));
     changes
 }
 
@@ -631,6 +649,7 @@ fn recommended_changes<'a>(
         if matches!(
             change.name.as_str(),
             "ShowTaskViewButton"
+                | "TaskbarFlashing"
                 | "AllowNewsAndInterests"
                 | "ShowRecent"
                 | "ShowRecommendations"
@@ -654,7 +673,7 @@ fn recommended_changes<'a>(
         changes.retain(|change| {
             !matches!(
                 change.name.as_str(),
-                "UseCompactMode" | "ShowRecommendations" | "LaunchTo"
+                "UseCompactMode" | "ShowRecommendations" | "LaunchTo" | "TaskbarFlashing"
             )
         });
     }
@@ -722,6 +741,7 @@ pub fn save_original_settings() -> io::Result<()> {
 #[serde(rename_all = "snake_case")]
 pub enum Recommendation {
     ShowTaskView,
+    ShowTaskbarFlashing,
     AllowWidgets,
     EnableTaskbarEndTask,
     UseCompactMode,
@@ -739,6 +759,7 @@ pub enum Recommendation {
     ShowFullPath,
     FolderSort,
     FolderGrouping,
+    FolderView,
 }
 
 pub fn apply_recommended_settings(
@@ -760,6 +781,7 @@ pub fn apply_recommended_settings(
     changes.retain(|change| recommendation(change).is_some_and(selected));
     let mut view_changes = folder_views::recommended_changes_in(HKCU, HKLM)?;
     let view_id = |change: &folder_views::ViewChange| match change {
+        folder_views::ViewChange::Mode(_) => Recommendation::FolderView,
         folder_views::ViewChange::Sort(_) => Recommendation::FolderSort,
         folder_views::ViewChange::Grouping(_) => Recommendation::FolderGrouping,
     };
@@ -790,20 +812,21 @@ fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {
     use Recommendation::*;
     Some(match change.name.as_str() {
         "ShowTaskViewButton" => ShowTaskView,
+        "TaskbarFlashing" => ShowTaskbarFlashing,
         "AllowNewsAndInterests" => AllowWidgets,
         "TaskbarEndTask" => EnableTaskbarEndTask,
         "UseCompactMode" => UseCompactMode,
+        "LaunchTo" => OpenExplorerTo,
+        "" if change.path == CLASSIC_CONTEXT_MENU_KEY => UseClassicContextMenu,
+        _ if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) => ShowHomeFolder,
+        _ if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) => ShowGallery,
         "ShowRecent" => ShowRecentFiles,
         "ShowRecommendations" => ShowRecommendations,
         "ShowFrequent" => ShowFrequentFolders,
         "ShowCloudFilesInQuickAccess" => ShowCloudFiles,
         "HideFileExt" => HideFileExtensions,
-        "LaunchTo" => OpenExplorerTo,
         "FullPath" => ShowFullPath,
-        "" if change.path == CLASSIC_CONTEXT_MENU_KEY => UseClassicContextMenu,
         "29" if change.path == SHELL_ICONS_KEY => HideShortcutArrow,
-        _ if change.name == HOME_CLSID || change.path.ends_with(HOME_CLSID) => ShowHomeFolder,
-        _ if change.name == GALLERY_CLSID || change.path.ends_with(GALLERY_CLSID) => ShowGallery,
         _ => return None,
     })
 }
@@ -863,6 +886,13 @@ pub fn restore_original_settings() -> io::Result<bool> {
         views_restored,
     )?;
     Ok(true)
+}
+
+pub fn set_folder_view(view: FolderView) -> io::Result<()> {
+    folder_views::apply_in(HKCU, HKLM, &[folder_views::ViewChange::Mode(view)], || {
+        Ok(())
+    })?;
+    restart_explorer("Folder view", false, true)
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
@@ -1362,6 +1392,7 @@ mod tests {
         for preference in [
             &CENTER_TASKBAR_ICONS,
             &SHOW_TASK_VIEW,
+            &SHOW_TASKBAR_FLASHING,
             &ALLOW_WIDGETS,
             &ENABLE_TASKBAR_END_TASK,
             &USE_COMPACT_MODE,
@@ -1436,7 +1467,7 @@ mod tests {
                 Path::new("test-blank.ico"),
             )
             .unwrap();
-            assert_eq!(changes.len(), if windows11 { 19 } else { 6 });
+            assert_eq!(changes.len(), if windows11 { 20 } else { 6 });
             let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
             for alignment in [None, Some(0u32), Some(1u32)] {
                 match alignment {
@@ -1471,7 +1502,7 @@ mod tests {
         let machine = TestRegistry::new();
         let advanced = user.key.create_subkey(ADVANCED_KEY).unwrap().0;
         advanced.set_value("HideFileExt", &1u32).unwrap();
-        advanced.set_value("LaunchTo", &3u32).unwrap();
+        advanced.set_value("LaunchTo", &1u32).unwrap();
         for value in [0u32, 1] {
             for name in ["AutoCheckSelect", "IconsOnly", "Hidden"] {
                 advanced.set_value(name, &value).unwrap();
@@ -1482,10 +1513,7 @@ mod tests {
                 .0
                 .set_value("ConfirmFileDelete", &value)
                 .unwrap();
-            let selected = [
-                Recommendation::HideFileExtensions,
-                Recommendation::OpenExplorerTo,
-            ];
+            let selected = [Recommendation::HideFileExtensions];
             let mut changes =
                 recommended_changes(&user.key, &machine.key, true, Path::new("unused.ico"))
                     .unwrap();
@@ -1501,7 +1529,7 @@ mod tests {
             assert_eq!(advanced.get_value::<u32, _>("HideFileExt").unwrap(), 0);
             assert_eq!(
                 explorer_launch_in(&user.key).unwrap(),
-                Some(ExplorerLaunch::Downloads)
+                Some(ExplorerLaunch::ThisPc)
             );
             for name in ["AutoCheckSelect", "IconsOnly", "Hidden"] {
                 assert_eq!(advanced.get_value::<u32, _>(name).unwrap(), value);
@@ -1511,12 +1539,52 @@ mod tests {
     }
 
     #[test]
+    fn taskbar_flashing_recommendation_disables_and_preserves_original_state() {
+        for enabled in [false, true] {
+            let user = TestRegistry::new();
+            let machine = TestRegistry::new();
+            let original = SHOW_TASKBAR_FLASHING.change_in(&user.key, enabled);
+            let prepared = prepare_changes(std::slice::from_ref(&original)).unwrap();
+            apply_changes(&[original], &prepared).unwrap();
+            let backup = original_settings_in(&user.key, &machine.key, true).unwrap();
+            let changes =
+                recommended_changes(&user.key, &machine.key, true, Path::new("blank.ico")).unwrap();
+            let changes: Vec<_> = pending_changes(changes)
+                .unwrap()
+                .into_iter()
+                .filter(|change| {
+                    recommendation(change) == Some(Recommendation::ShowTaskbarFlashing)
+                })
+                .collect();
+            assert_eq!(changes.len(), usize::from(enabled));
+            let prepared = prepare_changes(&changes).unwrap();
+            apply_changes(&changes, &prepared).unwrap();
+            assert!(!SHOW_TASKBAR_FLASHING.enabled_in(&user.key).unwrap());
+            let original: Vec<_> = original_changes(&user.key, &machine.key, &backup)
+                .unwrap()
+                .into_iter()
+                .filter(|change| change.name == "TaskbarFlashing")
+                .collect();
+            let prepared = prepare_changes(&original).unwrap();
+            apply_changes(&original, &prepared).unwrap();
+            assert_eq!(
+                SHOW_TASKBAR_FLASHING.enabled_in(&user.key).unwrap(),
+                enabled
+            );
+            assert_eq!(
+                Preference::ShowTaskbarFlashing.recommended_value(),
+                Some(false)
+            );
+        }
+    }
+
+    #[test]
     fn recommended_dword_values_differ_from_windows_defaults() {
         for (preference, setting) in [
             (Preference::ShowTaskView, &SHOW_TASK_VIEW),
+            (Preference::ShowTaskbarFlashing, &SHOW_TASKBAR_FLASHING),
             (Preference::AllowWidgets, &ALLOW_WIDGETS),
             (Preference::EnableTaskbarEndTask, &ENABLE_TASKBAR_END_TASK),
-            (Preference::UseCompactMode, &USE_COMPACT_MODE),
             (Preference::ShowRecentFiles, &SHOW_RECENT_FILES),
             (Preference::ShowRecommendations, &SHOW_RECOMMENDATIONS),
             (Preference::ShowFrequentFolders, &SHOW_FREQUENT_FOLDERS),
@@ -1551,8 +1619,8 @@ mod tests {
     fn completion_counts_preferences_instead_of_registry_values() {
         let mut changes = settings_changes(HKCU, HKLM, true);
         changes.retain(|change| change.name != "TaskbarAl");
-        assert_eq!(changed_preferences(&changes, false).len(), 15);
-        assert_eq!(changed_preferences(&changes, true).len(), 15);
+        assert_eq!(changed_preferences(&changes, false).len(), 16);
+        assert_eq!(changed_preferences(&changes, true).len(), 16);
         let recent = [SHOW_RECENT_FILES.change_in(HKCU, true)];
         assert_eq!(
             changed_preferences(&recent, false),
@@ -1618,7 +1686,7 @@ mod tests {
             .collect();
         let selected = [
             Recommendation::ShowRecentFiles,
-            Recommendation::ShowHomeFolder,
+            Recommendation::ShowFrequentFolders,
         ];
         let mut selected_changes =
             recommended_changes(&user.key, &machine.key, true, Path::new("test-blank.ico"))
@@ -1629,7 +1697,7 @@ mod tests {
         apply_changes(&selected_changes, &prepared).unwrap();
         assert_eq!(changed_preferences(&selected_changes, false), selected);
         assert!(!SHOW_RECENT_FILES.enabled_in(&user.key).unwrap());
-        assert!(!namespace_visible_in(&user.key, &machine.key, HOME_CLSID).unwrap());
+        assert!(!SHOW_FREQUENT_FOLDERS.enabled_in(&user.key).unwrap());
         for (change, original) in changes.iter().zip(originals) {
             if !recommendation(change).is_some_and(|id| selected.contains(&id)) {
                 assert_eq!(
@@ -1655,21 +1723,6 @@ mod tests {
                 .unwrap();
         let prepared = prepare_changes(&changes).unwrap();
         apply_changes(&changes, &prepared).unwrap();
-        for clsid in [HOME_CLSID, GALLERY_CLSID] {
-            let (_, non_enum, hidden) = namespace_paths(clsid);
-            machine
-                .key
-                .open_subkey_with_flags(non_enum, KEY_SET_VALUE)
-                .unwrap()
-                .delete_value(clsid)
-                .unwrap();
-            machine
-                .key
-                .open_subkey_with_flags(hidden, KEY_SET_VALUE)
-                .unwrap()
-                .delete_value("HiddenByDefault")
-                .unwrap();
-        }
         let machine_readonly = HKCU
             .open_subkey_with_flags(&machine.path, KEY_QUERY_VALUE)
             .unwrap();

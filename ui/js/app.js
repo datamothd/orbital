@@ -32,20 +32,22 @@ const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
+  { id: "taskbar-flashing", field: "show_taskbar_flashing", apply: "Allow taskbar app icons to flash when they need your attention?", restore: "Stop taskbar app icons from flashing for attention?", supported: "windows11_supported" },
+  { id: "restore-folder-windows", field: "restore_folder_windows", apply: "Restore previous folder windows when you sign in?", restore: "Stop restoring folder windows at sign-in?" },
   { id: "taskbar-centering", field: "center_taskbar_icons", apply: "Center taskbar icons?", restore: "Align taskbar icons to the left?", supported: "windows11_supported" },
   { id: "task-view", field: "show_task_view", apply: "Show the Task View button?", restore: "Hide the Task View button? Win+Tab will still work." },
   { id: "widgets", field: "allow_widgets", apply: "Allow Widgets, including the widgets board and taskbar content?", restore: "Disable Widgets?", supported: "windows11_supported", requiresAdmin: true },
   { id: "taskbar-end-task", field: "enable_taskbar_end_task", apply: "Add End task to app menus on the taskbar? It force-closes apps and can discard unsaved work.", restore: "Remove End task from app menus on the taskbar?", supported: "taskbar_end_task_supported" },
-  { id: "explorer-spacing", field: "use_compact_mode", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
-  { id: "modern-context-menu", field: "use_classic_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
+  { id: "explorer-spacing", personal: false, field: "use_compact_mode", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
+  { id: "modern-context-menu", personal: false, field: "use_classic_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
   { id: "recent-files", field: "show_recent_files", apply: "Show recently used files in File Explorer Home?", restore: "Hide recently used files in File Explorer Home?" },
   { id: "recommendations", field: "show_recommendations", apply: "Show the Recommended section in File Explorer Home?", restore: "Hide the Recommended section in File Explorer Home?", supported: "windows11_supported" },
   { id: "frequent-folders", field: "show_frequent_folders", apply: "Show frequently used folders in Quick access?", restore: "Hide frequently used folders in Quick access?" },
   { id: "office-files", field: "show_cloud_files", apply: "Allow cloud files and account-based recommendations in File Explorer?", restore: "Hide cloud files and account-based recommendations in File Explorer?", supported: "windows11_supported" },
-  { id: "home-folder", field: "show_home_folder", apply: "Show Home in the navigation pane?", restore: "Hide Home in the navigation pane?", supported: "home_supported", requiresAdmin: true },
-  { id: "gallery", field: "show_gallery", apply: "Show Gallery in the navigation pane?", restore: "Hide Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true },
+  { id: "home-folder", personal: true, field: "show_home_folder", apply: "Show Home in the navigation pane?", restore: "Hide Home in the navigation pane?", supported: "home_supported", requiresAdmin: true },
+  { id: "gallery", personal: true, field: "show_gallery", apply: "Show Gallery in the navigation pane?", restore: "Hide Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true },
   { id: "file-extensions", field: "hide_file_extensions", apply: "Hide known file extensions?", restore: "Show file extensions?" },
-  { id: "hidden-files", field: "show_hidden_files", apply: "Show hidden files, folders and drives?", restore: "Hide hidden files, folders and drives?" },
+  { id: "hidden-files", personal: false, field: "show_hidden_files", apply: "Show hidden files, folders and drives?", restore: "Hide hidden files, folders and drives?" },
   { id: "item-checkboxes", field: "show_item_checkboxes", apply: "Show selection checkboxes?", restore: "Hide selection checkboxes?" },
   { id: "libraries", field: "show_libraries", apply: "Show Libraries in the navigation pane?", restore: "Hide Libraries in the navigation pane?" },
   { id: "full-path", field: "show_full_path", apply: "Show the full folder path in the title bar?", restore: "Hide the full folder path in the title bar?" },
@@ -59,9 +61,10 @@ const explorerPreferences = [
 ];
 
 const explorerChoices = [
-  { id: "explorer-launch", picker: explorerLaunch, field: "open_explorer_to", command: "set_explorer_launch", argument: "target", label: "starting location", recommendedValue: "downloads", recommendation: "Open Explorer to Downloads" },
-  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
-  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", recommendedValue: "none", recommendation: "Set folder grouping to None" },
+  { id: "folder-view", picker: folderView, field: "folder_view", command: "set_folder_view", argument: "view", label: "view", personal: true, recommendedValue: "details", recommendation: "Set default folder view to Details" },
+  { id: "explorer-launch", picker: explorerLaunch, field: "open_explorer_to", command: "set_explorer_launch", argument: "target", label: "starting location", personal: true, recommendedValue: "downloads", recommendation: "Open Explorer to Downloads" },
+  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", personal: true, recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
+  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", personal: true, recommendedValue: "none", recommendation: "Set folder grouping to None" },
 ];
 
 function preferenceRecommendation(preference) {
@@ -70,6 +73,10 @@ function preferenceRecommendation(preference) {
 
 function preferenceRecommended(preference) {
   return preferenceRecommendation(preference) !== undefined;
+}
+
+function preferencePersonal(preference) {
+  return preference.personal ?? !preferenceRecommended(preference);
 }
 
 function preferenceAvailable(preference) {
@@ -210,14 +217,14 @@ function renderSettings() {
   });
   for (const view of explorerChoices) {
     view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
-    byId(`${view.id}-value`).dataset.state = view.recommendedValue === undefined ? "visual" : !settings ? "other"
+    byId(`${view.id}-value`).dataset.state = view.personal || view.recommendedValue === undefined ? "visual" : !settings ? "other"
       : view.picker.matches(view.recommendedValue, settings[view.field]) ? "enabled" : "disabled";
   }
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, preferenceAvailable(preference)
       ? preferenceValue(preference, settings[preference.field]) : "Unavailable",
-      !preferenceRecommended(preference));
-    if (preferenceAvailable(preference) && preferenceRecommended(preference) && settings[preference.field] !== null) {
+      preferencePersonal(preference));
+    if (preferenceAvailable(preference) && preferenceRecommended(preference) && !preferencePersonal(preference) && settings[preference.field] !== null) {
       byId(preference.id).dataset.state = settings[preference.field] === preferenceRecommendation(preference) ? "enabled" : "disabled";
     }
   }
@@ -382,7 +389,7 @@ function confirmChange(description, title = "Change preference?", recommendation
     const preference = explorerPreferences.find(preference => preference.field === id);
     const view = explorerChoices.find(view => view.field === id);
     const { row, text } = createChangeRow(id, preference ? `${preference.label} · ${preferenceValue(preference, preferenceRecommendation(preference))}` : view.recommendation,
-      (preference || view).description);
+      (preference || view).description, preference ? preferencePersonal(preference) : Boolean(view.personal));
     if (preference?.requiresAdmin) text.append(adminWarning());
     return row;
   }));
@@ -463,8 +470,8 @@ async function applyChange(command, args, description, skipConfirmation = false,
     }
     if (!skip && !await confirmChange(description, recommended ? "Recommended preferences" : reverting ? "Revert preferences?" : undefined, recommendations,
       reverting ? "If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved. Windows Explorer will restart to apply this change."
-        : recommendations.some(field => field === "folder_sort" || field === "folder_grouping")
-          ? "Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Windows Explorer will restart to apply these changes." : undefined)) return;
+        : recommendations.some(field => field === "folder_view" || field === "folder_sort" || field === "folder_grouping")
+          ? "Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Windows Explorer will restart to apply these changes." : undefined)) return;
     if (recommended) {
       args.selected = skip ? recommendations : selectedValues("recommendation-list");
       if (!args.selected.length || missingAdminCount(args.selected)) return;

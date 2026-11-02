@@ -98,6 +98,7 @@ byId("import-tweaks").addEventListener("click", async () => {
       ...profile,
       tweaks: profile.tweaks.filter(field => selected.has(field)),
       disabled_tweaks: (profile.disabled_tweaks || []).filter(field => selected.has(field)),
+      folder_view: selected.has("folder_view") ? profile.folder_view : null,
       folder_sort: selected.has("folder_sort") ? profile.folder_sort : null,
       folder_grouping: selected.has("folder_grouping") ? profile.folder_grouping : null,
       open_explorer_to: selected.has("open_explorer_to") ? profile.open_explorer_to : null,

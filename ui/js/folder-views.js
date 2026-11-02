@@ -169,3 +169,9 @@ const explorerLaunch = createFolderPicker("explorer-launch", () => {
   return (settings?.explorer_launch_options || []).map(value => ({ value, label: labels[value] }));
 }, "Choose a location", "Custom or unavailable location");
 explorerLaunch.labelFor = value => explorerLaunchLabels()[value] || "Custom or unavailable location";
+
+const folderView = createFolderPicker("folder-view", [
+  ["details", "Details"], ["list", "List"], ["tiles", "Tiles"], ["content", "Content"],
+  ["small_icons", "Small icons"], ["medium_icons", "Medium icons"],
+  ["large_icons", "Large icons"], ["extra_large_icons", "Extra large icons"],
+].map(([value, label]) => ({ value, label })), "Choose a view", "Windows defaults or mixed views");

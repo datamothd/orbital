@@ -8,6 +8,8 @@ pub struct TweakProfile {
     pub tweaks: Vec<Preference>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub disabled_tweaks: Vec<Preference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_view: Option<FolderView>,
     pub folder_sort: Option<FolderSort>,
     pub folder_grouping: Option<FolderGrouping>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -75,6 +77,7 @@ impl TweakProfile {
     fn change_count(&self) -> usize {
         self.tweaks.len()
             + self.disabled_tweaks.len()
+            + usize::from(self.folder_view.is_some())
             + usize::from(self.folder_sort.is_some())
             + usize::from(self.folder_grouping.is_some())
             + usize::from(self.open_explorer_to.is_some())
@@ -87,6 +90,9 @@ impl TweakProfile {
         for (tweaks, enabled) in [(&mut self.tweaks, true), (&mut self.disabled_tweaks, false)] {
             tweaks.retain(|tweak| tweak.state(current) != Some(enabled));
         }
+        self.folder_view = self
+            .folder_view
+            .filter(|view| current.folder_view != Some(*view));
         self.folder_sort = self
             .folder_sort
             .filter(|sort| current.folder_sort != Some(*sort));
@@ -97,9 +103,10 @@ impl TweakProfile {
 }
 
 impl Preference {
-    pub(super) const ALL: [Self; 24] = [
+    pub(super) const ALL: [Self; 26] = [
         Self::CenterTaskbarIcons,
         Self::ShowTaskView,
+        Self::ShowTaskbarFlashing,
         Self::AllowWidgets,
         Self::EnableTaskbarEndTask,
         Self::UseCompactMode,
@@ -122,12 +129,14 @@ impl Preference {
         Self::IconsOnly,
         Self::ShowInfoTips,
         Self::ShowSystemFiles,
+        Self::RestoreFolderWindows,
     ];
 
     fn name(self) -> &'static str {
         match self {
             Self::CenterTaskbarIcons => CENTER_TASKBAR_ICONS.name,
             Self::ShowTaskView => SHOW_TASK_VIEW.name,
+            Self::ShowTaskbarFlashing => SHOW_TASKBAR_FLASHING.name,
             Self::AllowWidgets => ALLOW_WIDGETS.name,
             Self::EnableTaskbarEndTask => ENABLE_TASKBAR_END_TASK.name,
             Self::UseCompactMode => USE_COMPACT_MODE.name,
@@ -150,6 +159,7 @@ impl Preference {
             Self::IconsOnly => ICONS_ONLY.name,
             Self::ShowInfoTips => SHOW_INFO_TIPS.name,
             Self::ShowSystemFiles => SHOW_SYSTEM_FILES.name,
+            Self::RestoreFolderWindows => RESTORE_FOLDER_WINDOWS.name,
         }
     }
 
@@ -157,6 +167,7 @@ impl Preference {
         Some(match self {
             Self::CenterTaskbarIcons => current.center_taskbar_icons,
             Self::ShowTaskView => current.show_task_view,
+            Self::ShowTaskbarFlashing => current.show_taskbar_flashing,
             Self::AllowWidgets => current.allow_widgets,
             Self::EnableTaskbarEndTask => current.enable_taskbar_end_task,
             Self::UseCompactMode => current.use_compact_mode,
@@ -179,6 +190,7 @@ impl Preference {
             Self::IconsOnly => current.icons_only,
             Self::ShowInfoTips => current.show_info_tips,
             Self::ShowSystemFiles => current.show_system_files,
+            Self::RestoreFolderWindows => current.restore_folder_windows,
         })
     }
 
@@ -188,7 +200,8 @@ impl Preference {
             Self::ConfirmFileDelete => current.confirm_file_delete_supported,
             Self::ShowHomeFolder => current.home_supported,
             Self::ShowGallery => current.gallery_supported,
-            Self::AllowWidgets
+            Self::ShowTaskbarFlashing
+            | Self::AllowWidgets
             | Self::CenterTaskbarIcons
             | Self::UseCompactMode
             | Self::ShowRecommendations
@@ -227,6 +240,7 @@ impl Preference {
     pub(super) fn recommended_value(self) -> Option<bool> {
         match self {
             Self::ShowTaskView
+            | Self::ShowTaskbarFlashing
             | Self::AllowWidgets
             | Self::ShowRecentFiles
             | Self::ShowRecommendations
@@ -259,6 +273,7 @@ fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
         version: 4,
         tweaks,
         disabled_tweaks,
+        folder_view: current.folder_view,
         folder_sort: current.folder_sort,
         folder_grouping: current.folder_grouping,
         open_explorer_to: current
@@ -305,6 +320,7 @@ fn batch_profile(
                         }
                     }
                 }
+                profile.folder_view = Some(FolderView::Details);
                 profile.folder_sort = Some(FolderSort {
                     column: SortColumn::Type,
                     descending: false,
@@ -338,6 +354,9 @@ pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
             println!("  - {}: {state}", preference.name());
         }
     }
+    if profile.folder_view.is_some() {
+        println!("  - Set default folder view to Details");
+    }
     if profile.folder_sort.is_some() {
         println!("  - Sort folders by Type - A to Z");
     }
@@ -363,6 +382,7 @@ pub fn set_explorer_launch(target: ExplorerLaunch) -> io::Result<()> {
             version: 4,
             tweaks: vec![],
             disabled_tweaks: vec![],
+            folder_view: None,
             folder_sort: None,
             folder_grouping: None,
             open_explorer_to: Some(target),
@@ -395,6 +415,7 @@ fn imported_changes<'a>(
         let change = match tweak {
             Preference::CenterTaskbarIcons => CENTER_TASKBAR_ICONS.change_in(user, enabled),
             Preference::ShowTaskView => SHOW_TASK_VIEW.change_in(user, enabled),
+            Preference::ShowTaskbarFlashing => SHOW_TASKBAR_FLASHING.change_in(user, enabled),
             Preference::AllowWidgets => ALLOW_WIDGETS.change_in(machine, enabled),
             Preference::EnableTaskbarEndTask => ENABLE_TASKBAR_END_TASK.change_in(user, enabled),
             Preference::UseCompactMode => USE_COMPACT_MODE.change_in(user, enabled),
@@ -418,6 +439,7 @@ fn imported_changes<'a>(
             Preference::IconsOnly => ICONS_ONLY.change_in(user, enabled),
             Preference::ShowInfoTips => SHOW_INFO_TIPS.change_in(user, enabled),
             Preference::ShowSystemFiles => SHOW_SYSTEM_FILES.change_in(user, enabled),
+            Preference::RestoreFolderWindows => RESTORE_FOLDER_WINDOWS.change_in(user, enabled),
             Preference::UseClassicContextMenu => RegistryChange::new(
                 user,
                 CLASSIC_CONTEXT_MENU_KEY,
@@ -499,6 +521,7 @@ fn apply_profile(
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
     }
     let views: Vec<_> = [
+        profile.folder_view.map(folder_views::ViewChange::Mode),
         profile.folder_sort.map(folder_views::ViewChange::Sort),
         profile
             .folder_grouping
@@ -529,6 +552,7 @@ mod tests {
             taskbar_end_task_supported: true,
             confirm_file_delete_supported: true,
             hide_shortcut_arrow: Some(false),
+            folder_view: None,
             folder_sort: Some(FolderSort {
                 column: SortColumn::Size,
                 descending: true,
@@ -627,15 +651,24 @@ mod tests {
     }
 
     #[test]
-    fn recommendations_apply_folder_defaults_and_preserve_personal_choices() {
+    fn recommendations_include_personal_defaults_and_preserve_manual_choices() {
         for enabled in [false, true] {
             let current = ExplorerSettings {
+                windows11_supported: true,
+                use_compact_mode: enabled,
+                use_classic_context_menu: enabled,
+                show_home_folder: enabled,
+                home_supported: true,
+                show_gallery: enabled,
+                gallery_supported: true,
                 hide_file_extensions: true,
                 show_item_checkboxes: enabled,
                 show_libraries: enabled,
                 show_full_path: enabled,
+                restore_folder_windows: enabled,
                 confirm_file_delete: enabled,
                 confirm_file_delete_supported: true,
+                folder_view: Some(FolderView::LargeIcons),
                 folder_sort: Some(FolderSort {
                     column: SortColumn::Size,
                     descending: true,
@@ -655,6 +688,7 @@ mod tests {
                     .disabled_tweaks
                     .contains(&Preference::HideFileExtensions)
             );
+            assert_eq!(profile.folder_view, Some(FolderView::Details));
             assert_eq!(profile.open_explorer_to, Some(ExplorerLaunch::Downloads));
             assert_eq!(profile.tweaks.contains(&Preference::ShowFullPath), !enabled);
             assert_eq!(
@@ -665,7 +699,26 @@ mod tests {
                 })
             );
             assert_eq!(profile.folder_grouping, Some(FolderGrouping::None));
+            assert_eq!(
+                profile.tweaks.contains(&Preference::UseCompactMode),
+                !enabled
+            );
+            assert_eq!(
+                profile.tweaks.contains(&Preference::UseClassicContextMenu),
+                !enabled
+            );
+            assert_eq!(
+                profile
+                    .disabled_tweaks
+                    .contains(&Preference::ShowHomeFolder),
+                enabled
+            );
+            assert_eq!(
+                profile.disabled_tweaks.contains(&Preference::ShowGallery),
+                enabled
+            );
             for preference in [
+                Preference::RestoreFolderWindows,
                 Preference::ShowItemCheckboxes,
                 Preference::ShowLibraries,
                 Preference::ConfirmFileDelete,
@@ -732,6 +785,7 @@ mod tests {
                     } else {
                         vec![Preference::ShowRecentFiles]
                     },
+                    folder_view: None,
                     folder_sort: None,
                     folder_grouping: None,
                     open_explorer_to: None,
@@ -775,6 +829,7 @@ mod tests {
             is_administrator: false,
             desktop_layout_safe_mode: false,
             windows11_supported: true,
+            folder_view: None,
             folder_sort: Some(FolderSort {
                 column: SortColumn::Size,
                 descending: true,
@@ -937,6 +992,7 @@ mod tests {
             version: 1,
             tweaks: vec![],
             disabled_tweaks: vec![],
+            folder_view: None,
             folder_sort: None,
             folder_grouping: None,
             open_explorer_to: None,

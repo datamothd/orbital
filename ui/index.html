@@ -82,6 +82,12 @@
             <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
           </div>
         </div>
+        <div class="preference" data-preference="taskbar-flashing">
+          <div>
+            <h3>Show flashing on taskbar apps</h3>
+            <p class="preference-description">Allows app icons on the taskbar to flash when they need your attention.</p>
+          </div>
+        </div>
         <div class="preference" data-preference="widgets">
           <div>
             <h3>Allow Widgets</h3>
@@ -134,7 +140,27 @@
             <p class="preference-description">Asks for confirmation before moving items to the Recycle Bin.</p>
           </div>
         </div>
+        <div class="preference" data-preference="restore-folder-windows">
+          <div>
+            <h3>Restore folder windows at sign-in</h3>
+            <p class="preference-description">Reopens previous folder windows when you sign in to Windows.</p>
+          </div>
+        </div>
         <h3 class="preference-group">File Explorer · Folder views</h3>
+        <div class="preference folder-view-preference">
+          <div>
+            <h3 id="folder-view-label">Default folder view</h3>
+            <p class="preference-description">Sets the view across all folder types. Resets saved views, including individual folder layouts.</p>
+            <p id="folder-view-value" class="preference-value">Loading…</p>
+          </div>
+          <div class="folder-view-controls">
+            <button id="folder-view-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-view-label folder-view-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-view-options" disabled>
+              <span id="folder-view-selection">Choose a view</span>
+              <span class="picker-arrow" aria-hidden="true"></span>
+            </button>
+            <button id="folder-view-apply" disabled>Apply</button>
+          </div>
+        </div>
         <div class="preference folder-view-preference">
           <div>
             <h3 id="folder-sort-label">Default folder sorting</h3>
@@ -417,6 +443,7 @@
     </svg>
   </template>
   <div id="explorer-launch-options" class="folder-view-options" role="listbox" aria-labelledby="explorer-launch-label" tabindex="-1" hidden></div>
+  <div id="folder-view-options" class="folder-view-options" role="listbox" aria-labelledby="folder-view-label" tabindex="-1" hidden></div>
   <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
   <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
   <div id="answer-preset-options" class="folder-view-options" role="listbox" aria-label="Presets" tabindex="-1" hidden></div>
@@ -446,7 +473,7 @@
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
         <div id="recommendation-list" class="changes-list recommendation-list" role="group" aria-label="Recommended changes"></div>
-        <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
+        <p class="note">Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
       </div>
     </details>
     <p id="confirm-note" class="note">Windows Explorer will restart to apply this change.</p>
@@ -476,7 +503,7 @@
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
         <div id="batch-list" class="changes-list recommendation-list" role="group" aria-label="Preference states"></div>
-        <p class="note">Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
+        <p class="note">Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
       </div>
     </details>
     <p class="note">Windows Explorer will restart once to apply these changes.</p>
@@ -496,7 +523,7 @@
       <div id="import-list" class="changes-scroll changes-list" role="group" aria-label="Imported tweaks compared with current settings"></div>
     </details>
     <p id="import-summary" class="note" role="status"></p>
-    <p class="note">Only selected changes will be applied. Windows Explorer will restart. Changing folder sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
+    <p class="note">Only selected changes will be applied. Windows Explorer will restart. Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
       <button id="import-apply" value="apply" class="primary" disabled>Apply &amp; restart</button>

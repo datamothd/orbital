@@ -3,7 +3,7 @@
 function batchSelection() {
   const profile = {
     format: "orbital-tweaks", version: 4,
-    tweaks: [], disabled_tweaks: [], folder_sort: null, folder_grouping: null, open_explorer_to: null,
+    tweaks: [], disabled_tweaks: [], folder_view: null, folder_sort: null, folder_grouping: null, open_explorer_to: null,
   };
   for (const checkbox of byId("batch-list").querySelectorAll("input:enabled")) {
     if (checkbox.indeterminate || checkbox.checked === settings[checkbox.value]) continue;
@@ -37,7 +37,7 @@ function prepareBatchDialog() {
   for (const preference of explorerPreferences) {
     const { row, checkbox, text } = createChangeRow(preference.field,
       preference.label,
-      preference.description, !preferenceRecommended(preference));
+      preference.description, preferencePersonal(preference));
     checkbox.checked = settings[preference.field] === true;
     checkbox.indeterminate = settings[preference.field] === null;
     const blocked = preferenceRestriction(preference);
@@ -51,7 +51,7 @@ function prepareBatchDialog() {
     rows.set(preference.row, row);
   }
   for (const view of explorerChoices) {
-    const row = element("div", view.recommendedValue === undefined ? "batch-folder-view visual-preference" : "batch-folder-view");
+    const row = element("div", view.personal || view.recommendedValue === undefined ? "batch-folder-view visual-preference" : "batch-folder-view");
     const label = element("span", "", view.title);
     label.id = `batch-${view.id}-label`;
     const select = document.createElement("select");

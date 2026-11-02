@@ -69,7 +69,15 @@ pub(super) const SHOW_SYSTEM_FILES: DwordPreference = DwordPreference {
     delete_when_default: false,
 };
 
-pub(super) const OPTIONS: [&DwordPreference; 9] = [
+pub(super) const RESTORE_FOLDER_WINDOWS: DwordPreference = DwordPreference {
+    name: "Restore folder windows at sign-in",
+    path: ADVANCED_KEY,
+    value: "PersistBrowsers",
+    default_value: false,
+    delete_when_default: false,
+};
+
+pub(super) const OPTIONS: [&DwordPreference; 10] = [
     &HIDE_FILE_EXTENSIONS,
     &SHOW_ITEM_CHECKBOXES,
     &SHOW_LIBRARIES,
@@ -79,6 +87,7 @@ pub(super) const OPTIONS: [&DwordPreference; 9] = [
     &ICONS_ONLY,
     &SHOW_INFO_TIPS,
     &SHOW_SYSTEM_FILES,
+    &RESTORE_FOLDER_WINDOWS,
 ];
 
 pub(super) fn hidden_files_in(user: &RegKey) -> io::Result<bool> {

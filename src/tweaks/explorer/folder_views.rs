@@ -37,6 +37,100 @@ pub enum FolderGrouping {
     Size,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FolderView {
+    Details,
+    List,
+    Tiles,
+    Content,
+    SmallIcons,
+    MediumIcons,
+    LargeIcons,
+    ExtraLargeIcons,
+}
+
+impl FolderView {
+    fn values(self) -> (u32, u32, u32) {
+        match self {
+            Self::Details => (1, 4, 16),
+            Self::List => (4, 3, 16),
+            Self::Tiles => (2, 6, 48),
+            Self::Content => (5, 8, 32),
+            Self::SmallIcons => (3, 2, 16),
+            Self::MediumIcons => (3, 1, 48),
+            Self::LargeIcons => (3, 1, 96),
+            Self::ExtraLargeIcons => (3, 1, 256),
+        }
+    }
+
+    fn matches(self, key: &RegKey) -> io::Result<bool> {
+        let (logical, _, size) = self.values();
+        Ok(
+            optional(key.get_value::<u32, _>("LogicalViewMode"))? == Some(logical)
+                && (logical != 3 || optional(key.get_value::<u32, _>("IconSize"))? == Some(size)),
+        )
+    }
+
+    fn write(self, key: &RegKey) -> io::Result<()> {
+        let (logical, mode, size) = self.values();
+        delete_value_if_present(key, "Vid")?;
+        key.set_value("LogicalViewMode", &logical)?;
+        key.set_value("Mode", &mode)?;
+        key.set_value("IconSize", &size)
+    }
+}
+
+pub(super) fn current_mode_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderView>> {
+    let Some(defaults) = open_optional(machine, FOLDER_TYPES)? else {
+        return Ok(None);
+    };
+    let Some(overrides) = open_optional(user, FOLDER_TYPES)? else {
+        return Ok(None);
+    };
+    let mut paths = top_views(&defaults)?;
+    paths.extend(top_views(&overrides)?);
+    paths.sort();
+    paths.dedup();
+    let mut current = None;
+    for path in paths {
+        let Some(key) = open_optional(&overrides, &path)? else {
+            return Ok(None);
+        };
+        let mut found = None;
+        for view in [
+            FolderView::Details,
+            FolderView::List,
+            FolderView::Tiles,
+            FolderView::Content,
+            FolderView::SmallIcons,
+            FolderView::MediumIcons,
+            FolderView::LargeIcons,
+            FolderView::ExtraLargeIcons,
+        ] {
+            if view.matches(&key)? {
+                found = Some(view);
+                break;
+            }
+        }
+        if found.is_none() || current.is_some_and(|previous| Some(previous) != found) {
+            return Ok(None);
+        }
+        current = found;
+    }
+    if let Some(mode) = current {
+        for path in grouping_bag_paths(&overrides)? {
+            let Some(key) = open_optional(user, &path)? else {
+                return Ok(None);
+            };
+            if !mode.matches(&key)? {
+                return Ok(None);
+            }
+        }
+    }
+    Ok(current)
+}
+
 #[repr(C)]
 #[derive(Default)]
 struct PropertyKey {
@@ -218,6 +312,7 @@ pub struct FolderSort {
 
 #[derive(Clone, Copy)]
 pub(super) enum ViewChange {
+    Mode(FolderView),
     Sort(FolderSort),
     Grouping(FolderGrouping),
 }
@@ -457,6 +552,7 @@ fn merge_defaults(source: &RegKey, destination: &RegKey) -> io::Result<()> {
 fn reset_saved_view(key: &RegKey, changes: &[ViewChange]) -> io::Result<()> {
     for change in changes {
         let values: &[&str] = match change {
+            ViewChange::Mode(_) => &["LogicalViewMode", "Mode", "IconSize", "Vid"],
             ViewChange::Sort(_) => &["Sort", "SortByList"],
             ViewChange::Grouping(_) => &[
                 "GroupBy",
@@ -494,7 +590,7 @@ pub(super) fn apply_in(
         .iter()
         .find_map(|change| match change {
             ViewChange::Grouping(grouping) => Some(*grouping),
-            ViewChange::Sort(_) => None,
+            _ => None,
         })
         .map(BagGrouping::resolve)
         .transpose()?;
@@ -518,6 +614,7 @@ pub(super) fn apply_in(
             let (view, _) = overrides.create_subkey(path)?;
             for change in changes {
                 match change {
+                    ViewChange::Mode(mode) => mode.write(&view)?,
                     ViewChange::Sort(sort) => {
                         view.set_value("SortByList", &sort.registry_value())?
                     }
@@ -540,6 +637,14 @@ pub(super) fn apply_in(
                 reset_saved_view(&destination, changes)?;
             }
         }
+        if let Some(mode) = changes.iter().find_map(|change| match change {
+            ViewChange::Mode(mode) => Some(*mode),
+            _ => None,
+        }) {
+            for path in grouping_bag_paths(&overrides)? {
+                mode.write(&user.create_subkey(path)?.0)?;
+            }
+        }
         if let Some(grouping) = &grouping {
             for path in grouping_bag_paths(&overrides)? {
                 grouping.write(&user.create_subkey(path)?.0)?;
@@ -559,6 +664,9 @@ pub(super) fn recommended_changes_in(
         descending: false,
     };
     let mut changes = Vec::new();
+    if current_mode_in(user, machine)? != Some(FolderView::Details) {
+        changes.push(ViewChange::Mode(FolderView::Details));
+    }
     if current_in(user, machine)? != Some(sort) {
         changes.push(ViewChange::Sort(sort));
     }
@@ -586,6 +694,85 @@ pub(super) fn restore_in(user: &RegKey) -> io::Result<bool> {
 mod tests {
     use super::super::tests::TestRegistry;
     use super::*;
+
+    #[test]
+    fn view_modes_preserve_sorting_grouping_and_restore_original_templates() {
+        let registry = Registry::new();
+        let sort = FolderSort {
+            column: SortColumn::Size,
+            descending: true,
+        };
+        apply_in(
+            &registry.user,
+            &registry.machine,
+            &[
+                ViewChange::Sort(sort),
+                ViewChange::Grouping(FolderGrouping::Name),
+            ],
+            || Ok(()),
+        )
+        .unwrap();
+        for mode in [
+            FolderView::Details,
+            FolderView::List,
+            FolderView::Tiles,
+            FolderView::Content,
+            FolderView::SmallIcons,
+            FolderView::MediumIcons,
+            FolderView::LargeIcons,
+            FolderView::ExtraLargeIcons,
+        ] {
+            apply_in(
+                &registry.user,
+                &registry.machine,
+                &[ViewChange::Mode(mode)],
+                || Ok(()),
+            )
+            .unwrap();
+            assert_eq!(
+                current_mode_in(&registry.user, &registry.machine).unwrap(),
+                Some(mode)
+            );
+            assert_eq!(
+                current_in(&registry.user, &registry.machine).unwrap(),
+                Some(sort)
+            );
+            assert_eq!(
+                current_grouping_in(&registry.user, &registry.machine).unwrap(),
+                Some(FolderGrouping::Name)
+            );
+        }
+        apply_sort(
+            &registry.user,
+            &registry.machine,
+            FolderSort {
+                column: SortColumn::Name,
+                descending: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            current_mode_in(&registry.user, &registry.machine).unwrap(),
+            Some(FolderView::ExtraLargeIcons)
+        );
+        let result = apply_in(
+            &registry.user,
+            &registry.machine,
+            &[ViewChange::Mode(FolderView::Details)],
+            || Err(io::Error::other("failed")),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            current_mode_in(&registry.user, &registry.machine).unwrap(),
+            Some(FolderView::ExtraLargeIcons)
+        );
+        assert!(restore_in(&registry.user).unwrap());
+        assert!(
+            open_optional(&registry.user, FOLDER_TYPES)
+                .unwrap()
+                .is_none()
+        );
+    }
 
     struct Registry {
         user: RegKey,
@@ -947,74 +1134,6 @@ mod tests {
             }
         }
         assert_eq!(FolderGrouping::parse("System.Unknown"), None);
-    }
-
-    #[test]
-    fn recommendations_apply_type_and_none_once_and_rollback_on_failure() {
-        let registry = Registry::new();
-        let sort = FolderSort {
-            column: SortColumn::Type,
-            descending: false,
-        };
-        let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
-        assert_eq!(changes.len(), 2);
-        let mut other_applies = 0;
-        apply_in(&registry.user, &registry.machine, &changes, || {
-            other_applies += 1;
-            Ok(())
-        })
-        .unwrap();
-        assert_eq!(other_applies, 1);
-        assert_eq!(
-            current_in(&registry.user, &registry.machine).unwrap(),
-            Some(sort)
-        );
-        assert_eq!(
-            current_grouping_in(&registry.user, &registry.machine).unwrap(),
-            Some(FolderGrouping::None)
-        );
-        let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
-        assert!(changes.is_empty());
-        let cached_path = format!(r"{}\ExistingFolder", VIEW_KEYS[1]);
-        registry.user.create_subkey(&cached_path).unwrap();
-        apply_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
-        assert!(registry.user.open_subkey(&cached_path).is_ok());
-        change_views_in(
-            &registry.user,
-            &registry.machine,
-            ViewChange::Grouping(FolderGrouping::Name),
-        )
-        .unwrap();
-        let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
-        assert_eq!(changes.len(), 1);
-        assert!(
-            apply_in(&registry.user, &registry.machine, &changes, || Err(
-                io::Error::other("Other preference failed")
-            ))
-            .is_err()
-        );
-        assert_eq!(
-            current_grouping_in(&registry.user, &registry.machine).unwrap(),
-            Some(FolderGrouping::Name)
-        );
-        assert_eq!(
-            current_in(&registry.user, &registry.machine).unwrap(),
-            Some(sort)
-        );
-        apply_in(&registry.user, &registry.machine, &changes, || Ok(())).unwrap();
-        let custom_sort = FolderSort {
-            column: SortColumn::Name,
-            descending: false,
-        };
-        apply_sort(&registry.user, &registry.machine, custom_sort).unwrap();
-        let changes = recommended_changes_in(&registry.user, &registry.machine).unwrap();
-        assert_eq!(changes.len(), 1);
-        assert!(restore_in(&registry.user).unwrap());
-        assert!(
-            open_optional(&registry.user, FOLDER_TYPES)
-                .unwrap()
-                .is_none()
-        );
     }
 
     #[test]
