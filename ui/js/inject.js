@@ -104,12 +104,15 @@ function renderInject() {
   for (const [kind, file] of Object.entries(injectFiles)) {
     byId(`inject-${kind}-name`).textContent = file ? file.name
       : kind === "iso" ? "No image selected" : "No answer file selected";
+    byId(`inject-${kind}-name`).title = file?.name || "";
+    if (kind === "xml") byId("inject-xml").title = file?.name || "";
     byId(`inject-${kind}-action`).textContent = `${file ? "Replace" : "Choose"} ${kind === "xml" ? "answer file" : "ISO"}`;
     byId(`inject-${kind}`).closest(".inject-file").classList.toggle("selected", Boolean(file));
     byId(`inject-${kind}-remove`).hidden = !file;
   }
   byId("inject-output").textContent = injectFiles.iso
     ? `${injectFiles.iso.name.replace(/\.iso$/i, "")}-orbital.iso` : "Choose a source image first";
+  byId("inject-output").title = injectFiles.iso ? byId("inject-output").textContent : "";
   byId("inject-source-entry").classList.toggle("ready", Boolean(injectFiles.iso));
   byId("inject-answer-entry").classList.toggle("ready", Boolean(injectFiles.xml));
   const count = Object.values(injectFiles).filter(Boolean).length;
@@ -172,6 +175,7 @@ byId("inject-start").addEventListener("click", async () => {
     const output = await invoke("inject_iso", { duplicate: mode === "copy", progress });
     if (output) {
       byId("inject-output").textContent = output;
+      byId("inject-output").title = output;
       setInjectStatus("ISO injected and verified.");
       showResult("ISO injected", `Your bootable ISO is ready: ${output}`);
     } else {

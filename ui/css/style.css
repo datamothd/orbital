@@ -974,7 +974,10 @@ button.primary:hover:not(:disabled) {
 
 .inject-name,
 #inject-output {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
 }
 
@@ -1039,7 +1042,7 @@ button.primary:hover:not(:disabled) {
 
 .inject-footer {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
   padding-top: var(--space-4);
@@ -1048,12 +1051,9 @@ button.primary:hover:not(:disabled) {
 .inject-feedback {
   display: grid;
   flex: 1 1 240px;
+  align-self: center;
   min-width: 0;
   gap: var(--space-2);
-}
-
-.inject-workspace:has(#inject-progress:not([hidden])) #inject-availability {
-  display: none;
 }
 
 #inject-status {
