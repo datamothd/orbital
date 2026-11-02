@@ -12,11 +12,15 @@ window.addEventListener("pointerdown", stopScrolling);
 window.addEventListener("keydown", stopScrolling);
 window.addEventListener("wheel", (event) => {
   if (event.target.closest("textarea")) { stopScrolling(); return; }
-  if (!smoothScrolling.enabled || event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
+  if (event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
     || document.querySelector("dialog:modal") || event.target.closest(".folder-view-options, dialog")) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
   const page = document.scrollingElement;
+  if (!smoothScrolling.enabled) {
+    page.scrollTop += event.deltaY * unit;
+    return;
+  }
   scrollTarget = Math.max(0, Math.min((scrollFrame ? scrollTarget : page.scrollTop)
     + event.deltaY * unit, page.scrollHeight - page.clientHeight));
   stopScrolling();
