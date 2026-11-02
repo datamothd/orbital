@@ -879,7 +879,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
   }
   const presetPicker = createChoicePicker(
     byId("answer-preset-picker"), byId("answer-preset-options"), byId("answer-preset-selection"),
-    () => [{ value: "defaults", label: "Windows defaults" }, ...(debugMode.enabled ? [{ value: "debug", label: "All preferences (debug)" }] : [])],
+    () => [{ value: "defaults", label: "Windows defaults" }, ...(debugMode.enabled ? [{ value: "debug", label: "All preferences (debug)" }, { value: "debug-install", label: "Installation test (debug)" }] : [])],
     "Choose a preset", choice => {
       initialize();
       if (choice.value === "defaults") {
@@ -887,7 +887,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
         showImportedChanges();
         status("Windows defaults restored.");
       } else {
-        restore({
+        const profile = {
           format: "orbital-answer", version: 1,
           values: {
             edition: "Windows 11 Pro", architecture: "all", "product-key-ui": "Never", "accept-eula": "true", "dynamic-update": "false", compact: "true", encryption: "false",
@@ -907,9 +907,16 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
           commands: [{ pass: "specialize", description: "Example debug command", path: "cmd.exe /c echo Orbital debug", reboot: "Never" }, { pass: "windowsPE", execution: "async", description: "Example asynchronous command", path: "cmd.exe /c echo Orbital Windows PE debug" }],
           scripts: [{ type: "ps1", label: "Example debug script", content: "Write-Output 'Orbital debug'" }],
           "data-images": [{ path: "D:\\sources\\data.wim", key: "/IMAGE/INDEX", value: "1", disk: "1", partition: "3" }]
-        });
+        };
+        if (choice.value === "debug-install") {
+          for (const key of ["edition", "product-key-ui", "disk-mode", "disk", "layout", "system-size", "recovery", "recovery-size", "language", "setup-language", "fallback", "join-mode", "join-name", "join-user", "join-password", "join-domain", "join-ou", "wifi-mode", "ssid", "wifi-auth", "wifi-password", "wifi-hidden", "drivers", "guest-tools", "image-selection", "image-version", "image-index", "image-location", "image-path", "image-ui", "disk-ui", "pe-log-path", "pe-pagefile", "pe-pagefile-path", "pe-pagefile-size", "pe-display", "pe-width", "pe-height", "pe-depth", "pe-refresh"]) delete profile.values[key];
+          profile["data-images"] = [];
+          profile.accounts[0].group = "Administrators";
+          profile.accounts[0].groups = "";
+        }
+        restore(profile);
         showImportedChanges();
-        status("Debug preset loaded with example values. Review all settings; disk erasure still requires confirmation.");
+        status(choice.value === "debug-install" ? "Installation test preset loaded. Review the image selection and example account credentials; choose the disk in Setup." : "Debug preset loaded with example values. Review all settings; disk erasure still requires confirmation.");
       }
       byId("answer-preset-picker").title = `${choice.label} (preset)`;
     }

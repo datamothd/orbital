@@ -69,6 +69,7 @@ if (window.__TAURI__) {
     try {
       do {
         pending = false;
+        root.setAttribute("data-window-content-fits", "");
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
         needsScrollbar = contentHeight > maxHeight;
         const tweaksActive = byId("tweaks-tab").getAttribute("aria-selected") === "true";
