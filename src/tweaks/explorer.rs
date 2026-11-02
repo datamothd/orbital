@@ -1616,7 +1616,6 @@ mod tests {
             Preference::IconsOnly,
             Preference::DoubleClickOpen,
             Preference::HideEmptyDrives,
-            Preference::ShowHiddenFiles,
             Preference::ShowSystemFiles,
             Preference::ShowInfoTips,
             Preference::CenterTaskbarIcons,

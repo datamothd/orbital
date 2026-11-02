@@ -360,6 +360,19 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.system-os {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+}
+
+.system-os-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tested-system-check,
 .older-system-dash,
 .unsupported-system-cross {

@@ -32,8 +32,8 @@ const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
-  { id: "transfer-details", field: "expand_transfer_details", personal: true, apply: "Expand details by default during file transfers?", restore: "Use the compact file-transfer dialog by default?" },
-  { id: "network", field: "show_network", personal: true, apply: "Show Network in the navigation pane?", restore: "Hide Network from the navigation pane?" },
+  { id: "transfer-details", field: "expand_transfer_details", apply: "Expand details by default during file transfers?", restore: "Use the compact file-transfer dialog by default?" },
+  { id: "network", field: "show_network", apply: "Show Network in the navigation pane?", restore: "Hide Network from the navigation pane?" },
   { id: "taskbar-flashing", field: "show_taskbar_flashing", apply: "Allow taskbar app icons to flash when they need your attention?", restore: "Stop taskbar app icons from flashing for attention?", supported: "windows11_supported" },
   { id: "restore-folder-windows", field: "restore_folder_windows", apply: "Restore previous folder windows when you sign in?", restore: "Stop restoring folder windows at sign-in?" },
   { id: "taskbar-centering", field: "center_taskbar_icons", apply: "Center taskbar icons?", restore: "Align taskbar icons to the left?", supported: "windows11_supported" },
@@ -283,6 +283,12 @@ async function loadSystem() {
   byId("system").replaceChildren(...rows.flatMap(([label, value]) => {
     const term = element("dt", "", label);
     const description = element("dd", "", value);
+    if (label === "OS") {
+      description.className = "system-os";
+      const name = element("span", "system-os-name", value);
+      name.title = value;
+      description.replaceChildren(name);
+    }
     if (label === "Recommended:") {
       description.className = "changes-count";
       description.replaceChildren(byId("changes-count").content.cloneNode(true));

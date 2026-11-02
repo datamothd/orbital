@@ -349,7 +349,7 @@ mod navigation_tests {
     use super::*;
 
     #[test]
-    fn navigation_and_transfer_options_round_trip_without_recommending_them() {
+    fn navigation_and_transfer_options_round_trip() {
         let user = TestRegistry::new();
         assert!(!EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap());
         assert!(SHOW_NETWORK.enabled_in(&user.key).unwrap());
@@ -371,9 +371,11 @@ mod navigation_tests {
             );
             assert_eq!(SHOW_NETWORK.enabled_in(&user.key).unwrap(), enabled);
         }
-        for preference in [Preference::ExpandTransferDetails, Preference::ShowNetwork] {
-            assert_eq!(preference.recommended_value(), None);
-        }
+        assert_eq!(
+            Preference::ExpandTransferDetails.recommended_value(),
+            Some(true)
+        );
+        assert_eq!(Preference::ShowNetwork.recommended_value(), Some(true));
     }
 
     #[test]

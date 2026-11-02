@@ -49,6 +49,7 @@
 
 #answer-page {
   margin-bottom: 0;
+  padding-bottom: var(--space-2);
 }
 
 #answer-page h1 {
@@ -385,7 +386,13 @@
 
 #answer-page footer {
   margin: 0;
-  padding-top: var(--space-4);
+  padding-top: var(--space-2);
+}
+
+#answer-status {
+  display: flex;
+  align-items: center;
+  min-height: calc(3.2em + var(--space-2) + 6px);
 }
 
 #answer-page details, #answer-page footer {

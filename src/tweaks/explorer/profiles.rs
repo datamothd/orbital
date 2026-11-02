@@ -259,6 +259,9 @@ impl Preference {
             | Self::UseCompactMode
             | Self::UseClassicContextMenu
             | Self::HideShortcutArrow
+            | Self::ExpandTransferDetails
+            | Self::ShowHiddenFiles
+            | Self::ShowNetwork
             | Self::ShowFullPath => Some(true),
             _ => None,
         }
@@ -673,6 +676,8 @@ mod tests {
                 show_item_checkboxes: enabled,
                 show_libraries: enabled,
                 show_full_path: enabled,
+                show_hidden_files: enabled,
+                show_network: enabled,
                 restore_folder_windows: enabled,
                 confirm_file_delete: enabled,
                 confirm_file_delete_supported: true,
@@ -699,6 +704,11 @@ mod tests {
             assert_eq!(profile.folder_view, Some(FolderView::Details));
             assert_eq!(profile.open_explorer_to, Some(ExplorerLaunch::Downloads));
             assert_eq!(profile.tweaks.contains(&Preference::ShowFullPath), !enabled);
+            assert_eq!(
+                profile.tweaks.contains(&Preference::ShowHiddenFiles),
+                !enabled
+            );
+            assert_eq!(profile.tweaks.contains(&Preference::ShowNetwork), !enabled);
             assert_eq!(
                 profile.folder_sort,
                 Some(FolderSort {
@@ -730,7 +740,6 @@ mod tests {
                 Preference::ShowItemCheckboxes,
                 Preference::ShowLibraries,
                 Preference::ConfirmFileDelete,
-                Preference::ShowHiddenFiles,
                 Preference::ShowSystemFiles,
                 Preference::DoubleClickOpen,
                 Preference::IconsOnly,
