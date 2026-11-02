@@ -73,6 +73,7 @@ function updateInjectControls() {
 function setInjectStatus(message, error = false) {
   const status = byId("inject-status");
   status.textContent = message;
+  status.title = message;
   status.classList.toggle("error", error);
 }
 
@@ -164,9 +165,9 @@ byId("inject-start").addEventListener("click", async () => {
         injectWriting = true;
         updateInjectControls();
         indicator.hidden = false;
+        start.hidden = true;
         cancel.hidden = false;
         cancel.disabled = false;
-        start.textContent = "Injecting…";
       }
       if (percent == null) indicator.removeAttribute("value");
       else indicator.value = percent;
@@ -188,7 +189,7 @@ byId("inject-start").addEventListener("click", async () => {
     receivingProgress = false;
     indicator.hidden = true;
     cancel.hidden = true;
-    start.textContent = "Inject ISO";
+    start.hidden = false;
     setInjectBusy(false);
   }
 });
