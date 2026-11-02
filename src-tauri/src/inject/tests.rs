@@ -118,6 +118,132 @@ fn boots() -> Vec<BootImage> {
     ]
 }
 
+fn install_image(images: &[(u32, &str, &str)]) -> Vec<u8> {
+    let mut xml = String::from("<WIM>");
+    for (index, (build, name, product_type)) in images.iter().enumerate() {
+        xml.push_str(&format!(
+            "<IMAGE INDEX=\"{}\"><NAME>{name}</NAME><WINDOWS><PRODUCTTYPE>{product_type}</PRODUCTTYPE><VERSION><MAJOR>10</MAJOR><MINOR>0</MINOR><BUILD>{build}</BUILD></VERSION></WINDOWS></IMAGE>",
+            index + 1
+        ));
+    }
+    xml.push_str("</WIM>");
+    let mut metadata = vec![0xff, 0xfe];
+    for character in xml.encode_utf16() {
+        metadata.extend_from_slice(&character.to_le_bytes());
+    }
+    let mut bytes = vec![0x45; 16_384];
+    bytes[..208].fill(0);
+    bytes[..8].copy_from_slice(b"MSWIM\0\0\0");
+    bytes[8..12].copy_from_slice(&208u32.to_le_bytes());
+    bytes[44..48].copy_from_slice(&(images.len() as u32).to_le_bytes());
+    bytes[72..80].copy_from_slice(&(metadata.len() as u64).to_le_bytes());
+    bytes[80..88].copy_from_slice(&208u64.to_le_bytes());
+    bytes[88..96].copy_from_slice(&(metadata.len() as u64).to_le_bytes());
+    bytes[208..208 + metadata.len()].copy_from_slice(&metadata);
+    bytes
+}
+
+fn windows11_image() -> Vec<u8> {
+    install_image(&[(26100, "Windows 11 Enterprise LTSC", "WinNT")])
+}
+
+#[test]
+fn media_versions_reject_windows10_including_ltsc_and_mixed_images() {
+    let workspace = Workspace::new(&std::env::temp_dir()).unwrap();
+    let path = workspace.0.join("windows11.iso");
+    for (build, name) in [
+        (19045, "Windows 10 Pro"),
+        (19044, "Windows 10 Enterprise LTSC"),
+        (17763, "Windows 10 IoT Enterprise LTSC"),
+        (19044, "Windows 11 Pro"),
+        (21999, "Renamed image"),
+    ] {
+        fs::write(&path, install_image(&[(build, name, "WinNT")])).unwrap();
+        assert!(
+            media::validate_install_image(&path)
+                .unwrap_err()
+                .to_string()
+                .contains("Windows 10")
+        );
+    }
+    fs::write(
+        &path,
+        install_image(&[
+            (26100, "Windows 11 Pro", "WinNT"),
+            (19044, "Windows 10 Enterprise LTSC", "WinNT"),
+        ]),
+    )
+    .unwrap();
+    assert!(media::validate_install_image(&path).is_err());
+    fs::write(
+        &path,
+        install_image(&[(26100, "Windows Server", "ServerNT")]),
+    )
+    .unwrap();
+    assert!(media::validate_install_image(&path).is_err());
+}
+
+#[test]
+fn media_versions_accept_windows11_and_ltsc_by_build_in_all_image_formats() {
+    let workspace = Workspace::new(&std::env::temp_dir()).unwrap();
+    fs::create_dir(workspace.0.join("sources")).unwrap();
+    fs::write(workspace.0.join("setup.exe"), b"setup").unwrap();
+    fs::write(workspace.0.join("sources/boot.wim"), b"boot").unwrap();
+    for name in ["install.wim", "install.esd", "install.swm"] {
+        let path = workspace.0.join("sources").join(name);
+        for (build, edition) in [
+            (22000, "Windows 10 Pro"),
+            (26200, "Windows 11 Pro"),
+            (26100, "Windows 11 Enterprise LTSC"),
+            (26100, "Windows 11 Enterprise N LTSC"),
+            (26100, "Windows 11 IoT Enterprise LTSC"),
+        ] {
+            fs::write(&path, install_image(&[(build, edition, "WinNT")])).unwrap();
+            media::validate_source(&workspace.0).unwrap();
+        }
+        fs::remove_file(path).unwrap();
+    }
+    assert!(media::validate_source(&workspace.0).is_err());
+}
+
+#[test]
+fn source_reports_actual_image_names() {
+    let workspace = Workspace::new(&std::env::temp_dir()).unwrap();
+    fs::create_dir(workspace.0.join("sources")).unwrap();
+    fs::write(workspace.0.join("setup.exe"), b"setup").unwrap();
+    fs::write(workspace.0.join("sources/boot.wim"), b"boot").unwrap();
+    fs::write(workspace.0.join("sources/install.esd"), install_image(&[
+        (26100, "Windows 11 Pro", "WinNT"),
+        (26100, "Windows 11 Enterprise LTSC Evaluation", "WinNT"),
+    ])).unwrap();
+    assert_eq!(media::validate_source(&workspace.0).unwrap(), vec!["Windows 11 Enterprise LTSC Evaluation", "Windows 11 Pro"]);
+}
+
+#[test]
+fn media_versions_reject_missing_damaged_and_oversized_metadata() {
+    let workspace = Workspace::new(&std::env::temp_dir()).unwrap();
+    let path = workspace.0.join("install.wim");
+    for (range, replacement) in [
+        (0..8, b"NOTAWIM!".to_vec()),
+        (72..80, 0u64.to_le_bytes().to_vec()),
+        (72..80, (32u64 * 1024 * 1024).to_le_bytes().to_vec()),
+        (80..88, u64::MAX.to_le_bytes().to_vec()),
+        (88..96, 0u64.to_le_bytes().to_vec()),
+        (44..48, 2u32.to_le_bytes().to_vec()),
+        (208..210, vec![0, 0]),
+        (210..212, vec![0, 0xd8]),
+    ] {
+        let mut bytes = windows11_image();
+        bytes[range].copy_from_slice(&replacement);
+        fs::write(&path, bytes).unwrap();
+        assert!(media::validate_install_image(&path).is_err());
+    }
+    for bytes in [Vec::new(), b"invalid".to_vec(), install_image(&[])] {
+        fs::write(&path, bytes).unwrap();
+        assert!(media::validate_install_image(&path).is_err());
+    }
+}
+
 fn fixture(workspace: &Workspace, boot_images: &[BootImage]) -> PathBuf {
     let _com = Com::new().unwrap();
     let root = workspace.0.join("tree");
@@ -125,7 +251,7 @@ fn fixture(workspace: &Workspace, boot_images: &[BootImage]) -> PathBuf {
     fs::create_dir_all(root.join("nested folder")).unwrap();
     fs::write(root.join("setup.exe"), b"setup payload").unwrap();
     fs::write(root.join("sources/boot.wim"), vec![0x31; 8192]).unwrap();
-    fs::write(root.join("sources/install.wim"), vec![0x45; 16_384]).unwrap();
+    fs::write(root.join("sources/install.wim"), windows11_image()).unwrap();
     fs::write(
         root.join("nested folder/payload.txt"),
         "unchanged payload \u{1f680}",
@@ -173,7 +299,7 @@ fn injection_preserves_payloads_and_boot_images_in_both_save_modes() {
         );
         assert_eq!(
             fs::read(mounted.root.join("sources/install.wim")).unwrap(),
-            vec![0x45; 16_384]
+            windows11_image()
         );
     }
     inject(&source, changed, &source, true, &cancelled, &mut |_, _| {}).unwrap();

@@ -79,6 +79,7 @@ function setInjectStatus(message, error = false) {
 function setInjectFile(kind, file = null) {
   const input = byId(`inject-${kind}`);
   injectFiles[kind] = file;
+  if (kind === "iso") answer.setIso(file);
   if (!file) input.value = "";
   input.removeAttribute("aria-invalid");
   renderInject();

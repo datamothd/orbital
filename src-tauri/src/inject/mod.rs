@@ -1,5 +1,6 @@
 mod answer;
 mod image;
+mod media;
 #[cfg(test)]
 mod tests;
 
@@ -102,8 +103,8 @@ pub async fn select_injection_file(
             .map_err(|_| "An injection operation is already in progress.".to_string())?;
         let (filter, title, ext) = match kind.as_str() {
             "iso" => (
-                w!("Windows ISO (*.iso)\0*.iso\0"),
-                w!("Choose a Windows installation ISO"),
+                w!("Windows 11 ISO (*.iso)\0*.iso\0"),
+                w!("Choose a Windows 11 installation ISO"),
                 w!("iso"),
             ),
             "xml" => (
@@ -118,15 +119,20 @@ pub async fn select_injection_file(
         };
         let result: io::Result<_> = (|| {
             extension(&path, &kind)?;
+            let mut editions = None;
             if kind == "iso" {
+                let _com = Com::new()?;
                 image::boot_images(&mut File::open(&path)?)?;
+                let mounted = MountedIso::open(&path)?;
+                editions = Some(media::validate_source(&mounted.root)?);
                 selection.iso = Some(path.clone());
             } else {
                 let bytes = crate::files::read_document(&path)?;
                 selection.set_answer(bytes)?;
             }
             Ok(Some(json!({
-                "name": path.file_name().unwrap_or_default().to_string_lossy()
+                "name": path.file_name().unwrap_or_default().to_string_lossy(),
+                "editions": editions
             })))
         })();
         result.map_err(|reason| reason.to_string())
@@ -332,20 +338,7 @@ fn inject(
             "Eject the selected ISO in File Explorer before replacing it.",
         ));
     }
-    if !mounted.root.join("setup.exe").is_file()
-        || !mounted.root.join("sources/boot.wim").is_file()
-        || ![
-            "sources/install.wim",
-            "sources/install.esd",
-            "sources/install.swm",
-        ]
-        .iter()
-        .any(|name| mounted.root.join(name).is_file())
-    {
-        return Err(error(
-            "Choose a Windows installation ISO containing setup.exe, boot.wim, and an install image.",
-        ));
-    }
+    media::validate_source(&mounted.root)?;
     let workspace = Workspace::new(
         destination
             .parent()

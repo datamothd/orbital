@@ -16,12 +16,13 @@ const answer = (() => {
   const number = (value, min, max) => ({ type: "number", value, min, max, required: true });
   const setupUI = [["", "Windows default"], ["Always", "Always"], ["OnError", "Only on error"], ["Never", "Never"]];
   const imageKeys = [["/IMAGE/INDEX", "Image index"], ["/IMAGE/NAME", "Image name"], ["/IMAGE/DESCRIPTION", "Image description"]];
+  const defaultEditions = ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise", "Enterprise LTSC", "Enterprise N LTSC", "IoT Enterprise LTSC"].map(edition => `Windows 11 ${edition}`);
+  let isoEditions = null;
   const advancedGroups = new Set(["drivers", "virtual-machine", "image-source", "partitions", "setup-behavior", "winpe-network", "winpe-logs", "winpe-pagefile", "winpe-display", "data-images", "deployment", "commands", "scripts", "advanced"]);
-  const isWindows10 = () => controls.get("deployment-mode").value === "wds" || (controls.get("image-selection").value ? controls.get("image-version").value === "10" : controls.get("edition").value.startsWith("Windows 10 "));
   const groups = [
     ["installation", "Installation", [
-      ["edition", "Windows edition", choice([["", "Choose during Setup"], ...[11, 10].flatMap(version => ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise", "Enterprise LTSC", "Enterprise N LTSC", "IoT Enterprise LTSC"].map(edition => `Windows ${version} ${edition}`))], { when: () => !value("image-selection") && value("deployment-mode") !== "wds", help: "Choose an edition included in your ISO. LTSC editions require LTSC installation media. For evaluation or renamed images, use Custom image selection with the exact image name or index." })],
-      ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["x86", "x86 (Windows 10)"], ["all", "All matching"]], { value: "amd64" })],
+      ["edition", "Windows edition", choice([["", "Choose during Setup"], ...defaultEditions], { when: () => !value("image-selection"), help: "When an ISO is selected, this list shows its image names. Without an ISO, it shows common Windows 11 editions. Custom image selection can select by index, name, or description." })],
+      ["architecture", "Processor architecture", choice([["amd64", "x64"], ["arm64", "ARM64"], ["all", "All matching"]], { value: "amd64" })],
       ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["product-key-ui", "Show product key screen", choice([["", "Windows default (on error)"], ["Always", "Always"], ["Never", "Never"]], { help: "Controls the product-key screen during Windows Setup. The Windows default shows it if an error occurs." })],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)],
@@ -34,7 +35,7 @@ const answer = (() => {
       ["disk", "Target disk number", { ...number("0", 0, 999), when: () => ["erase", "existing"].includes(value("disk-mode")) }],
       ["partition", "Target partition number", { ...number("1", 1, 999), when: () => value("disk-mode") === "existing", help: "Partition numbers start at 1. The partition must already be prepared for Windows Setup or created by your custom disk layout." }],
       ["disk-confirm", "Confirm disk number to erase", { required: true, when: () => value("disk-mode") === "erase", help: "Every partition and file on this disk will be erased during the Windows installation. Type its number again." }],
-      ["layout", "Boot layout", choice([["gpt", "UEFI / GPT"], ["mbr", "BIOS / MBR (Windows 10)"]], { value: "gpt", when: () => value("disk-mode") === "erase" })],
+      ["layout", "Boot layout", choice([["gpt", "UEFI / GPT"]], { value: "gpt", when: () => value("disk-mode") === "erase" })],
       ["system-size", "System partition size (MB)", { ...number("300", 300, 32768), when: () => value("disk-mode") === "erase" }],
       ["recovery", "Create a recovery partition", choice(yesNo, { value: "true", when: () => value("disk-mode") === "erase" })],
       ["recovery-size", "Recovery partition size (MB)", { ...number("2048", 1024, 65536), when: () => value("disk-mode") === "erase" && value("recovery") !== "false" }]
@@ -87,7 +88,7 @@ const answer = (() => {
     ]],
     ["image-source", "Custom image selection", [
       ["image-selection", "Select Windows image by", choice([["", "Standard Windows edition list"], ...imageKeys], { when: () => value("deployment-mode") !== "wds" })],
-      ["image-version", "Custom image Windows version", choice([["11", "Windows 11"], ["10", "Windows 10"]], { value: "11", when: () => Boolean(value("image-selection")), help: "Used to offer compatible architectures and installation options. This does not change the image." })],
+      ["image-version", "Custom image Windows version", choice([["11", "Windows 11"]], { value: "11", when: () => Boolean(value("image-selection")), help: "Custom installation images must contain Windows 11. This does not change the image." })],
       ["image-index", "Windows image index", { ...number("1", 1, 2147483647), when: () => value("image-selection") === "/IMAGE/INDEX" }],
       ["image-value", "Windows image name or description", { required: true, maxLength: 259, when: () => ["/IMAGE/NAME", "/IMAGE/DESCRIPTION"].includes(value("image-selection")), help: "Enter the exact name or description recorded in the WIM image." }],
       ["image-location", "Windows image source", choice([["", "Installation media"], ["custom", "Custom WIM file"]], { when: () => value("deployment-mode") !== "wds" })],
@@ -131,7 +132,7 @@ const answer = (() => {
     ]],
     ["data-images", "Secondary data images", []],
     ["deployment", "Deployment & upgrades", [
-      ["deployment-mode", "Installation workflow", choice([["", "Standard installation"], ["upgrade", "Upgrade existing Windows (upgrade settings only)"], ["wds", "Windows Deployment Services (Windows 10)"]], { help: "Upgrade exports only UpgradeData settings and must run from the existing Windows installation. Other configuration choices are excluded. WDS requires its network deployment client and does not apply to Windows 11." })],
+      ["deployment-mode", "Installation workflow", choice([["", "Standard installation"], ["upgrade", "Upgrade existing Windows (upgrade settings only)"]], { help: "Upgrade exports only UpgradeData settings and must run from the existing Windows installation. Other configuration choices are excluded." })],
       ["upgrade-ui", "Show upgrade screen", choice(setupUI, { when: () => value("deployment-mode") === "upgrade" })],
       ["wds-login-ui", "Show WDS sign-in screen", choice(setupUI, { when: () => value("deployment-mode") === "wds" })],
       ["wds-image-ui", "Show WDS image selection screen", choice(setupUI, { when: () => value("deployment-mode") === "wds" })],
@@ -298,12 +299,26 @@ const answer = (() => {
     byId("answer-form").addEventListener("input", update);
     byId("answer-form").addEventListener("change", update);
     byId("answer-form").addEventListener("reset", () => { for (const list of lists.values()) list.replaceChildren(); byId("answer-search").value = ""; requestAnimationFrame(update); });
+    refreshEditions();
     update();
+  }
+  function refreshEditions() {
+    if (!initialized || !controls.has("edition")) return;
+    const control = controls.get("edition"), selected = control.value;
+    const onlyLtsc = isoEditions?.length === 1 && /\bLTSC\b/i.test(isoEditions[0]);
+    control.replaceChildren(...(onlyLtsc ? [] : [new Option("Choose during Setup", "")]), ...(isoEditions ?? defaultEditions).map(name => new Option(name, name)));
+    control.value = onlyLtsc ? isoEditions[0] : [...control.options].some(option => option.value === selected) ? selected : "";
+    if (selected && !control.value) status("The previous Windows edition is not available on the selected ISO. Choose an available image.", true);
+  }
+  function setIso(file) {
+    isoEditions = file ? (Array.isArray(file.editions) ? file.editions : []) : null;
+    if (initialized) { refreshEditions(); update(); }
   }
   function update() {
     closeChoicePicker();
-    const windows10 = isWindows10(), home = !value("image-selection") && / Home(?: N)?$/.test(value("edition")), upgrade = value("deployment-mode") === "upgrade";
-    for (const [id, blocked] of [["architecture", windows10 ? "" : "x86"], ["layout", windows10 ? "" : "mbr"], ["join-mode", home ? "domain" : ""]]) {
+    if (isoEditions?.length === 1 && /\bLTSC\b/i.test(isoEditions[0])) controls.get("edition").value = isoEditions[0];
+    const home = !value("image-selection") && / Home(?: N)?$/.test(value("edition")), upgrade = value("deployment-mode") === "upgrade";
+    for (const [id, blocked] of [["join-mode", home ? "domain" : ""]]) {
       const control = controls.get(id);
       for (const option of control.options) option.hidden = option.disabled = Boolean(blocked && option.value === blocked);
       if (control.selectedOptions[0]?.disabled) control.value = control.options[0].value;
@@ -567,7 +582,7 @@ const answer = (() => {
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid settings entry.");
       for (const [key, text] of Object.entries(data)) {
         const config = fields.find(([id]) => id === key)?.[2];
-        if (!config || typeof text !== "string" || config.choices && !config.choices.some(([value]) => value === text) && key !== "autologon") throw new Error(`Unsupported setting or value: ${key}.`);
+        if (!config || typeof text !== "string" || config.choices && !config.choices.some(([value]) => value === text) && key !== "autologon" && key !== "edition") throw new Error(`Unsupported setting or value: ${key}.`);
       }
     };
     check(profile.values, groups.flatMap(([, , fields]) => fields));
@@ -579,6 +594,7 @@ const answer = (() => {
     const logon = profile.values.autologon;
     if (logon && !(logon === "@Administrator" && profile.values["builtin-admin"] === "true") && !profile.accounts.some(row => row.name === logon)) throw new Error("Automatic sign-in must refer to an enabled account in these settings.");
     byId("answer-form").reset();
+    if (isoEditions === null && profile.values.edition && ![...controls.get("edition").options].some(option => option.value === profile.values.edition)) controls.get("edition").add(new Option(profile.values.edition, profile.values.edition));
     for (const [key, text] of Object.entries(profile.values)) if (key !== "autologon") controls.get(key).value = text;
     if (!Object.hasOwn(profile.values, "product-key-ui")) controls.get("product-key-ui").value = "Never";
     for (const kind of Object.keys(rowFields)) for (const row of profile[kind] || []) addRow(kind, row);
@@ -700,7 +716,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     const setting = (pass, name, path, text) => node(component(pass, name), path, text);
     const finish = () => {
       for (const pass of passes) { const settings = [...root.children].find(child => child.getAttribute("pass") === pass); if (settings) root.append(settings); }
-      if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) for (const arch of isWindows10() ? ["arm64", "x86"] : ["arm64"]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", arch); settings.append(copy); }
+      if (value("architecture") === "all") for (const settings of [...root.children].filter(child => child.localName === "settings")) for (const original of [...settings.children]) { const copy = original.cloneNode(true); copy.setAttribute("processorArchitecture", "arm64"); settings.append(copy); }
       for (const child of [...root.children]) if (child.namespaceURI !== ns) root.append(child);
       const metadata = xml.createElementNS(extraNs, "Configuration"), profile = capture(); profile.values.mode = "guided"; delete profile.values.xml; metadata.textContent = base64(JSON.stringify(profile)); root.append(metadata);
       indentGeneratedXml(root); metadata.setAttribute("hash", fingerprint(root));
@@ -913,7 +929,7 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
       else { controls.get("xml").value = serialize(xml); controls.get("mode").value = "xml"; update(); }
     }
     showImportedChanges();
-    status("Settings imported. Confirm disk erasure or formatting again if applicable.");
+    status("Settings imported. Confirm disk erasure or formatting again if applicable." + (isoEditions !== null ? " Check the Windows edition against the selected ISO." : ""));
   }
   async function upload(settings) {
     const input = byId("answer-upload"); input.accept = settings ? ".xml,.json" : ".xml"; input.value = "";
@@ -955,5 +971,5 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     else { const link = element("a"), url = URL.createObjectURL(new Blob([content], { type: "application/xml" })); link.href = url; link.download = "autounattend.xml"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status("File downloaded."); }
   }));
   byId("answer-form").addEventListener("submit", event => { event.preventDefault(); attempt(async () => { const xml = build(); const file = invoke ? await invoke("set_answer_file", { xml }) : { name: "Orbital answer file.xml", xml }; setInjectFile("xml", file); show(false); }); });
-  return { choose };
+  return { choose, setIso };
 })();

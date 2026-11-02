@@ -61,7 +61,7 @@ npm run build
 
 Open Inject, choose an official Windows installation ISO, then choose an answer file. Upload existing XML or configure installation settings in Orbital. The configurator covers image selection, storage, initial accounts, language, welcome screens, networking, encryption prevention and installation drivers. Desktop customization and post-install jobs are excluded.
 
-ISO injection supports Windows 10 and Windows 11 Enterprise LTSC, Enterprise N LTSC and IoT Enterprise LTSC. Select the matching edition under Installation and use LTSC installation media. For evaluation or renamed images, use Custom image selection to specify the exact image name or index and Windows version.
+ISO injection supports Windows 11, including Enterprise LTSC, Enterprise N LTSC and IoT Enterprise LTSC. Windows 10 ISOs are rejected, including LTSC, based on the installation image's version metadata rather than the ISO filename. Select the matching edition under Installation and use Windows 11 LTSC installation media for LTSC editions. For evaluation or renamed images, use Custom image selection to specify the exact image name or index. Custom installation images must also contain Windows 11.
 
 Leave the installation key blank to skip key entry. Disk erasure requires typing the disk number again, including after importing saved settings. All blocking issues appear together and link to the affected controls. Downloaded XML generated from installation settings can be reopened as editable settings. Previously saved JSON settings can still be imported. Imported complete XML is preserved. Exports may contain passwords, and password obfuscation is reversible. Validate custom scripts and generated files with the intended Windows image in a disposable VM.
 
