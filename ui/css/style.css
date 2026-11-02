@@ -54,9 +54,6 @@
 
 html {
   overflow-y: auto;
-}
-
-html:has(#tweaks-tab[aria-selected="true"]) {
   overflow-x: hidden;
 }
 
@@ -77,13 +74,10 @@ body {
 }
 
 main {
+  width: min(640px, 100vw);
   max-width: 640px;
   padding: var(--panel-padding);
   margin: 0;
-}
-
-html:has(#tweaks-tab[aria-selected="true"]) main {
-  width: min(640px, 100vw);
 }
 
 [role="tabpanel"] > :is(section, details):last-child {

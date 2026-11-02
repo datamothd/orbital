@@ -51,6 +51,7 @@ if (window.__TAURI__) {
   let needsScrollbar = false;
   let lastWidth = 0;
   let lastHeight = 0;
+  let injectHeight = 0;
 
   function syncScrollbar() {
     const sizeReady = Math.abs(window.innerWidth - lastWidth) <= 1
@@ -71,10 +72,11 @@ if (window.__TAURI__) {
         pending = false;
         root.setAttribute("data-window-content-fits", "");
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
-        needsScrollbar = contentHeight > maxHeight;
-        const tweaksActive = byId("tweaks-tab").getAttribute("aria-selected") === "true";
-        const width = baseWidth + (tweaksActive && needsScrollbar ? scrollbarWidth : 0);
-        const height = Math.min(maxHeight, contentHeight);
+        const editorOpen = !byId("answer-page").hidden;
+        const height = editorOpen ? injectHeight || maxHeight : Math.min(maxHeight, contentHeight);
+        if (!byId("inject-panel").hidden) injectHeight = height;
+        needsScrollbar = contentHeight > height;
+        const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
         if (width !== lastWidth || height !== lastHeight) {
           lastWidth = width;
           lastHeight = height;
