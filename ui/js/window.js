@@ -1,41 +1,86 @@
 "use strict";
 
 let scrollFrame = 0;
-let scrollTarget = 0;
-const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", true, stopScrolling);
+const scrollAnimations = new Map();
+const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", false, stopScrolling);
+let waitForWindowLayout = async () => { await new Promise(requestAnimationFrame); };
 
 function stopScrolling() {
   cancelAnimationFrame(scrollFrame);
   scrollFrame = 0;
+  scrollAnimations.clear();
 }
-window.addEventListener("pointerdown", stopScrolling);
-window.addEventListener("keydown", stopScrolling);
-window.addEventListener("wheel", (event) => {
-  if (event.target.closest("textarea")) { stopScrolling(); return; }
-  if (event.ctrlKey || event.shiftKey || !event.cancelable || !event.deltaY
-    || document.querySelector("dialog:modal") || event.target.closest(".folder-view-options, dialog")) return;
-  event.preventDefault();
-  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
-  const page = document.scrollingElement;
+
+function scrollContainer(target, axis, delta) {
+  const vertical = axis === "y";
+  const position = vertical ? "scrollTop" : "scrollLeft";
+  const extent = node => vertical ? node.scrollHeight - node.clientHeight : node.scrollWidth - node.clientWidth;
+  for (let node = target instanceof Element ? target : target?.parentElement;
+    node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    const overflow = vertical ? style.overflowY : style.overflowX;
+    const contained = /^(contain|none)$/.test(vertical ? style.overscrollBehaviorY : style.overscrollBehaviorX);
+    if (/^(auto|scroll|overlay)$/.test(overflow)) {
+      const current = scrollAnimations.get(node)?.[axis] ?? node[position];
+      const maximum = extent(node);
+      if (contained || (delta < 0 ? current > 0 : current < maximum)) return node;
+    }
+    if (node.matches("dialog[open]")) return null;
+  }
+  return document.querySelector("dialog:modal") ? null : document.scrollingElement;
+}
+
+function animateScroll(now) {
+  const modal = document.querySelector("dialog:modal");
+  for (const [node, animation] of scrollAnimations) {
+    if (!node.isConnected || (modal && node !== modal && !modal.contains(node))) {
+      scrollAnimations.delete(node);
+      continue;
+    }
+    const progress = Math.min(1, (now - animation.started) / 180);
+    const eased = 1 - (1 - progress) ** 3;
+    node.scrollLeft = animation.startX + (animation.x - animation.startX) * eased;
+    node.scrollTop = animation.startY + (animation.y - animation.startY) * eased;
+    if (progress === 1) scrollAnimations.delete(node);
+  }
+  scrollFrame = scrollAnimations.size ? requestAnimationFrame(animateScroll) : 0;
+}
+
+function moveScroll(node, dx, dy) {
+  const previous = scrollAnimations.get(node);
+  const x = Math.max(0, Math.min((previous?.x ?? node.scrollLeft) + dx, node.scrollWidth - node.clientWidth));
+  const y = Math.max(0, Math.min((previous?.y ?? node.scrollTop) + dy, node.scrollHeight - node.clientHeight));
   if (!smoothScrolling.enabled) {
-    page.scrollTop += event.deltaY * unit;
+    node.scrollLeft = x;
+    node.scrollTop = y;
     return;
   }
-  scrollTarget = Math.max(0, Math.min((scrollFrame ? scrollTarget : page.scrollTop)
-    + event.deltaY * unit, page.scrollHeight - page.clientHeight));
-  stopScrolling();
-  const start = page.scrollTop;
-  const started = performance.now();
-  function step(now) {
-    if (document.querySelector("dialog:modal")) {
-      stopScrolling();
-      return;
-    }
-    const progress = Math.min(1, (now - started) / 180);
-    page.scrollTop = start + (scrollTarget - start) * (1 - (1 - progress) ** 3);
-    scrollFrame = progress < 1 ? requestAnimationFrame(step) : 0;
+  if (x === node.scrollLeft && y === node.scrollTop) return;
+  scrollAnimations.set(node, { x, y, startX: node.scrollLeft, startY: node.scrollTop, started: performance.now() });
+  if (!scrollFrame) scrollFrame = requestAnimationFrame(animateScroll);
+}
+
+window.addEventListener("pointerdown", stopScrolling);
+window.addEventListener("keydown", stopScrolling);
+window.addEventListener("blur", stopScrolling);
+window.addEventListener("wheel", event => {
+  if (event.ctrlKey || event.defaultPrevented || !event.cancelable || (!event.deltaX && !event.deltaY)) return;
+  let dx = event.deltaX, dy = event.deltaY;
+  if (event.shiftKey && !dx) { dx = dy; dy = 0; }
+  const movements = new Map();
+  for (const [axis, delta] of [["x", dx], ["y", dy]]) {
+    if (!delta) continue;
+    const node = scrollContainer(event.target, axis, delta);
+    if (!node) continue;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? axis === "y" ? node.clientHeight : node.clientWidth : 1;
+    const movement = movements.get(node) || { x: 0, y: 0 };
+    movement[axis] += delta * unit;
+    movements.set(node, movement);
   }
-  scrollFrame = requestAnimationFrame(step);
+  if (!movements.size) return;
+  event.preventDefault();
+  if (!smoothScrolling.enabled) stopScrolling();
+  for (const [node, movement] of movements) moveScroll(node, movement.x, movement.y);
 }, { passive: false });
 
 if (window.__TAURI__) {
@@ -56,6 +101,24 @@ if (window.__TAURI__) {
   let lastWidth = 0;
   let lastHeight = 0;
   let injectHeight = 0;
+  const layoutWaiters = [];
+
+  function waitForSize(width, height) {
+    if (Math.abs(innerWidth - width) <= 1 && Math.abs(innerHeight - height) <= 1) return Promise.resolve();
+    return new Promise(resolve => {
+      const finish = () => {
+        clearTimeout(timeout);
+        window.removeEventListener("resize", changed);
+        resolve();
+      };
+      const changed = () => {
+        if (Math.abs(innerWidth - width) <= 1 && Math.abs(innerHeight - height) <= 1) finish();
+      };
+      const timeout = setTimeout(finish, 1000);
+      window.addEventListener("resize", changed);
+      changed();
+    });
+  }
 
   function syncScrollbar() {
     const sizeReady = Math.abs(window.innerWidth - lastWidth) <= 1
@@ -67,7 +130,7 @@ if (window.__TAURI__) {
     if (resizing) {
       pending = true;
       syncScrollbar();
-      return;
+      return new Promise(resolve => layoutWaiters.push(resolve));
     }
 
     resizing = true;
@@ -86,6 +149,7 @@ if (window.__TAURI__) {
           lastHeight = height;
           syncScrollbar();
           await appWindow.setSize(new LogicalSize(width, height));
+          await waitForSize(width, height);
         }
         syncScrollbar();
       } while (pending);
@@ -96,8 +160,15 @@ if (window.__TAURI__) {
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
       resizing = false;
+      for (const resolve of layoutWaiters.splice(0)) resolve();
     }
   }
+
+  waitForWindowLayout = async () => {
+    await document.fonts.ready;
+    await fitWindow();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  };
 
   const observer = new ResizeObserver(fitWindow);
   observer.observe(main);

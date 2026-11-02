@@ -6,11 +6,13 @@
   <title>Orbital</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/answer.css">
+  <link rel="stylesheet" href="css/debloat.css">
   <script src="js/shared.js" defer></script>
   <script src="js/folder-views.js" defer></script>
   <script src="js/app.js" defer></script>
   <script src="js/batch.js" defer></script>
   <script src="js/profiles.js" defer></script>
+  <script src="js/debloat.js" defer></script>
   <script src="js/answer.js" defer></script>
   <script src="js/inject.js" defer></script>
   <script src="js/window.js" defer></script>
@@ -60,6 +62,7 @@
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
         <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
       </div>
+      <hr class="preferences-divider settings-actions-divider" aria-hidden="true">
       <details id="explorer-preferences" aria-labelledby="preferences-title">
         <summary>
           <h2 id="preferences-title">
@@ -302,6 +305,58 @@
           </div>
         </div>
       </details>
+      <details id="debloat-preferences" aria-labelledby="debloat-title">
+        <summary>
+          <h2 id="debloat-title">
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M7 1h2v2H7zM3 3h2v2H3zM11 3h2v2h-2zM1 7h2v4H1zM13 7h2v4h-2zM3 11h2v2H3zM11 11h2v2h-2zM5 13h6v2H5zM10 5h2v2h-2v2H8v2H6V7h2V5z"/></svg>
+            <span>Debloat</span>
+          </h2>
+        </summary>
+        <hr class="preferences-divider" aria-hidden="true">
+        <div class="debloat-subgroups answer-subgroups">
+          <details id="uninstall-apps" aria-labelledby="uninstall-title">
+            <summary>
+              <svg class="answer-branch" viewBox="0 0 20 14" width="20" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M0 0h2v6h2v4h4v2h12v2H8v-2H4v-2H2V6H0z"/></svg>
+              <h3 id="uninstall-title">
+                <svg class="uninstall-title-icon" viewBox="0 0 20 20" width="20" height="20" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M2 2h16v16H2zm2 2v3h12V4zm0 5v7h12V9zM6 11h8v2H6z"/></svg>
+                <span>Uninstall apps</span>
+              </h3>
+            </summary>
+            <div class="uninstall-workspace">
+              <p class="note uninstall-intro">Check or right-click apps to select them. Drag with either mouse button to select a range. Left-click an app to see its details.</p>
+              <div class="tweaks-output uninstall-terminal" aria-label="Installed apps terminal">
+                <div class="tweaks-output-header">
+                  <span class="tweaks-output-icon" aria-hidden="true">&gt;_</span>
+                  <span>Installed apps</span>
+                  <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
+                    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M4 1h7v2H4zM2 3h2v3H2zM11 3h2v2h2v2H9V1h2zM1 9h6v6H5v-2H3v-2H1zM12 10h2v3h-2zM5 13h7v2H5z"/></svg>
+                    <span>Refresh</span>
+                  </button>
+                </div>
+                <div class="tweaks-output-line uninstall-command"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><span id="uninstall-command-text">winget list</span><span id="uninstall-refresh-dots" class="uninstall-command-dots" aria-hidden="true" hidden><span></span><span></span><span></span></span></div>
+                <div id="uninstall-inventory" class="uninstall-inventory" aria-busy="false">
+                  <p id="uninstall-empty" class="uninstall-empty">Open this dropdown to load installed apps.</p>
+                  <div class="uninstall-table-scroll" tabindex="0" role="region" aria-label="Installed apps" hidden>
+                    <table id="uninstall-table">
+                      <caption>Apps reported by winget list. Select apps to uninstall.</caption>
+                      <thead><tr id="uninstall-columns"></tr></thead>
+                      <tbody id="uninstall-rows"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <pre id="uninstall-log" class="uninstall-log" role="log" aria-label="Uninstall output" aria-live="polite" hidden></pre>
+              </div>
+              <div class="uninstall-footer">
+                <div class="uninstall-feedback">
+                  <p id="uninstall-selection">0 apps selected</p>
+                  <p id="uninstall-status" class="note" role="status" aria-live="polite">Your installed apps will appear here.</p>
+                </div>
+                <button id="uninstall-start" type="button" class="primary" disabled>Uninstall apps</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
       <div class="tweaks-output" aria-label="Tweaks output">
         <div class="tweaks-output-header"><span class="tweaks-output-icon" aria-hidden="true">&gt;_</span><span>Output</span></div>
         <div class="tweaks-output-line"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><p id="status" role="status">Reading your system…</p></div>
@@ -401,9 +456,9 @@
           <div>
             <h3 id="smooth-scroll-label">Smooth scrolling</h3>
             <p id="smooth-scroll-description" class="preference-description">Animate scrolling within the app.</p>
-            <p id="smooth-scroll-value" class="preference-value" data-state="enabled">Enabled</p>
+            <p id="smooth-scroll-value" class="preference-value" data-state="disabled">Disabled</p>
           </div>
-          <button id="smooth-scroll-toggle" type="button" role="switch" aria-checked="true" aria-labelledby="smooth-scroll-label" aria-describedby="smooth-scroll-description">Toggle</button>
+          <button id="smooth-scroll-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="smooth-scroll-label" aria-describedby="smooth-scroll-description">Toggle</button>
         </div>
         <div class="preference">
           <div>
@@ -466,6 +521,15 @@
       <button value="original"><strong>Inject selected ISO</strong><span>Replace the selected ISO after verification.</span></button>
       <span id="inject-replace-note" class="note">Any existing autounattend.xml at the image root will be replaced.</span>
       <button value="cancel" class="inject-dismiss" autofocus>Cancel</button>
+    </form>
+  </dialog>
+  <dialog id="uninstall-confirm" aria-labelledby="uninstall-confirm-title" aria-describedby="uninstall-confirm-description">
+    <h2 id="uninstall-confirm-title">Uninstall selected apps?</h2>
+    <p id="uninstall-confirm-description" class="note">These apps will be removed from your PC. An app may open its own uninstaller or request administrator access.</p>
+    <ul id="uninstall-confirm-list"></ul>
+    <form method="dialog">
+      <button value="cancel" autofocus>Cancel</button>
+      <button value="apply" class="primary">Uninstall</button>
     </form>
   </dialog>
   <dialog id="administrator-notice" aria-labelledby="administrator-title" aria-describedby="administrator-description">

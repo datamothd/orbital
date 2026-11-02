@@ -1,0 +1,376 @@
+#debloat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+#debloat-title svg {
+  flex-shrink: 0;
+}
+
+#debloat-preferences > .preferences-divider {
+  margin-left: 32px;
+  border-top-color: var(--border);
+}
+
+.debloat-subgroups > details {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid #222;
+}
+
+.debloat-subgroups > details > summary {
+  position: relative;
+  min-height: 58px;
+  margin: 0;
+  padding: var(--space-5) 0;
+  line-height: 18px;
+}
+
+.debloat-subgroups h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.uninstall-title-icon {
+  flex-shrink: 0;
+}
+
+.uninstall-workspace {
+  min-width: 0;
+  padding-bottom: var(--space-4);
+}
+
+.debloat-subgroups > details[open] > summary {
+  border-bottom: 1px solid #222;
+  margin-bottom: var(--space-4);
+}
+
+.uninstall-intro.note {
+  margin: 0 0 var(--space-3);
+}
+
+.uninstall-terminal .tweaks-output-header {
+  min-height: 42px;
+}
+
+#uninstall-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  padding: var(--space-1) var(--space-2);
+  font-size: 11px;
+}
+
+.uninstall-command {
+  font-size: 12px;
+}
+
+#uninstall-command-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uninstall-command-dots {
+  display: inline-flex;
+  align-items: flex-end;
+  align-self: baseline;
+  margin-left: -5px;
+  gap: 4px;
+  height: 3px;
+  color: var(--muted);
+}
+
+.uninstall-command-dots > span {
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+  animation: uninstall-dot-bounce 3.2s steps(1, end) infinite;
+}
+
+.uninstall-command-dots[hidden] {
+  display: none;
+}
+
+.uninstall-command-dots > span:nth-child(2) {
+  animation-delay: 0.25s;
+}
+
+.uninstall-command-dots > span:nth-child(3) {
+  animation-delay: 0.5s;
+}
+
+@keyframes uninstall-dot-bounce {
+  0%, 40%, 100% { transform: translateY(0); }
+  8%, 32% { transform: translateY(-1px); }
+  14%, 26% { transform: translateY(-2px); }
+  20% { transform: translateY(-3px); }
+}
+
+.uninstall-inventory {
+  border-top: 1px solid #222;
+}
+
+.uninstall-empty {
+  padding: var(--space-4) var(--space-3);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.uninstall-table-scroll {
+  max-height: 400px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.uninstall-table-scroll:focus-visible,
+.uninstall-log:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: -1px;
+}
+
+#uninstall-table {
+  width: 100%;
+  table-layout: fixed;
+  border-spacing: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+#uninstall-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+#uninstall-table :is(th, td) {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid #222;
+}
+
+#uninstall-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+#uninstall-table :is(th, td):first-child {
+  width: 60px;
+}
+
+#uninstall-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#uninstall-table .uninstall-app-row:is(:hover, :focus-within) td {
+  background: #171717;
+}
+
+#uninstall-table tbody tr:has(input:checked) td {
+  background: #102018;
+}
+
+#uninstall-table input {
+  display: block;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+#uninstall-table input:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: 3px;
+}
+
+#uninstall-table .uninstall-app-row[data-selectable="false"] input {
+  cursor: default;
+  opacity: 0.45;
+}
+
+#uninstall-table .uninstall-app-row[data-selectable="false"] .uninstall-app-toggle {
+  color: #777;
+}
+
+#uninstall-table .uninstall-app-row td:nth-child(2) {
+  padding: 0;
+}
+
+.uninstall-app-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.uninstall-app-toggle > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uninstall-app-toggle:hover:not(:disabled) {
+  background: transparent;
+}
+
+.uninstall-app-toggle:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: -3px;
+}
+
+.uninstall-app-arrow {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-right: 3px;
+  border-right: 1px solid var(--muted);
+  border-bottom: 1px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+}
+
+[aria-expanded="true"] > .uninstall-app-arrow {
+  transform: translateY(2px) rotate(225deg);
+}
+
+#uninstall-table .uninstall-app-details > td {
+  padding: var(--space-3);
+  background: #070707;
+}
+
+.uninstall-app-details dl {
+  grid-template-columns: minmax(0, 80px) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  white-space: normal;
+}
+
+.uninstall-app-details :is(dt, dd) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uninstall-app-details dd {
+  color: var(--text);
+  user-select: text;
+}
+
+.uninstall-app-warning {
+  margin-top: var(--space-3);
+  color: var(--yellow);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.uninstall-table-scroll.is-selecting,
+.uninstall-table-scroll.is-selecting * {
+  cursor: crosshair;
+}
+
+.uninstall-inventory[aria-busy="true"] tbody {
+  opacity: 0.45;
+}
+
+.uninstall-log {
+  max-height: 180px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.uninstall-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.uninstall-feedback {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+#uninstall-selection {
+  color: var(--muted);
+}
+
+#uninstall-selection[data-selected="true"] {
+  color: var(--green);
+}
+
+#uninstall-status {
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+#uninstall-status.error {
+  color: var(--red);
+}
+
+#uninstall-start {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+#uninstall-confirm-list {
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#uninstall-confirm-list li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid #222;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+#uninstall-confirm-list li:last-child {
+  border-bottom: 0;
+}
+
+#uninstall-confirm-list span {
+  display: block;
+  color: var(--muted);
+}

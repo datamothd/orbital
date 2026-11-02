@@ -954,11 +954,19 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
     });
     return selected;
   }
+  let choosing = false;
   async function choose() {
-    const dialog = byId("answer-source"); if (dialog.open) return;
-    while (await showDialog(dialog) === "continue") {
-      if (dialog.querySelector("input:checked").value === "configure") { show(true); return; }
-      if (invoke ? await changeInjectFile("xml") : await upload(false)) return;
+    if (choosing) return;
+    choosing = true;
+    try {
+      if (typeof waitForWindowLayout === "function") await waitForWindowLayout();
+      const dialog = byId("answer-source"); if (dialog.open) return;
+      while (await showDialog(dialog) === "continue") {
+        if (dialog.querySelector("input:checked").value === "configure") { show(true); return; }
+        if (invoke ? await changeInjectFile("xml") : await upload(false)) return;
+      }
+    } finally {
+      choosing = false;
     }
   }
   byId("answer-back").addEventListener("click", () => { show(false); if (!injectFiles.xml) choose(); });

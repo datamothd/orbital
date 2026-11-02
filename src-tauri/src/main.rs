@@ -5,6 +5,7 @@ use tauri::Manager;
 use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
 use windows::core::Interface;
 use windows_sys::{Win32::UI::Shell::ShellExecuteW, core::w};
+mod debloat;
 mod files;
 mod inject;
 mod profiles;
@@ -135,6 +136,7 @@ fn main() {
             Ok(())
         })
         .manage(inject::InjectionState::default())
+        .manage(debloat::WingetState::default())
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
@@ -156,6 +158,8 @@ fn main() {
             profiles::export_tweaks,
             profiles::import_tweaks,
             profiles::apply_imported_tweaks,
+            debloat::list_installed_apps,
+            debloat::uninstall_apps,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");

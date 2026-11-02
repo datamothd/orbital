@@ -412,7 +412,17 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
-  margin: calc(-1 * var(--space-2)) 0 var(--space-2);
+  margin: calc(-1 * var(--space-2)) 0 0;
+}
+
+.settings-actions-divider {
+  margin: var(--space-4) 0;
+  height: 2px;
+  border: 0;
+  background-image: linear-gradient(to right, transparent 3px, #666 3px 11px, transparent 11px);
+  background-size: 14px 100%;
+  background-repeat: space no-repeat;
+  background-position: center;
 }
 
 #batch-changes {
