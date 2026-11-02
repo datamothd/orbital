@@ -169,6 +169,8 @@ pub struct ExplorerSettings {
     pub show_info_tips: bool,
     pub show_system_files: bool,
     pub restore_folder_windows: bool,
+    pub expand_transfer_details: bool,
+    pub show_network: bool,
     pub open_explorer_to: Option<ExplorerLaunch>,
     pub explorer_launch_options: Vec<ExplorerLaunch>,
     pub recommended_preferences: Vec<(Preference, bool)>,
@@ -183,7 +185,7 @@ pub fn settings() -> io::Result<ExplorerSettings> {
     Ok(ExplorerSettings {
         is_administrator: is_administrator()?,
         desktop_layout_safe_mode: desktop_layout_safe_mode_in(HKCU)?,
-        folder_sort: folder_views::current_in(HKCU, HKLM)?,
+        folder_sort: folder_views::current_sort_in(HKCU, HKLM)?,
         folder_view: folder_views::current_mode_in(HKCU, HKLM)?,
         folder_grouping: folder_views::current_grouping_in(HKCU, HKLM)?,
         center_taskbar_icons: CENTER_TASKBAR_ICONS.enabled_in(HKCU)?,
@@ -219,6 +221,13 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         show_info_tips: SHOW_INFO_TIPS.enabled_in(HKCU)?,
         show_system_files: SHOW_SYSTEM_FILES.enabled_in(HKCU)?,
         restore_folder_windows: RESTORE_FOLDER_WINDOWS.enabled_in(HKCU)?,
+        expand_transfer_details: EXPAND_TRANSFER_DETAILS.enabled_in(HKCU)?,
+        show_network: read_toggle(
+            HKCU,
+            NETWORK_KEY,
+            "System.IsPinnedToNameSpaceTree",
+            read_toggle(HKLM, NETWORK_KEY, "System.IsPinnedToNameSpaceTree", true)?,
+        )?,
         open_explorer_to: explorer_launch_in(HKCU)?,
         explorer_launch_options: launch_options_in(HKCU, build)?,
         recommended_preferences: Preference::ALL
@@ -309,6 +318,8 @@ pub enum Preference {
     ShowInfoTips,
     ShowSystemFiles,
     RestoreFolderWindows,
+    ExpandTransferDetails,
+    ShowNetwork,
 }
 
 fn read_toggle(root: &RegKey, path: &str, name: &str, default: bool) -> io::Result<bool> {
@@ -632,6 +643,9 @@ fn settings_changes<'a>(
     ));
     changes.push(RESTORE_FOLDER_WINDOWS.change_in(user, true));
     changes.push(SHOW_TASKBAR_FLASHING.change_in(user, true));
+    changes.push(EXPAND_TRANSFER_DETAILS.change_in(user, true));
+    changes.push(SHOW_NETWORK.change_in(user, true));
+    changes.extend(retired_snapshot_slots(user, machine));
     changes
 }
 
@@ -889,27 +903,23 @@ pub fn restore_original_settings() -> io::Result<bool> {
 }
 
 pub fn set_folder_view(view: FolderView) -> io::Result<()> {
-    folder_views::apply_in(HKCU, HKLM, &[folder_views::ViewChange::Mode(view)], || {
-        Ok(())
-    })?;
-    restart_explorer("Folder view", false, true)
+    set_folder_default("Folder view", folder_views::ViewChange::Mode(view))
 }
 
 pub fn set_folder_sort(sort: FolderSort) -> io::Result<()> {
-    folder_views::apply_in(HKCU, HKLM, &[folder_views::ViewChange::Sort(sort)], || {
-        Ok(())
-    })?;
-    restart_explorer("Folder sorting", false, true)
+    set_folder_default("Folder sorting", folder_views::ViewChange::Sort(sort))
 }
 
 pub fn set_folder_grouping(grouping: FolderGrouping) -> io::Result<()> {
-    folder_views::apply_in(
-        HKCU,
-        HKLM,
-        &[folder_views::ViewChange::Grouping(grouping)],
-        || Ok(()),
-    )?;
-    restart_explorer("Folder grouping", false, true)
+    set_folder_default(
+        "Folder grouping",
+        folder_views::ViewChange::Grouping(grouping),
+    )
+}
+
+fn set_folder_default(label: &str, change: folder_views::ViewChange) -> io::Result<()> {
+    folder_views::apply_in(HKCU, HKLM, &[change], || Ok(()))?;
+    restart_explorer(label, false, true)
 }
 
 fn transparent_icon() -> Vec<u8> {

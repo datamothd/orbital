@@ -458,7 +458,7 @@ const answer = (() => {
         if (action === "modify" && rowValue(row, "format") === "FAT32" && rowValue(row, "label").length > 11) add(rowControl(row, "label"), "FAT32 partition labels must be at most 11 characters.");
       }
     }
-    const fullPath = (path, variables = false, network = false) => ( /^[a-z]:\\/i.test(path) || variables && /^%[a-z_][a-z_0-9]*%\\/i.test(path) || network && /^\\\\[^\\]+\\[^\\]+\\/.test(path)) && !/["<>|?*]/.test(path) && !path.slice(2).includes(":") && !path.split("\\").some(part => [".", ".."].includes(part));
+    const fullPath = (path, variables = false) => ( /^[a-z]:\\/i.test(path) || variables && /^%[a-z_][a-z_0-9]*%\\/i.test(path)) && !/["<>|?*]/.test(path) && !path.slice(2).includes(":") && !path.split("\\").some(part => [".", ".."].includes(part));
     const wimPath = path => /\.wim$/i.test(path) && !/["<>|?*]/.test(path) && !path.replace(/^[a-z]:\\/i, "").includes(":") && (!path.startsWith("\\\\") || /^\\\\[^\\]+\\[^\\]+\\/.test(path)) && (!path.includes("%") || /^%configsetroot%\\[^%]+$/i.test(path));
     if (value("pe-log-path") && !fullPath(value("pe-log-path"))) add("pe-log-path", "Use a full local fixed-disk directory, such as C:\\SetupLogs. Network paths and environment variables are unsupported.");
     if (value("pe-pagefile-path") && (!fullPath(value("pe-pagefile-path"), true) || value("pe-pagefile-path").endsWith("\\"))) add("pe-pagefile-path", "Use a full fixed-disk file path, optionally starting with a Windows environment variable.");
@@ -555,7 +555,11 @@ const answer = (() => {
     }
   }
   function capture() {
-    return { format: "orbital-answer", version: 1, values: Object.fromEntries([...controls].map(([key, control]) => [key, read(control)])), ...Object.fromEntries(Object.keys(rowFields).map(kind => [kind, rows(kind).map(row => Object.fromEntries(rowFields[kind].map(([key]) => [key, rowValue(row, key)])))])) };
+    const values = Object.fromEntries([...controls].map(([key, control]) => [key, read(control)]));
+    const entries = Object.fromEntries(Object.keys(rowFields).map(kind => [kind,
+      rows(kind).map(row => Object.fromEntries(rowFields[kind].map(([key]) => [key, rowValue(row, key)])))
+    ]));
+    return { format: "orbital-answer", version: 1, values, ...entries };
   }
   function restore(profile) {
     if (!profile || profile.format !== "orbital-answer" || profile.version !== 1 || !profile.values || Array.isArray(profile.values)) throw new Error("Choose installation settings exported by this version of Orbital.");
@@ -588,8 +592,14 @@ const answer = (() => {
     return btoa(binary);
   }
   function fingerprint(root) {
-    const copy = root.cloneNode(true); for (const node of [...copy.children]) if (node.namespaceURI === extraNs && node.localName === "Configuration") node.remove();
-    let hash = 2166136261; for (const character of new XMLSerializer().serializeToString(copy)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    const copy = root.cloneNode(true);
+    for (const node of [...copy.children]) {
+      if (node.namespaceURI === extraNs && node.localName === "Configuration") node.remove();
+    }
+    let hash = 2166136261;
+    for (const character of new XMLSerializer().serializeToString(copy)) {
+      hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    }
     return (hash >>> 0).toString(16);
   }
   function indentGeneratedXml(element, depth = 0) {
@@ -941,7 +951,6 @@ Register-ScheduledTask -TaskName ${quote(task)} -Action $action -Trigger $trigge
   }));
   for (const button of document.querySelectorAll("[data-answer-save]")) button.addEventListener("click", () => attempt(async () => {
     const content = build();
-    if (utf8.encode(content).length > 1048576) throw new Error("Reduce the configuration to less than 1 MiB.");
     if (invoke) { if (await invoke("answer_document", { content, kind: "xml" }) !== null) status("File saved."); }
     else { const link = element("a"), url = URL.createObjectURL(new Blob([content], { type: "application/xml" })); link.href = url; link.download = "autounattend.xml"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status("File downloaded."); }
   }));

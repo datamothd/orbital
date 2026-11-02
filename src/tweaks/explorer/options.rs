@@ -284,3 +284,120 @@ mod tests {
         assert!(hidden_files_in(&registry.key).unwrap());
     }
 }
+
+pub(super) const NETWORK_KEY: &str =
+    r"Software\Classes\CLSID\{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}";
+const REMOVABLE_CLSID: &str = "{F5FB2C77-0E2F-4A16-A381-3E560C68BC83}";
+const NON_ENUM_KEYS: [&str; 2] = [
+    r"Software\Microsoft\Windows\CurrentVersion\Policies\NonEnum",
+    r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Policies\NonEnum",
+];
+const THIS_PC_FOLDERS: [&str; 7] = [
+    "{31C0DD25-9439-4F12-BF41-7FF4EDA38722}",
+    "{a0c69a99-21c8-4671-8703-7934162fcf1d}",
+    "{7d83ee9b-2244-4e70-b1f5-5393042af1e4}",
+    "{0ddd015d-b06c-45d5-8c4c-f59713854639}",
+    "{35286a68-3c57-41a1-bbb1-0eae73d76c95}",
+    "{f42ee2d3-909f-4907-8871-4c22fc0bf756}",
+    "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+];
+
+pub(super) const EXPAND_TRANSFER_DETAILS: DwordPreference = DwordPreference {
+    name: "Expand file-transfer details",
+    path: r"Software\Microsoft\Windows\CurrentVersion\Explorer\OperationStatusManager",
+    value: "EnthusiastMode",
+    default_value: false,
+    delete_when_default: false,
+};
+pub(super) const SHOW_NETWORK: DwordPreference = DwordPreference {
+    name: "Show Network in navigation pane",
+    path: NETWORK_KEY,
+    value: "System.IsPinnedToNameSpaceTree",
+    default_value: true,
+    delete_when_default: false,
+};
+
+pub(super) fn retired_snapshot_slots<'a>(
+    user: &'a RegKey,
+    machine: &'a RegKey,
+) -> Vec<RegistryChange<'a>> {
+    let mut slots = Vec::new();
+    for base in [
+        EXPLORER_KEY,
+        r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Explorer",
+    ] {
+        for id in THIS_PC_FOLDERS {
+            slots.push(RegistryChange::new(
+                machine,
+                &format!(r"{base}\FolderDescriptions\{id}\PropertyBag"),
+                "ThisPCPolicy",
+                None,
+            ));
+        }
+    }
+    for path in NON_ENUM_KEYS {
+        for root in [user, machine] {
+            slots.push(RegistryChange::new(root, path, REMOVABLE_CLSID, None));
+        }
+    }
+    slots
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::super::tests::TestRegistry;
+    use super::*;
+
+    #[test]
+    fn navigation_and_transfer_options_round_trip_without_recommending_them() {
+        let user = TestRegistry::new();
+        assert!(!EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap());
+        assert!(SHOW_NETWORK.enabled_in(&user.key).unwrap());
+        for enabled in [true, false] {
+            let changes = vec![
+                EXPAND_TRANSFER_DETAILS.change_in(&user.key, enabled),
+                SHOW_NETWORK.change_in(&user.key, enabled),
+            ];
+            assert!(
+                changes
+                    .iter()
+                    .all(|change| recommendation(change).is_none())
+            );
+            let prepared = prepare_changes(&changes).unwrap();
+            apply_changes(&changes, &prepared).unwrap();
+            assert_eq!(
+                EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap(),
+                enabled
+            );
+            assert_eq!(SHOW_NETWORK.enabled_in(&user.key).unwrap(), enabled);
+        }
+        for preference in [Preference::ExpandTransferDetails, Preference::ShowNetwork] {
+            assert_eq!(preference.recommended_value(), None);
+        }
+    }
+
+    #[test]
+    fn new_navigation_values_restore_their_exact_original_values() {
+        let user = TestRegistry::new();
+        let machine = TestRegistry::new();
+        let backup = original_settings_in(&user.key, &machine.key, true).unwrap();
+        let changes = vec![
+            SHOW_NETWORK.change_in(&user.key, false),
+            EXPAND_TRANSFER_DETAILS.change_in(&user.key, true),
+        ];
+        apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
+        let restored = original_changes(&user.key, &machine.key, &backup).unwrap();
+        apply_changes(&restored, &prepare_changes(&restored).unwrap()).unwrap();
+        assert!(!EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap());
+        assert!(SHOW_NETWORK.enabled_in(&user.key).unwrap());
+        for path in NON_ENUM_KEYS {
+            for root in [&user.key, &machine.key] {
+                assert!(
+                    read_original(root, path, REMOVABLE_CLSID)
+                        .unwrap()
+                        .is_none()
+                );
+            }
+        }
+    }
+}

@@ -42,7 +42,7 @@ if (window.__TAURI__) {
   const baseWidth = 640;
   const maxHeight = 720;
   const scrollbar = document.createElement("div");
-  scrollbar.style.cssText = "position:fixed;width:100px;height:100px;overflow:scroll;visibility:hidden";
+  scrollbar.className = "scrollbar-probe";
   document.body.append(scrollbar);
   const scrollbarWidth = scrollbar.offsetWidth - scrollbar.clientWidth;
   scrollbar.remove();

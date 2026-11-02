@@ -32,6 +32,8 @@ const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
+  { id: "transfer-details", field: "expand_transfer_details", personal: true, apply: "Expand details by default during file transfers?", restore: "Use the compact file-transfer dialog by default?" },
+  { id: "network", field: "show_network", personal: true, apply: "Show Network in the navigation pane?", restore: "Hide Network from the navigation pane?" },
   { id: "taskbar-flashing", field: "show_taskbar_flashing", apply: "Allow taskbar app icons to flash when they need your attention?", restore: "Stop taskbar app icons from flashing for attention?", supported: "windows11_supported" },
   { id: "restore-folder-windows", field: "restore_folder_windows", apply: "Restore previous folder windows when you sign in?", restore: "Stop restoring folder windows at sign-in?" },
   { id: "taskbar-centering", field: "center_taskbar_icons", apply: "Center taskbar icons?", restore: "Align taskbar icons to the left?", supported: "windows11_supported" },
@@ -88,9 +90,8 @@ function preferenceRestriction(preference, unavailable = "Unavailable on this sy
   return preference.requiresAdmin && !settings.is_administrator ? "Requires administrator access" : "";
 }
 
-function preferenceValue(preference, enabled) {
-  if (enabled === null) return "Custom or missing overlay icon";
-  return enabled ? (preference.enabledLabel || "Enabled") : (preference.disabledLabel || "Disabled");
+function preferenceValue(enabled) {
+  return enabled === null ? "Custom or missing overlay icon" : enabled ? "Enabled" : "Disabled";
 }
 
 function setStatus(message, error = false) {
@@ -140,7 +141,7 @@ function renderBohr() {
   if (!settings) return;
   const available = [
     ...explorerPreferences.filter(preference => preferenceRecommended(preference) && preferenceAvailable(preference))
-      .map(preference => ({ ...preference, label: `${preference.label} · ${preferenceValue(preference, preferenceRecommendation(preference))}`, enabled: settings[preference.field] === preferenceRecommendation(preference) })),
+      .map(preference => ({ ...preference, label: `${preference.label} · ${preferenceValue(preferenceRecommendation(preference))}`, enabled: settings[preference.field] === preferenceRecommendation(preference) })),
     ...explorerChoices.filter(choice => choice.recommendedValue !== undefined && choice.picker.choices.some(option => choice.picker.matches(option.value, choice.recommendedValue)))
       .map(choice => ({ ...choice, label: choice.recommendation, enabled: choice.picker.matches(choice.recommendedValue, settings[choice.field]) })),
   ];
@@ -222,7 +223,7 @@ function renderSettings() {
   }
   for (const preference of explorerPreferences) {
     setPreferenceValue(preference.id, preferenceAvailable(preference)
-      ? preferenceValue(preference, settings[preference.field]) : "Unavailable",
+      ? preferenceValue(settings[preference.field]) : "Unavailable",
       preferencePersonal(preference));
     if (preferenceAvailable(preference) && preferenceRecommended(preference) && !preferencePersonal(preference) && settings[preference.field] !== null) {
       byId(preference.id).dataset.state = settings[preference.field] === preferenceRecommendation(preference) ? "enabled" : "disabled";
@@ -388,7 +389,7 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
     const preference = explorerPreferences.find(preference => preference.field === id);
     const view = explorerChoices.find(view => view.field === id);
-    const { row, text } = createChangeRow(id, preference ? `${preference.label} · ${preferenceValue(preference, preferenceRecommendation(preference))}` : view.recommendation,
+    const { row, text } = createChangeRow(id, preference ? `${preference.label} · ${preferenceValue(preferenceRecommendation(preference))}` : view.recommendation,
       (preference || view).description, preference ? preferencePersonal(preference) : Boolean(view.personal));
     if (preference?.requiresAdmin) text.append(adminWarning());
     return row;

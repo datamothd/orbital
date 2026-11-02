@@ -90,7 +90,7 @@ async function changeInjectFile(kind, clear = false) {
   try {
     const file = invoke ? await invoke(clear ? "clear_injection_file" : "select_injection_file", { kind }) : null;
     if (clear || file) setInjectFile(kind, file || null);
-  return clear || Boolean(file);
+    return clear || Boolean(file);
   } catch (error) {
     setInjectStatus(String(error), true);
   } finally {

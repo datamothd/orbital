@@ -82,22 +82,7 @@ impl FolderView {
 }
 
 pub(super) fn current_mode_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderView>> {
-    let Some(defaults) = open_optional(machine, FOLDER_TYPES)? else {
-        return Ok(None);
-    };
-    let Some(overrides) = open_optional(user, FOLDER_TYPES)? else {
-        return Ok(None);
-    };
-    let mut paths = top_views(&defaults)?;
-    paths.extend(top_views(&overrides)?);
-    paths.sort();
-    paths.dedup();
-    let mut current = None;
-    for path in paths {
-        let Some(key) = open_optional(&overrides, &path)? else {
-            return Ok(None);
-        };
-        let mut found = None;
+    let current = uniform_view_in(user, machine, |key| {
         for view in [
             FolderView::Details,
             FolderView::List,
@@ -108,18 +93,15 @@ pub(super) fn current_mode_in(user: &RegKey, machine: &RegKey) -> io::Result<Opt
             FolderView::LargeIcons,
             FolderView::ExtraLargeIcons,
         ] {
-            if view.matches(&key)? {
-                found = Some(view);
-                break;
+            if view.matches(key)? {
+                return Ok(Some(view));
             }
         }
-        if found.is_none() || current.is_some_and(|previous| Some(previous) != found) {
-            return Ok(None);
-        }
-        current = found;
-    }
+        Ok(None)
+    })?;
     if let Some(mode) = current {
-        for path in grouping_bag_paths(&overrides)? {
+        let overrides = user.open_subkey(FOLDER_TYPES)?;
+        for path in default_bag_paths(&overrides)? {
             let Some(key) = open_optional(user, &path)? else {
                 return Ok(None);
             };
@@ -247,7 +229,7 @@ impl BagGrouping {
     }
 }
 
-fn grouping_bag_paths(folder_types: &RegKey) -> io::Result<Vec<String>> {
+fn default_bag_paths(folder_types: &RegKey) -> io::Result<Vec<String>> {
     let types = folder_types.enum_keys().collect::<io::Result<Vec<_>>>()?;
     let mut paths = Vec::new();
     for bags in [VIEW_KEYS[1], VIEW_KEYS[3]] {
@@ -443,7 +425,7 @@ pub(super) fn current_grouping_in(
     };
     let overrides = user.open_subkey(FOLDER_TYPES)?;
     let expected = BagGrouping::resolve(grouping)?;
-    for path in grouping_bag_paths(&overrides)? {
+    for path in default_bag_paths(&overrides)? {
         let Some(key) = open_optional(user, &path)? else {
             return Ok(None);
         };
@@ -454,7 +436,7 @@ pub(super) fn current_grouping_in(
     Ok(Some(grouping))
 }
 
-pub(super) fn current_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderSort>> {
+pub(super) fn current_sort_in(user: &RegKey, machine: &RegKey) -> io::Result<Option<FolderSort>> {
     current_view_in(user, machine, "SortByList", FolderSort::parse)
 }
 
@@ -463,6 +445,16 @@ fn current_view_in<T: Copy + Eq>(
     machine: &RegKey,
     name: &str,
     parse: impl Fn(&str) -> Option<T>,
+) -> io::Result<Option<T>> {
+    uniform_view_in(user, machine, |key| {
+        Ok(optional(key.get_value::<String, _>(name))?.and_then(|value| parse(&value)))
+    })
+}
+
+fn uniform_view_in<T: Copy + Eq>(
+    user: &RegKey,
+    machine: &RegKey,
+    read: impl Fn(&RegKey) -> io::Result<Option<T>>,
 ) -> io::Result<Option<T>> {
     let Some(defaults) = open_optional(machine, FOLDER_TYPES)? else {
         return Ok(None);
@@ -479,10 +471,7 @@ fn current_view_in<T: Copy + Eq>(
         let Some(key) = open_optional(&overrides, &path)? else {
             return Ok(None);
         };
-        let Some(value) = optional(key.get_value::<String, _>(name))? else {
-            return Ok(None);
-        };
-        let Some(value) = parse(&value) else {
+        let Some(value) = read(&key)? else {
             return Ok(None);
         };
         if current.is_some_and(|previous| previous != value) {
@@ -641,12 +630,12 @@ pub(super) fn apply_in(
             ViewChange::Mode(mode) => Some(*mode),
             _ => None,
         }) {
-            for path in grouping_bag_paths(&overrides)? {
+            for path in default_bag_paths(&overrides)? {
                 mode.write(&user.create_subkey(path)?.0)?;
             }
         }
         if let Some(grouping) = &grouping {
-            for path in grouping_bag_paths(&overrides)? {
+            for path in default_bag_paths(&overrides)? {
                 grouping.write(&user.create_subkey(path)?.0)?;
             }
         }
@@ -667,7 +656,7 @@ pub(super) fn recommended_changes_in(
     if current_mode_in(user, machine)? != Some(FolderView::Details) {
         changes.push(ViewChange::Mode(FolderView::Details));
     }
-    if current_in(user, machine)? != Some(sort) {
+    if current_sort_in(user, machine)? != Some(sort) {
         changes.push(ViewChange::Sort(sort));
     }
     if current_grouping_in(user, machine)? != Some(FolderGrouping::None) {
@@ -734,7 +723,7 @@ mod tests {
                 Some(mode)
             );
             assert_eq!(
-                current_in(&registry.user, &registry.machine).unwrap(),
+                current_sort_in(&registry.user, &registry.machine).unwrap(),
                 Some(sort)
             );
             assert_eq!(
@@ -1050,7 +1039,7 @@ mod tests {
             ViewChange::Grouping(FolderGrouping::Type),
         )
         .unwrap();
-        for path in grouping_bag_paths(&overrides).unwrap() {
+        for path in default_bag_paths(&overrides).unwrap() {
             let key = registry.user.open_subkey(path).unwrap();
             assert_eq!(key.get_value::<u32, _>("GroupView").unwrap(), u32::MAX);
             assert_eq!(
@@ -1122,7 +1111,7 @@ mod tests {
                 Some(grouping)
             );
             assert_eq!(
-                current_in(&registry.user, &registry.machine).unwrap(),
+                current_sort_in(&registry.user, &registry.machine).unwrap(),
                 Some(sort)
             );
             assert_eq!(FolderGrouping::parse(grouping.property()), Some(grouping));
@@ -1205,7 +1194,7 @@ mod tests {
                 Some(FolderGrouping::None)
             );
             assert_eq!(
-                current_in(&registry.user, &registry.machine).unwrap(),
+                current_sort_in(&registry.user, &registry.machine).unwrap(),
                 Some(sort)
             );
             let view = registry.user.open_subkey(&path).unwrap();
@@ -1275,14 +1264,17 @@ mod tests {
             .unwrap();
         all_folders.set_value("Mode", &4u32).unwrap();
         set_binary(&all_folders, "Sort", &[4, 5, 6]);
-        assert_eq!(current_in(&registry.user, &registry.machine).unwrap(), None);
+        assert_eq!(
+            current_sort_in(&registry.user, &registry.machine).unwrap(),
+            None
+        );
         let sort = FolderSort {
             column: SortColumn::DateModified,
             descending: true,
         };
         apply_sort(&registry.user, &registry.machine, sort).unwrap();
         assert_eq!(
-            current_in(&registry.user, &registry.machine).unwrap(),
+            current_sort_in(&registry.user, &registry.machine).unwrap(),
             Some(sort)
         );
         assert_eq!(
@@ -1449,7 +1441,10 @@ mod tests {
             )
             .unwrap();
         key.set_value("SortByList", &"prop:+System.Size").unwrap();
-        assert_eq!(current_in(&registry.user, &registry.machine).unwrap(), None);
+        assert_eq!(
+            current_sort_in(&registry.user, &registry.machine).unwrap(),
+            None
+        );
         assert_eq!(FolderSort::parse("prop:+System.Unknown"), None);
         assert_eq!(
             FolderSort::parse("prop:+System.Size;-System.ItemNameDisplay"),

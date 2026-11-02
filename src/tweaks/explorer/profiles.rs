@@ -103,7 +103,7 @@ impl TweakProfile {
 }
 
 impl Preference {
-    pub(super) const ALL: [Self; 26] = [
+    pub(super) const ALL: [Self; 28] = [
         Self::CenterTaskbarIcons,
         Self::ShowTaskView,
         Self::ShowTaskbarFlashing,
@@ -130,6 +130,8 @@ impl Preference {
         Self::ShowInfoTips,
         Self::ShowSystemFiles,
         Self::RestoreFolderWindows,
+        Self::ExpandTransferDetails,
+        Self::ShowNetwork,
     ];
 
     fn name(self) -> &'static str {
@@ -160,6 +162,8 @@ impl Preference {
             Self::ShowInfoTips => SHOW_INFO_TIPS.name,
             Self::ShowSystemFiles => SHOW_SYSTEM_FILES.name,
             Self::RestoreFolderWindows => RESTORE_FOLDER_WINDOWS.name,
+            Self::ExpandTransferDetails => EXPAND_TRANSFER_DETAILS.name,
+            Self::ShowNetwork => SHOW_NETWORK.name,
         }
     }
 
@@ -191,6 +195,8 @@ impl Preference {
             Self::ShowInfoTips => current.show_info_tips,
             Self::ShowSystemFiles => current.show_system_files,
             Self::RestoreFolderWindows => current.restore_folder_windows,
+            Self::ExpandTransferDetails => current.expand_transfer_details,
+            Self::ShowNetwork => current.show_network,
         })
     }
 
@@ -440,6 +446,8 @@ fn imported_changes<'a>(
             Preference::ShowInfoTips => SHOW_INFO_TIPS.change_in(user, enabled),
             Preference::ShowSystemFiles => SHOW_SYSTEM_FILES.change_in(user, enabled),
             Preference::RestoreFolderWindows => RESTORE_FOLDER_WINDOWS.change_in(user, enabled),
+            Preference::ExpandTransferDetails => EXPAND_TRANSFER_DETAILS.change_in(user, enabled),
+            Preference::ShowNetwork => SHOW_NETWORK.change_in(user, enabled),
             Preference::UseClassicContextMenu => RegistryChange::new(
                 user,
                 CLASSIC_CONTEXT_MENU_KEY,
