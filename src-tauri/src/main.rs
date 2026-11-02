@@ -2,6 +2,8 @@
 
 use orbital::{explorer, sysinfo};
 use tauri::Manager;
+use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+use windows::core::Interface;
 use windows_sys::{Win32::UI::Shell::ShellExecuteW, core::w};
 mod files;
 mod inject;
@@ -122,8 +124,13 @@ fn main() {
                         .controller()
                         .CoreWebView2()
                         .and_then(|view| view.Settings())
-                        .and_then(|settings| settings.SetAreDefaultContextMenusEnabled(false))
-                        .expect("Could not disable the default context menu");
+                        .and_then(|settings| {
+                            settings.SetAreDefaultContextMenusEnabled(false)?;
+                            settings
+                                .cast::<ICoreWebView2Settings3>()?
+                                .SetAreBrowserAcceleratorKeysEnabled(false)
+                        })
+                        .expect("Could not disable browser shortcuts and the default context menu");
                 })?;
             Ok(())
         })
