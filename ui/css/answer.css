@@ -100,7 +100,7 @@
   flex: 1;
 }
 
-#answer-collapse {
+#answer-collapse, .collapse-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;

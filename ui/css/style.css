@@ -453,8 +453,14 @@ button:disabled {
   margin: calc(-1 * var(--space-2)) 0 0;
 }
 
-#batch-changes {
+.settings-action-row {
   grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-2);
+}
+
+#batch-changes {
+  flex: 1;
 }
 
 .batch-folder-view {

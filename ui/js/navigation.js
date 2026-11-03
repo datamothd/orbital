@@ -2,6 +2,10 @@
 
 const navigationTabs = [...document.querySelectorAll('.navigation-tabs [role="tab"]')];
 
+byId("tweaks-collapse").addEventListener("click", () => {
+  for (const section of byId("tweaks-panel").querySelectorAll("details")) section.open = false;
+});
+
 function selectNavigationTab(selectedTab) {
   for (const tab of navigationTabs) {
     const selected = tab === selectedTab;

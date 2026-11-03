@@ -60,7 +60,10 @@
       <div class="settings-actions" role="group" aria-label="Settings actions">
         <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Apply recommended preferences</button>
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
-        <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
+        <div class="settings-action-row">
+          <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
+          <button id="tweaks-collapse" class="collapse-button" type="button" aria-label="Collapse all" title="Collapse all"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M2 2h10v10H2zm1 1v8h8V3zM5 7h4v1H5zM13 4h1v10H4v-1h9z"/></svg></button>
+        </div>
       </div>
       <hr class="preferences-divider settings-actions-divider" aria-hidden="true">
       <details id="visual-settings" class="tweak-category" aria-labelledby="visual-settings-title">
