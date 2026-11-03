@@ -660,6 +660,12 @@ fn recommended_changes<'a>(
         recommendation(change).is_some() && !(change.path == SHELL_ICONS_KEY && change.name == "29")
     });
     for change in &mut changes {
+        if change.path == NETWORK_KEY && change.name == SHOW_NETWORK.value {
+            change.value = Some(0u32.to_reg_value());
+        }
+        if change.path == ADVANCED_KEY && change.name == "Hidden" {
+            change.value = Some(1u32.to_reg_value());
+        }
         if matches!(
             change.name.as_str(),
             "ShowTaskViewButton"
@@ -754,6 +760,9 @@ pub fn save_original_settings() -> io::Result<()> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Recommendation {
+    ExpandTransferDetails,
+    ShowHiddenFiles,
+    ShowNetwork,
     ShowTaskView,
     ShowTaskbarFlashing,
     AllowWidgets,
@@ -825,6 +834,9 @@ pub fn apply_recommended_settings(
 fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {
     use Recommendation::*;
     Some(match change.name.as_str() {
+        "EnthusiastMode" if change.path == EXPAND_TRANSFER_DETAILS.path => ExpandTransferDetails,
+        "Hidden" if change.path == ADVANCED_KEY => ShowHiddenFiles,
+        "System.IsPinnedToNameSpaceTree" if change.path == NETWORK_KEY => ShowNetwork,
         "ShowTaskViewButton" => ShowTaskView,
         "TaskbarFlashing" => ShowTaskbarFlashing,
         "AllowNewsAndInterests" => AllowWidgets,
@@ -1477,7 +1489,7 @@ mod tests {
                 Path::new("test-blank.ico"),
             )
             .unwrap();
-            assert_eq!(changes.len(), if windows11 { 20 } else { 6 });
+            assert_eq!(changes.len(), if windows11 { 23 } else { 9 });
             let (key, _) = user.key.create_subkey(ADVANCED_KEY).unwrap();
             for alignment in [None, Some(0u32), Some(1u32)] {
                 match alignment {
@@ -1529,7 +1541,7 @@ mod tests {
                     .unwrap();
             assert!(!changes.iter().any(|change| matches!(
                 change.name.as_str(),
-                "AutoCheckSelect" | "ConfirmFileDelete" | "IconsOnly" | "Hidden" | "ShellState"
+                "AutoCheckSelect" | "ConfirmFileDelete" | "IconsOnly" | "ShellState"
             )));
             changes
                 .retain(|change| recommendation(change).is_some_and(|id| selected.contains(&id)));
@@ -1625,11 +1637,56 @@ mod tests {
     }
 
     #[test]
+    fn counted_recommendations_are_pending_selectable_and_repeatable() {
+        for selected in [
+            Recommendation::ExpandTransferDetails,
+            Recommendation::ShowHiddenFiles,
+            Recommendation::ShowNetwork,
+        ] {
+            let user = TestRegistry::new();
+            let machine = TestRegistry::new();
+            let advanced = user.key.create_subkey(ADVANCED_KEY).unwrap().0;
+            advanced.set_value("Hidden", &2u32).unwrap();
+            let initial = [SHOW_NETWORK.change_in(&user.key, true)];
+            apply_changes(&initial, &prepare_changes(&initial).unwrap()).unwrap();
+            let backup = original_settings_in(&user.key, &machine.key, true).unwrap();
+            let pending = || {
+                let mut changes =
+                    recommended_changes(&user.key, &machine.key, true, Path::new("unused.ico"))
+                        .unwrap();
+                changes.retain(|change| recommendation(change) == Some(selected));
+                pending_changes(changes).unwrap()
+            };
+            let changes = pending();
+            assert_eq!(changed_preferences(&changes, false), [selected]);
+            apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
+            assert_eq!(
+                EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap(),
+                selected == Recommendation::ExpandTransferDetails
+            );
+            assert_eq!(
+                hidden_files_in(&user.key).unwrap(),
+                selected == Recommendation::ShowHiddenFiles
+            );
+            assert_eq!(
+                SHOW_NETWORK.enabled_in(&user.key).unwrap(),
+                selected != Recommendation::ShowNetwork
+            );
+            assert!(pending().is_empty());
+            let restored = original_changes(&user.key, &machine.key, &backup).unwrap();
+            apply_changes(&restored, &prepare_changes(&restored).unwrap()).unwrap();
+            assert!(!EXPAND_TRANSFER_DETAILS.enabled_in(&user.key).unwrap());
+            assert!(!hidden_files_in(&user.key).unwrap());
+            assert!(SHOW_NETWORK.enabled_in(&user.key).unwrap());
+        }
+    }
+
+    #[test]
     fn completion_counts_preferences_instead_of_registry_values() {
         let mut changes = settings_changes(HKCU, HKLM, true);
         changes.retain(|change| change.name != "TaskbarAl");
-        assert_eq!(changed_preferences(&changes, false).len(), 16);
-        assert_eq!(changed_preferences(&changes, true).len(), 16);
+        assert_eq!(changed_preferences(&changes, false).len(), 19);
+        assert_eq!(changed_preferences(&changes, true).len(), 19);
         let recent = [SHOW_RECENT_FILES.change_in(HKCU, true)];
         assert_eq!(
             changed_preferences(&recent, false),

@@ -87,6 +87,7 @@ byId("import-tweaks").addEventListener("click", async () => {
   setBusy(true);
   try {
     selectNavigationTab(byId("tweaks-tab"));
+    byId("visual-settings").open = true;
     byId("explorer-preferences").open = true;
     const profile = await invoke("import_tweaks");
     if (!profile) return;

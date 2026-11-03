@@ -254,6 +254,7 @@ impl Preference {
             | Self::ShowCloudFiles
             | Self::ShowHomeFolder
             | Self::ShowGallery
+            | Self::ShowNetwork
             | Self::HideFileExtensions => Some(false),
             Self::EnableTaskbarEndTask
             | Self::UseCompactMode
@@ -261,7 +262,6 @@ impl Preference {
             | Self::HideShortcutArrow
             | Self::ExpandTransferDetails
             | Self::ShowHiddenFiles
-            | Self::ShowNetwork
             | Self::ShowFullPath => Some(true),
             _ => None,
         }
@@ -708,7 +708,11 @@ mod tests {
                 profile.tweaks.contains(&Preference::ShowHiddenFiles),
                 !enabled
             );
-            assert_eq!(profile.tweaks.contains(&Preference::ShowNetwork), !enabled);
+            assert!(!profile.tweaks.contains(&Preference::ShowNetwork));
+            assert_eq!(
+                profile.disabled_tweaks.contains(&Preference::ShowNetwork),
+                enabled
+            );
             assert_eq!(
                 profile.folder_sort,
                 Some(FolderSort {

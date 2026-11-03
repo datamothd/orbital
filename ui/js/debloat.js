@@ -3,6 +3,7 @@
 (() => {
   const dropdown = byId("uninstall-apps");
   const parent = byId("debloat-preferences");
+  const category = byId("optimization-settings");
   const inventory = byId("uninstall-inventory");
   const tableScroll = inventory.querySelector(".uninstall-table-scroll");
   const rows = byId("uninstall-rows");
@@ -245,7 +246,11 @@
     try {
       refreshDots.hidden = false;
       const onCommand = new window.__TAURI__.core.Channel();
-      onCommand.onmessage = command => { byId("uninstall-command-text").textContent = command; };
+      onCommand.onmessage = command => {
+        const commandText = byId("uninstall-command-text");
+        commandText.textContent = "winget list --details";
+        commandText.title = command;
+      };
       const result = await invoke("list_installed_apps", { onCommand });
       render(result);
       inventoryValid = true;
@@ -330,8 +335,12 @@
     updateControls();
   }
 
-  dropdown.addEventListener("toggle", () => { if (dropdown.open && parent.open) refreshApps(); else finishDrag(true); });
-  parent.addEventListener("toggle", () => { if (parent.open && dropdown.open) refreshApps(); else finishDrag(true); });
+  for (const section of [category, parent, dropdown]) {
+    section.addEventListener("toggle", () => {
+      if (category.open && parent.open && dropdown.open) refreshApps();
+      else finishDrag(true);
+    });
+  }
   refreshButton.addEventListener("click", refreshApps);
   uninstallButton.addEventListener("click", uninstallSelected);
   log.tabIndex = 0;

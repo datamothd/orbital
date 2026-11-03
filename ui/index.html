@@ -63,296 +63,320 @@
         <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
       </div>
       <hr class="preferences-divider settings-actions-divider" aria-hidden="true">
-      <details id="explorer-preferences" aria-labelledby="preferences-title">
+      <details id="visual-settings" class="tweak-category" aria-labelledby="visual-settings-title">
         <summary>
-          <h2 id="preferences-title">
-            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M4 1h5v1h1v1h4v1h1v7h-1v1H5v-1H4zM6 3v7h7V5H9V4H8V3zM1 6h2v7h10v2H3v-1H1z"/></svg>
-            <span>Explorer Settings</span>
+          <h2 id="visual-settings-title" class="tweak-heading">
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" fill-rule="evenodd" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M1 2h14v10H9v1h3v2H4v-2h3v-1H1zm2 2v6h10V4z"/></svg>
+            <span>Visual Settings</span>
           </h2>
         </summary>
         <hr class="preferences-divider" aria-hidden="true">
-        <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
-        <h3 class="preference-group">Taskbar</h3>
-        <div class="preference" data-preference="taskbar-centering">
-          <div>
-            <h3>Center taskbar icons</h3>
-            <p class="preference-description">Centers taskbar icons. Disable to align them to the left.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="task-view">
-          <div>
-            <h3>Show Task View button</h3>
-            <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="taskbar-flashing">
-          <div>
-            <h3>Show flashing on taskbar apps</h3>
-            <p class="preference-description">Allows app icons on the taskbar to flash when they need your attention.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="widgets">
-          <div>
-            <h3>Allow Widgets</h3>
-            <p class="preference-description">Allows the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
-          </div>
-        </div>
-        <div class="preference" data-preference="taskbar-end-task">
-          <div>
-            <h3>Enable taskbar End task</h3>
-            <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
-          </div>
-        </div>
-        <h3 class="preference-group">Desktop</h3>
-        <div class="preference" data-preference="shortcut-arrow">
-          <div>
-            <h3>Hide shortcut arrow icon</h3>
-            <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · Behavior</h3>
-        <div class="preference folder-view-preference">
-          <div>
-            <h3 id="explorer-launch-label">Open Explorer to</h3>
-            <p class="preference-description">Choose the starting location for new File Explorer windows.</p>
-            <p id="explorer-launch-value" class="preference-value">Loading…</p>
-          </div>
-          <div class="folder-view-controls">
-            <button id="explorer-launch-picker" class="folder-view-picker" role="combobox" aria-labelledby="explorer-launch-label explorer-launch-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="explorer-launch-options" disabled>
-              <span id="explorer-launch-selection">Choose a location</span>
-              <span class="picker-arrow" aria-hidden="true"></span>
-            </button>
-            <button id="explorer-launch-apply" disabled>Apply</button>
-          </div>
-        </div>
-        <div class="preference" data-preference="item-checkboxes">
-          <div>
-            <h3>Show selection checkboxes</h3>
-            <p class="preference-description">Adds checkboxes for selecting files and folders.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="single-click">
-          <div>
-            <h3>Double-click to open items</h3>
-            <p class="preference-description">Requires two clicks to open files and folders. Disable to open with one click.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="confirm-delete">
-          <div>
-            <h3>Confirm before recycling files</h3>
-            <p class="preference-description">Asks for confirmation before moving items to the Recycle Bin.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="restore-folder-windows">
-          <div>
-            <h3>Restore folder windows at sign-in</h3>
-            <p class="preference-description">Reopens previous folder windows when you sign in to Windows.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="transfer-details">
-          <div>
-            <h3>Expand file-transfer details</h3>
-            <p class="preference-description">Shows transfer speed and other details by default when copying, moving or deleting files.</p>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · Folder views</h3>
-        <div class="preference folder-view-preference">
-          <div>
-            <h3 id="folder-view-label">Default folder view</h3>
-            <p class="preference-description">Sets the view across all folder types. Resets saved views, including individual folder layouts.</p>
-            <p id="folder-view-value" class="preference-value">Loading…</p>
-          </div>
-          <div class="folder-view-controls">
-            <button id="folder-view-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-view-label folder-view-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-view-options" disabled>
-              <span id="folder-view-selection">Choose a view</span>
-              <span class="picker-arrow" aria-hidden="true"></span>
-            </button>
-            <button id="folder-view-apply" disabled>Apply</button>
-          </div>
-        </div>
-        <div class="preference folder-view-preference">
-          <div>
-            <h3 id="folder-sort-label">Default folder sorting</h3>
-            <p class="preference-description">Sets sorting across all folder types. Resets saved views, including individual folder layouts.</p>
-            <p id="folder-sort-value" class="preference-value">Loading…</p>
-          </div>
-          <div class="folder-view-controls">
-            <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
-              <span id="folder-sort-selection">Choose sorting</span>
-              <span class="picker-arrow" aria-hidden="true"></span>
-            </button>
-            <button id="folder-sort-apply" disabled>Apply</button>
-          </div>
-        </div>
-        <div class="preference folder-view-preference">
-          <div>
-            <h3 id="folder-grouping-label">Default folder grouping</h3>
-            <p class="preference-description">Sets grouping across all folder types. Resets saved views, including individual folder layouts.</p>
-            <p id="folder-grouping-value" class="preference-value">Loading…</p>
-          </div>
-          <div class="folder-view-controls">
-            <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
-              <span id="folder-grouping-selection">Choose grouping</span>
-              <span class="picker-arrow" aria-hidden="true"></span>
-            </button>
-            <button id="folder-grouping-apply" disabled>Apply</button>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · File visibility</h3>
-        <div class="preference" data-preference="file-extensions">
-          <div>
-            <h3>Hide known file extensions</h3>
-            <p class="preference-description">Hides extensions for known file types, such as .exe, .txt and .png.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="hidden-files">
-          <div>
-            <h3>Show hidden files</h3>
-            <p class="preference-description">Shows hidden files, folders and drives.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="empty-drives">
-          <div>
-            <h3>Hide empty drives</h3>
-            <p class="preference-description">Hides drives when no media is inserted.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="system-files">
-          <div>
-            <h3>Show protected operating system files</h3>
-            <p class="preference-description">Reveals protected system files when Show hidden files is also enabled.</p>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · Appearance</h3>
-        <div class="preference" data-preference="explorer-spacing">
-          <div>
-            <h3>Use compact spacing</h3>
-            <p class="preference-description">Uses compact spacing in File Explorer.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="modern-context-menu">
-          <div>
-            <h3>Use classic context menu</h3>
-            <p class="preference-description">Requests the classic Windows 10-style right-click menu.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="full-path">
-          <div>
-            <h3>Show full path in title bar</h3>
-            <p class="preference-description">Displays the complete folder path in the window title bar.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="icons-only">
-          <div>
-            <h3>Show icons instead of thumbnails</h3>
-            <p class="preference-description">Uses file icons instead of image and video thumbnails.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="info-tips">
-          <div>
-            <h3>Show hover descriptions</h3>
-            <p class="preference-description">Shows pop-up descriptions when pointing at files and folders.</p>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · Navigation pane</h3>
-        <div class="preference" data-preference="network">
-          <div>
-            <h3>Show Network in navigation pane</h3>
-            <p class="preference-description">Shows the Network entry in the sidebar. Does not change network discovery or file sharing.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="libraries">
-          <div>
-            <h3>Show Libraries</h3>
-            <p class="preference-description">Shows Libraries in the navigation pane.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="home-folder">
-          <div>
-            <h3>Show Home folder</h3>
-            <p class="preference-description">Shows Home in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-          </div>
-        </div>
-        <div class="preference" data-preference="gallery">
-          <div>
-            <h3>Show Gallery</h3>
-            <p class="preference-description">Shows Gallery in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
-          </div>
-        </div>
-        <h3 class="preference-group">File Explorer · Home and privacy</h3>
-        <div class="preference" data-preference="recent-files">
-          <div>
-            <h3>Show recently used files</h3>
-            <p class="preference-description">Shows recently used files in File Explorer Home or Quick access.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="recommendations">
-          <div>
-            <h3>Show recommendations</h3>
-            <p class="preference-description">Shows the Recommended section in File Explorer Home.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="frequent-folders">
-          <div>
-            <h3>Show frequently used folders</h3>
-            <p class="preference-description">Shows your most accessed folders in Quick access.</p>
-          </div>
-        </div>
-        <div class="preference" data-preference="office-files">
-          <div>
-            <h3>Show cloud files in Quick access</h3>
-            <p class="preference-description">Shows account and cloud-provider content in File Explorer. Availability depends on your account.</p>
-          </div>
-        </div>
-      </details>
-      <details id="debloat-preferences" aria-labelledby="debloat-title">
-        <summary>
-          <h2 id="debloat-title">
-            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M7 1h2v2H7zM3 3h2v2H3zM11 3h2v2h-2zM1 7h2v4H1zM13 7h2v4h-2zM3 11h2v2H3zM11 11h2v2h-2zM5 13h6v2H5zM10 5h2v2h-2v2H8v2H6V7h2V5z"/></svg>
-            <span>Debloat</span>
-          </h2>
-        </summary>
-        <hr class="preferences-divider" aria-hidden="true">
-        <div class="debloat-subgroups answer-subgroups">
-          <details id="uninstall-apps" aria-labelledby="uninstall-title">
+        <div class="tweak-subgroups answer-subgroups">
+          <details id="explorer-preferences" aria-labelledby="preferences-title">
             <summary>
               <svg class="answer-branch" viewBox="0 0 20 14" width="20" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M0 0h2v6h2v4h4v2h12v2H8v-2H4v-2H2V6H0z"/></svg>
-              <h3 id="uninstall-title">
-                <svg class="uninstall-title-icon" viewBox="0 0 20 20" width="20" height="20" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M2 2h16v16H2zm2 2v3h12V4zm0 5v7h12V9zM6 11h8v2H6z"/></svg>
-                <span>Uninstall apps</span>
+              <h3 id="preferences-title" class="tweak-heading">
+                <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M4 1h5v1h1v1h4v1h1v7h-1v1H5v-1H4zM6 3v7h7V5H9V4H8V3zM1 6h2v7h10v2H3v-1H1z"/></svg>
+                <span>Explorer Settings</span>
               </h3>
             </summary>
-            <div class="uninstall-workspace">
-              <p class="note uninstall-intro">Check or right-click apps to select them. Drag with either mouse button to select a range. Left-click an app to see its details.</p>
-              <div class="tweaks-output uninstall-terminal" aria-label="Installed apps terminal">
-                <div class="tweaks-output-header">
-                  <span class="tweaks-output-icon" aria-hidden="true">&gt;_</span>
-                  <span>Installed apps</span>
-                  <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
-                    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M4 1h7v2H4zM2 3h2v3H2zM11 3h2v2h2v2H9V1h2zM1 9h6v6H5v-2H3v-2H1zM12 10h2v3h-2zM5 13h7v2H5z"/></svg>
-                    <span>Refresh</span>
-                  </button>
-                </div>
-                <div class="tweaks-output-line uninstall-command"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><span id="uninstall-command-text">winget list</span><span id="uninstall-refresh-dots" class="uninstall-command-dots" aria-hidden="true" hidden><span></span><span></span><span></span></span></div>
-                <div id="uninstall-inventory" class="uninstall-inventory" aria-busy="false">
-                  <p id="uninstall-empty" class="uninstall-empty">Open this dropdown to load installed apps.</p>
-                  <div class="uninstall-table-scroll" tabindex="0" role="region" aria-label="Installed apps" hidden>
-                    <table id="uninstall-table">
-                      <caption>Apps reported by winget list. Select apps to uninstall.</caption>
-                      <thead><tr id="uninstall-columns"></tr></thead>
-                      <tbody id="uninstall-rows"></tbody>
-                    </table>
+            <hr class="preferences-divider" aria-hidden="true">
+            <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
+            <h3 class="preference-group">Taskbar</h3>
+            <div class="preference" data-preference="taskbar-centering">
+              <div>
+                <h3>Center taskbar icons</h3>
+                <p class="preference-description">Centers taskbar icons. Disable to align them to the left.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="task-view">
+              <div>
+                <h3>Show Task View button</h3>
+                <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="taskbar-flashing">
+              <div>
+                <h3>Show flashing on taskbar apps</h3>
+                <p class="preference-description">Allows app icons on the taskbar to flash when they need your attention.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="widgets">
+              <div>
+                <h3>Allow Widgets</h3>
+                <p class="preference-description">Allows the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
+              </div>
+            </div>
+            <div class="preference" data-preference="taskbar-end-task">
+              <div>
+                <h3>Enable taskbar End task</h3>
+                <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
+              </div>
+            </div>
+            <h3 class="preference-group">Desktop</h3>
+            <div class="preference" data-preference="shortcut-arrow">
+              <div>
+                <h3>Hide shortcut arrow icon</h3>
+                <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · Behavior</h3>
+            <div class="preference folder-view-preference">
+              <div>
+                <h3 id="explorer-launch-label">Open Explorer to</h3>
+                <p class="preference-description">Choose the starting location for new File Explorer windows.</p>
+                <p id="explorer-launch-value" class="preference-value">Loading…</p>
+              </div>
+              <div class="folder-view-controls">
+                <button id="explorer-launch-picker" class="folder-view-picker" role="combobox" aria-labelledby="explorer-launch-label explorer-launch-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="explorer-launch-options" disabled>
+                  <span id="explorer-launch-selection">Choose a location</span>
+                  <span class="picker-arrow" aria-hidden="true"></span>
+                </button>
+                <button id="explorer-launch-apply" disabled>Apply</button>
+              </div>
+            </div>
+            <div class="preference" data-preference="item-checkboxes">
+              <div>
+                <h3>Show selection checkboxes</h3>
+                <p class="preference-description">Adds checkboxes for selecting files and folders.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="single-click">
+              <div>
+                <h3>Double-click to open items</h3>
+                <p class="preference-description">Requires two clicks to open files and folders. Disable to open with one click.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="confirm-delete">
+              <div>
+                <h3>Confirm before recycling files</h3>
+                <p class="preference-description">Asks for confirmation before moving items to the Recycle Bin.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="restore-folder-windows">
+              <div>
+                <h3>Restore folder windows at sign-in</h3>
+                <p class="preference-description">Reopens previous folder windows when you sign in to Windows.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="transfer-details">
+              <div>
+                <h3>Expand file-transfer details</h3>
+                <p class="preference-description">Shows transfer speed and other details by default when copying, moving or deleting files.</p>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · Folder views</h3>
+            <div class="preference folder-view-preference">
+              <div>
+                <h3 id="folder-view-label">Default folder view</h3>
+                <p class="preference-description">Sets the view across all folder types. Resets saved views, including individual folder layouts.</p>
+                <p id="folder-view-value" class="preference-value">Loading…</p>
+              </div>
+              <div class="folder-view-controls">
+                <button id="folder-view-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-view-label folder-view-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-view-options" disabled>
+                  <span id="folder-view-selection">Choose a view</span>
+                  <span class="picker-arrow" aria-hidden="true"></span>
+                </button>
+                <button id="folder-view-apply" disabled>Apply</button>
+              </div>
+            </div>
+            <div class="preference folder-view-preference">
+              <div>
+                <h3 id="folder-sort-label">Default folder sorting</h3>
+                <p class="preference-description">Sets sorting across all folder types. Resets saved views, including individual folder layouts.</p>
+                <p id="folder-sort-value" class="preference-value">Loading…</p>
+              </div>
+              <div class="folder-view-controls">
+                <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
+                  <span id="folder-sort-selection">Choose sorting</span>
+                  <span class="picker-arrow" aria-hidden="true"></span>
+                </button>
+                <button id="folder-sort-apply" disabled>Apply</button>
+              </div>
+            </div>
+            <div class="preference folder-view-preference">
+              <div>
+                <h3 id="folder-grouping-label">Default folder grouping</h3>
+                <p class="preference-description">Sets grouping across all folder types. Resets saved views, including individual folder layouts.</p>
+                <p id="folder-grouping-value" class="preference-value">Loading…</p>
+              </div>
+              <div class="folder-view-controls">
+                <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
+                  <span id="folder-grouping-selection">Choose grouping</span>
+                  <span class="picker-arrow" aria-hidden="true"></span>
+                </button>
+                <button id="folder-grouping-apply" disabled>Apply</button>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · File visibility</h3>
+            <div class="preference" data-preference="file-extensions">
+              <div>
+                <h3>Hide known file extensions</h3>
+                <p class="preference-description">Hides extensions for known file types, such as .exe, .txt and .png.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="hidden-files">
+              <div>
+                <h3>Show hidden files</h3>
+                <p class="preference-description">Shows hidden files, folders and drives.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="empty-drives">
+              <div>
+                <h3>Hide empty drives</h3>
+                <p class="preference-description">Hides drives when no media is inserted.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="system-files">
+              <div>
+                <h3>Show protected operating system files</h3>
+                <p class="preference-description">Reveals protected system files when Show hidden files is also enabled.</p>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · Appearance</h3>
+            <div class="preference" data-preference="explorer-spacing">
+              <div>
+                <h3>Use compact spacing</h3>
+                <p class="preference-description">Uses compact spacing in File Explorer.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="modern-context-menu">
+              <div>
+                <h3>Use classic context menu</h3>
+                <p class="preference-description">Requests the classic Windows 10-style right-click menu.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="full-path">
+              <div>
+                <h3>Show full path in title bar</h3>
+                <p class="preference-description">Displays the complete folder path in the window title bar.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="icons-only">
+              <div>
+                <h3>Show icons instead of thumbnails</h3>
+                <p class="preference-description">Uses file icons instead of image and video thumbnails.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="info-tips">
+              <div>
+                <h3>Show hover descriptions</h3>
+                <p class="preference-description">Shows pop-up descriptions when pointing at files and folders.</p>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · Navigation pane</h3>
+            <div class="preference" data-preference="network">
+              <div>
+                <h3>Show Network in navigation pane</h3>
+                <p class="preference-description">Shows the Network entry in the sidebar. Does not change network discovery or file sharing.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="libraries">
+              <div>
+                <h3>Show Libraries</h3>
+                <p class="preference-description">Shows Libraries in the navigation pane.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="home-folder">
+              <div>
+                <h3>Show Home folder</h3>
+                <p class="preference-description">Shows Home in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+              </div>
+            </div>
+            <div class="preference" data-preference="gallery">
+              <div>
+                <h3>Show Gallery</h3>
+                <p class="preference-description">Shows Gallery in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
+              </div>
+            </div>
+            <h3 class="preference-group">File Explorer · Home and privacy</h3>
+            <div class="preference" data-preference="recent-files">
+              <div>
+                <h3>Show recently used files</h3>
+                <p class="preference-description">Shows recently used files in File Explorer Home or Quick access.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="recommendations">
+              <div>
+                <h3>Show recommendations</h3>
+                <p class="preference-description">Shows the Recommended section in File Explorer Home.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="frequent-folders">
+              <div>
+                <h3>Show frequently used folders</h3>
+                <p class="preference-description">Shows your most accessed folders in Quick access.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="office-files">
+              <div>
+                <h3>Show cloud files in Quick access</h3>
+                <p class="preference-description">Shows account and cloud-provider content in File Explorer. Availability depends on your account.</p>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+      <details id="optimization-settings" class="tweak-category" aria-labelledby="optimization-settings-title">
+        <summary>
+          <h2 id="optimization-settings-title" class="tweak-heading">
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" fill-rule="evenodd" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M5 1h2v2h2V1h2v2h2v2h2v2h-2v2h2v2h-2v2h-2v2H9v-2H7v2H5v-2H3v-2H1V9h2V7H1V5h2V3h2zm0 4v6h6V5zM7 7h2v2H7z"/></svg>
+            <span>Optimization Settings</span>
+          </h2>
+        </summary>
+        <hr class="preferences-divider" aria-hidden="true">
+        <div class="tweak-subgroups answer-subgroups">
+          <details id="debloat-preferences" aria-labelledby="debloat-title">
+            <summary>
+              <svg class="answer-branch" viewBox="0 0 20 14" width="20" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M0 0h2v6h2v4h4v2h12v2H8v-2H4v-2H2V6H0z"/></svg>
+              <h3 id="debloat-title" class="tweak-heading">
+                <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M7 1h2v2H7zM3 3h2v2H3zM11 3h2v2h-2zM1 7h2v4H1zM13 7h2v4h-2zM3 11h2v2H3zM11 11h2v2h-2zM5 13h6v2H5zM10 5h2v2h-2v2H8v2H6V7h2V5z"/></svg>
+                <span>Debloat</span>
+              </h3>
+            </summary>
+            <hr class="preferences-divider" aria-hidden="true">
+            <div class="tweak-subgroups debloat-subgroups answer-subgroups">
+              <details id="uninstall-apps" aria-labelledby="uninstall-title">
+                <summary>
+                  <svg class="answer-branch" viewBox="0 0 20 14" width="20" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M0 0h2v6h2v4h4v2h12v2H8v-2H4v-2H2V6H0z"/></svg>
+                  <h4 id="uninstall-title" class="tweak-heading">
+                    <svg class="uninstall-title-icon" viewBox="0 0 20 20" width="18" height="18" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M2 2h16v16H2zm2 2v3h12V4zm0 5v7h12V9zM6 11h8v2H6z"/></svg>
+                    <span>Uninstall apps</span>
+                  </h4>
+                </summary>
+                <div class="uninstall-workspace">
+                  <p class="note uninstall-intro">Check or right-click apps to select them. Drag with either mouse button to select a range. Left-click an app to see its details.</p>
+                  <div class="tweaks-output uninstall-terminal" aria-label="Installed apps terminal">
+                    <div class="tweaks-output-header">
+                      <span class="tweaks-output-icon" aria-hidden="true">&gt;_</span>
+                      <span>Installed apps</span>
+                      <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
+                        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M4 1h7v2H4zM2 3h2v3H2zM11 3h2v2h2v2H9V1h2zM1 9h6v6H5v-2H3v-2H1zM12 10h2v3h-2zM5 13h7v2H5z"/></svg>
+                        <span>Refresh</span>
+                      </button>
+                    </div>
+                    <div class="tweaks-output-line uninstall-command"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><span id="uninstall-command-text">winget list</span><span id="uninstall-refresh-dots" class="uninstall-command-dots" aria-hidden="true" hidden><span></span><span></span><span></span></span></div>
+                    <div id="uninstall-inventory" class="uninstall-inventory" aria-busy="false">
+                      <p id="uninstall-empty" class="uninstall-empty">Open this dropdown to load installed apps.</p>
+                      <div class="uninstall-table-scroll" tabindex="0" role="region" aria-label="Installed apps" hidden>
+                        <table id="uninstall-table">
+                          <caption>Apps reported by winget list. Select apps to uninstall.</caption>
+                          <thead><tr id="uninstall-columns"></tr></thead>
+                          <tbody id="uninstall-rows"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <pre id="uninstall-log" class="uninstall-log" role="log" aria-label="Uninstall output" aria-live="polite" hidden></pre>
+                  </div>
+                  <div class="uninstall-footer">
+                    <div class="uninstall-feedback">
+                      <p id="uninstall-selection">0 apps selected</p>
+                      <p id="uninstall-status" class="note" role="status" aria-live="polite">Your installed apps will appear here.</p>
+                    </div>
+                    <button id="uninstall-start" type="button" class="primary" disabled>Uninstall apps</button>
                   </div>
                 </div>
-                <pre id="uninstall-log" class="uninstall-log" role="log" aria-label="Uninstall output" aria-live="polite" hidden></pre>
-              </div>
-              <div class="uninstall-footer">
-                <div class="uninstall-feedback">
-                  <p id="uninstall-selection">0 apps selected</p>
-                  <p id="uninstall-status" class="note" role="status" aria-live="polite">Your installed apps will appear here.</p>
-                </div>
-                <button id="uninstall-start" type="button" class="primary" disabled>Uninstall apps</button>
-              </div>
+              </details>
             </div>
           </details>
         </div>
@@ -435,7 +459,6 @@
     <div id="settings-panel" role="tabpanel" aria-labelledby="settings-tab" hidden>
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">Settings</h2>
-        <svg class="settings-divider" width="100%" height="6" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><defs><pattern id="settings-zigzag" width="16" height="6" patternUnits="userSpaceOnUse"><path fill="currentColor" d="M0 0h4v2H0zm4 2h4v2H4zm4 2h4v2H8zm4-2h4v2h-4z"/></pattern></defs><rect width="100%" height="6" fill="url(#settings-zigzag)"/></svg>
         <div class="preference">
           <div>
             <h3 id="desktop-layout-safe-mode-label">Desktop icon layout safe mode</h3>

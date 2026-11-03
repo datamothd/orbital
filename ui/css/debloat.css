@@ -1,52 +1,15 @@
-#debloat-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-#debloat-title svg {
-  flex-shrink: 0;
-}
-
 #debloat-preferences > .preferences-divider {
   margin-left: 32px;
   border-top-color: var(--border);
 }
 
-.debloat-subgroups > details {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  border-bottom: 1px solid #222;
-}
-
-.debloat-subgroups > details > summary {
-  position: relative;
-  min-height: 58px;
-  margin: 0;
-  padding: var(--space-5) 0;
-  line-height: 18px;
-}
-
-.debloat-subgroups h3 {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
 .uninstall-title-icon {
   flex-shrink: 0;
+  transform: translateY(-1px);
 }
 
 .uninstall-workspace {
   min-width: 0;
-  padding-bottom: var(--space-4);
 }
 
 .debloat-subgroups > details[open] > summary {

@@ -361,7 +361,7 @@ mod navigation_tests {
             assert!(
                 changes
                     .iter()
-                    .all(|change| recommendation(change).is_none())
+                    .all(|change| recommendation(change).is_some())
             );
             let prepared = prepare_changes(&changes).unwrap();
             apply_changes(&changes, &prepared).unwrap();
@@ -375,7 +375,7 @@ mod navigation_tests {
             Preference::ExpandTransferDetails.recommended_value(),
             Some(true)
         );
-        assert_eq!(Preference::ShowNetwork.recommended_value(), Some(true));
+        assert_eq!(Preference::ShowNetwork.recommended_value(), Some(false));
     }
 
     #[test]
