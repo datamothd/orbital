@@ -144,6 +144,7 @@
     if (![0, 2].includes(event.button) || event.pointerType !== "mouse" || operation || !selectionAllowed()) return;
     const row = event.target.closest(event.button === 2 ? ".uninstall-app-row, .uninstall-app-details" : ".uninstall-app-row");
     if (!row || !apps[Number(row.dataset.index)]?.selectable) return;
+    if (event.button === 2) event.preventDefault();
     finishDrag(true);
     suppressClick = false;
     suppressContextMenu = event.button === 2;
@@ -160,6 +161,7 @@
     if (!drag.active) {
       if (Math.hypot(event.clientX - drag.x, event.clientY - drag.originY) < 6) return;
       drag.active = true;
+      tableScroll.focus({ preventScroll: true });
       tableScroll.setPointerCapture(drag.pointerId);
       tableScroll.classList.add("is-selecting");
       dragFrame = requestAnimationFrame(scrollWhileSelecting);

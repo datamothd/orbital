@@ -144,7 +144,7 @@
   border-bottom: 0;
 }
 
-#uninstall-table .uninstall-app-row:is(:hover, :focus-within) td {
+:where(.uninstall-table-scroll:not(.is-selecting)) #uninstall-table .uninstall-app-row:where(:hover, :focus-within) td {
   background: #171717;
 }
 
