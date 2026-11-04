@@ -1,4 +1,4 @@
-use orbital::explorer::{self, TweakProfile};
+use orbital::explorer::{self, AppRemoval, TweakProfile};
 use std::path::{Path, PathBuf};
 use windows_sys::core::w;
 
@@ -17,12 +17,20 @@ fn choose_file(owner: usize, save: bool) -> Result<Option<PathBuf>, String> {
 }
 
 #[tauri::command]
-pub async fn export_tweaks(window: tauri::Window) -> Result<bool, String> {
+pub async fn export_tweaks(
+    window: tauri::Window,
+    apps_to_remove: Option<Vec<AppRemoval>>,
+) -> Result<bool, String> {
     crate::files::with_dialog(window, move |owner| {
         let Some(path) = choose_file(owner, true)? else {
             return Ok(false);
         };
-        let profile = explorer::export_tweaks().map_err(|error| error.to_string())?;
+        let mut profile = explorer::export_tweaks().map_err(|error| error.to_string())?;
+        profile.apps_to_remove = apps_to_remove.unwrap_or_default();
+        if !profile.apps_to_remove.is_empty() {
+            profile.version = 5;
+        }
+        profile.validate().map_err(|error| error.to_string())?;
         let json = serde_json::to_string_pretty(&profile).map_err(|error| error.to_string())?;
         std::fs::write(path, format!("{json}\n"))
             .map_err(|error| format!("Could not save the export: {error}"))?;
@@ -60,6 +68,25 @@ pub async fn apply_imported_tweaks(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn app_removal_profiles_preserve_absent_apps_and_reject_ambiguous_entries() {
+        let json = r#"{"format":"orbital-tweaks","version":5,"tweaks":[],"folder_sort":null,"folder_grouping":null,"apps_to_remove":[{"name":"Calculator","id":"Microsoft.WindowsCalculator","kind":"appx"},{"name":"OneDrive","id":"Microsoft.OneDrive","kind":"winget"}]}"#;
+        let mut profile: TweakProfile = serde_json::from_str(json).unwrap();
+        profile.normalize().unwrap();
+        assert_eq!(
+            serde_json::to_value(&profile).unwrap(),
+            serde_json::from_str::<serde_json::Value>(json).unwrap()
+        );
+        profile
+            .apps_to_remove
+            .push(profile.apps_to_remove[0].clone());
+        assert!(profile.validate().is_err());
+        profile.apps_to_remove.pop();
+        profile.version = 4;
+        assert!(profile.validate().is_err());
+        assert!(serde_json::from_str::<TweakProfile>(&json.replace("appx", "command")).is_err());
+    }
 
     #[test]
     fn json_round_trip_preserves_non_recommended_folder_choices() {

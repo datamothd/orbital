@@ -3,6 +3,8 @@ use super::*;
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TweakProfile {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apps_to_remove: Vec<AppRemoval>,
     pub format: String,
     pub version: u32,
     pub tweaks: Vec<Preference>,
@@ -16,6 +18,21 @@ pub struct TweakProfile {
     pub open_explorer_to: Option<ExplorerLaunch>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppRemoval {
+    pub name: String,
+    pub id: String,
+    pub kind: AppIdentityKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppIdentityKind {
+    Appx,
+    Winget,
+}
+
 pub enum SettingsCommand {
     Toggle(Preference),
     Recommended,
@@ -23,9 +40,26 @@ pub enum SettingsCommand {
 
 impl TweakProfile {
     pub fn validate(&self) -> io::Result<()> {
-        if self.format != "orbital-tweaks" || !matches!(self.version, 1..=4) {
+        if self.format != "orbital-tweaks" || !matches!(self.version, 1..=5) {
             return Err(io::Error::other(
-                "Choose an Orbital tweaks JSON file (version 1, 2, 3 or 4).",
+                "Choose an Orbital tweaks JSON file (version 1, 2, 3, 4 or 5).",
+            ));
+        }
+        if (!self.apps_to_remove.is_empty() && self.version < 5)
+            || self.apps_to_remove.len() > 2048
+            || self.apps_to_remove.iter().enumerate().any(|(index, app)| {
+                app.name.trim().is_empty()
+                    || app.name.len() > 512
+                    || app.id.trim().is_empty()
+                    || app.id.len() > 1024
+                    || app.id.chars().any(char::is_control)
+                    || self.apps_to_remove[..index].iter().any(|other| {
+                        other.kind == app.kind && other.id.eq_ignore_ascii_case(&app.id)
+                    })
+            })
+        {
+            return Err(io::Error::other(
+                "Invalid or duplicate app removal selections.",
             ));
         }
         let all: Vec<_> = self.tweaks.iter().chain(&self.disabled_tweaks).collect();
@@ -278,6 +312,7 @@ fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
         .filter(|preference| preference.supported(current) && preference.state(current).is_some())
         .partition(|preference| preference.state(current) == Some(true));
     TweakProfile {
+        apps_to_remove: vec![],
         format: "orbital-tweaks".into(),
         version: 4,
         tweaks,
@@ -387,6 +422,7 @@ pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
 pub fn set_explorer_launch(target: ExplorerLaunch) -> io::Result<()> {
     apply_imported_tweaks(
         TweakProfile {
+            apps_to_remove: vec![],
             format: "orbital-tweaks".into(),
             version: 4,
             tweaks: vec![],
@@ -794,6 +830,7 @@ mod tests {
         for version in [1, 2, 3] {
             for enabled in [false, true] {
                 let mut profile = TweakProfile {
+                    apps_to_remove: vec![],
                     format: "orbital-tweaks".into(),
                     version,
                     tweaks: if enabled {
@@ -1009,6 +1046,7 @@ mod tests {
     #[test]
     fn profile_rejects_wrong_format_version_and_duplicate_tweaks() {
         let mut profile = TweakProfile {
+            apps_to_remove: vec![],
             format: "orbital-tweaks".into(),
             version: 1,
             tweaks: vec![],
@@ -1019,7 +1057,7 @@ mod tests {
             open_explorer_to: None,
         };
         assert!(profile.validate().is_ok());
-        profile.version = 5;
+        profile.version = 6;
         assert!(profile.validate().is_err());
         profile.version = 1;
         profile.format = "other-app".into();

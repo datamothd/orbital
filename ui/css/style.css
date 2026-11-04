@@ -612,6 +612,7 @@ button:disabled {
   position: fixed;
   z-index: 10;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #555 var(--control);
   padding: var(--space-1);

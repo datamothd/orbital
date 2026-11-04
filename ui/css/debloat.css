@@ -337,3 +337,24 @@
   display: block;
   color: var(--muted);
 }
+
+.uninstall-view-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.uninstall-view-switch button {
+  border: 0;
+  border-radius: 0;
+  padding: 5px 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+.uninstall-view-switch button + button { border-left: 1px solid var(--border); }
+.uninstall-view-switch button[aria-pressed="true"] { background: #102018; color: var(--green); }
+.uninstall-view-switch button:focus-visible { outline: 1px solid var(--green); outline-offset: -3px; }
+.uninstall-terminal .tweaks-output-header { flex-wrap: wrap; }
+.uninstall-app-state { color: var(--muted); font-size: 10px; margin-left: 8px; }

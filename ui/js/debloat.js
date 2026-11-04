@@ -13,12 +13,58 @@
   const log = byId("uninstall-log");
   const selected = new Set();
   let apps = [];
+  let installed = { headers: ["Name", "Id", "Version"], apps: [] };
+  let view = "installed";
+  const known = new Map();
+  const selectionAllowed = () => view === "default" || inventoryValid;
+  const selectionKey = app => {
+    const entry = defaultWindowsApps.find(entry => defaultAppMatch(entry, app));
+    return entry ? `${entry.kind}:${entry.id.toLowerCase()}` : `winget:${app.id.toLowerCase()}`;
+  };
+  const chosenInstalled = () => inventoryValid ? installed.apps.filter(app => app.selectable && selected.has(selectionKey(app))) : [];
+  window.orbitalAppSelections = {
+    export: () => [...selected].map(key => known.get(key)).filter(Boolean),
+    restore: entries => {
+      for (const entry of entries || []) {
+        const key = `${entry.kind}:${entry.id.toLowerCase()}`;
+        known.set(key, entry);
+        selected.add(key);
+      }
+      updateControls();
+    },
+  };
+  for (const entry of defaultWindowsApps) known.set(`${entry.kind}:${entry.id.toLowerCase()}`, { name: entry.name, id: entry.id, kind: entry.kind });
   let operation = "";
   let inventoryValid = false;
   let drag = null;
   let dragFrame = 0;
   let suppressClick = false;
   let suppressContextMenu = false;
+
+  function renderView() {
+    byId("apps-installed").setAttribute("aria-pressed", String(view === "installed"));
+    byId("apps-default").setAttribute("aria-pressed", String(view === "default"));
+    const label = view === "default" ? "Default Windows apps" : "Installed apps";
+    tableScroll.setAttribute("aria-label", label);
+    byId("uninstall-table").querySelector("caption").textContent = `${label}. Select apps for removal or export.`;
+    byId("uninstall-command-text").textContent = view === "default" ? "Windows app catalog" : "winget list --details";
+    byId("uninstall-command-text").removeAttribute("title");
+    const result = view === "installed" ? { ...installed, apps: installed.apps.map(app => ({ ...app, key: selectionKey(app) })) } : {
+      headers: ["Name", "Package", "Status"],
+      apps: defaultWindowsApps.map(entry => {
+        const matches = inventoryValid ? installed.apps.filter(app => defaultAppMatch(entry, app)) : [];
+        return {
+          ...entry, key: `${entry.kind}:${entry.id.toLowerCase()}`, selectable: true,
+          version: matches[0]?.version || "—",
+          state: matches.length ? "Installed" : inventoryValid ? "Not reported" : "Not checked",
+          cells: [entry.name, entry.id, matches.length ? `Installed · ${matches.map(app => app.version).join(", ")}` : inventoryValid ? "Not reported by WinGet" : "Installation status not checked"],
+          details: [{ label: "Availability", value: entry.availability }, { label: "Identity type", value: entry.kind === "appx" ? "Appx package name" : "WinGet package ID" }, { label: "Export", value: "Remove after Windows installation, including when absent now" }, ...(entry.caution ? [{ label: "Dependency", value: entry.caution }] : [])],
+        };
+      }),
+    };
+    render(result);
+    updateControls();
+  }
 
   function status(message, error = false) {
     byId("uninstall-status").textContent = message;
@@ -27,14 +73,14 @@
 
   function updateControls() {
     refreshButton.disabled = Boolean(operation) || !invoke;
-    uninstallButton.disabled = Boolean(operation) || !inventoryValid || !selected.size;
+    uninstallButton.disabled = Boolean(operation) || !chosenInstalled().length;
     uninstallButton.textContent = operation === "uninstall" ? "Uninstalling…" : "Uninstall apps";
     inventory.setAttribute("aria-busy", String(Boolean(operation)));
     const selection = byId("uninstall-selection");
     selection.textContent = `${selected.size} ${selected.size === 1 ? "app" : "apps"} selected`;
     selection.dataset.selected = String(selected.size > 0);
     for (const checkbox of rows.querySelectorAll("input")) {
-      checkbox.disabled = Boolean(operation) || !inventoryValid || checkbox.dataset.selectable !== "true";
+      checkbox.disabled = Boolean(operation) || !selectionAllowed() || checkbox.dataset.selectable !== "true";
       checkbox.checked = selected.has(checkbox.value);
     }
   }
@@ -95,7 +141,7 @@
   }
 
   rows.addEventListener("pointerdown", event => {
-    if (![0, 2].includes(event.button) || event.pointerType !== "mouse" || operation || !inventoryValid) return;
+    if (![0, 2].includes(event.button) || event.pointerType !== "mouse" || operation || !selectionAllowed()) return;
     const row = event.target.closest(event.button === 2 ? ".uninstall-app-row, .uninstall-app-details" : ".uninstall-app-row");
     if (!row || !apps[Number(row.dataset.index)]?.selectable) return;
     finishDrag(true);
@@ -148,7 +194,7 @@
   }, true);
 
   function toggleSelection(index) {
-    if (operation || !inventoryValid) return;
+    if (operation || !selectionAllowed()) return;
     const app = apps[index];
     if (!app?.selectable) return;
     if (selected.has(app.key)) selected.delete(app.key);
@@ -160,14 +206,13 @@
     event.preventDefault();
     if (suppressContextMenu || drag) return;
     const row = event.target.closest(".uninstall-app-row, .uninstall-app-details");
-    if (!row || operation || !inventoryValid) return;
+    if (!row || operation || !selectionAllowed()) return;
     toggleSelection(Number(row.dataset.index));
   });
 
   function render(result) {
     finishDrag();
     apps = result.apps;
-    selected.clear();
     const selectionHeader = element("th");
     selectionHeader.scope = "col";
     selectionHeader.textContent = "select";
@@ -199,6 +244,7 @@
       toggle.setAttribute("aria-expanded", "false");
       toggle.setAttribute("aria-controls", `uninstall-details-${index}`);
       toggle.append(element("span", "", app.name), element("span", "uninstall-app-arrow"));
+      if (app.state) toggle.firstChild.append(element("span", "uninstall-app-state", app.state));
       toggle.lastChild.setAttribute("aria-hidden", "true");
       const details = element("tr", "uninstall-app-details");
       details.id = `uninstall-details-${index}`;
@@ -237,7 +283,6 @@
   async function loadApps() {
     finishDrag();
     inventoryValid = false;
-    selected.clear();
     updateControls();
     if (!apps.length) {
       byId("uninstall-empty").hidden = false;
@@ -247,13 +292,19 @@
       refreshDots.hidden = false;
       const onCommand = new window.__TAURI__.core.Channel();
       onCommand.onmessage = command => {
+        if (view !== "installed") return;
         const commandText = byId("uninstall-command-text");
         commandText.textContent = "winget list --details";
         commandText.title = command;
       };
       const result = await invoke("list_installed_apps", { onCommand });
-      render(result);
+      installed = result;
+      for (const app of result.apps) {
+        const key = selectionKey(app);
+        if (!known.has(key)) known.set(key, { name: app.name, id: app.id, kind: "winget" });
+      }
       inventoryValid = true;
+      renderView();
       return null;
     } catch (reason) {
       if (!apps.length) byId("uninstall-empty").textContent = "Could not load installed apps. Try Refresh.";
@@ -262,6 +313,7 @@
       return message;
     } finally {
       refreshDots.hidden = true;
+      renderView();
     }
   }
 
@@ -277,7 +329,7 @@
     status("Running winget list…");
     const error = await loadApps();
     operation = "";
-    status(error || `${apps.length} ${apps.length === 1 ? "app" : "apps"} found.`, Boolean(error));
+    status(error || `${installed.apps.length} installed apps found. Selections are included in Export.`, Boolean(error));
     updateControls();
   }
 
@@ -288,8 +340,8 @@
   }
 
   async function uninstallSelected() {
-    if (operation || !inventoryValid || !selected.size) return;
-    const chosen = apps.filter(app => selected.has(app.key));
+    if (operation || !chosenInstalled().length) return;
+    const chosen = chosenInstalled();
     operation = "confirm";
     updateControls();
     byId("uninstall-confirm-title").textContent = `Uninstall ${chosen.length} ${chosen.length === 1 ? "app" : "apps"}?`;
@@ -337,8 +389,16 @@
 
   for (const section of [category, parent, dropdown]) {
     section.addEventListener("toggle", () => {
-      if (category.open && parent.open && dropdown.open) refreshApps();
+      if (category.open && parent.open && dropdown.open && !inventoryValid) refreshApps();
       else finishDrag(true);
+    });
+  }
+  for (const [id, next] of [["apps-installed", "installed"], ["apps-default", "default"]]) {
+    byId(id).addEventListener("click", () => {
+      finishDrag(true);
+      view = next;
+      renderView();
+      status(view === "default" ? "Select apps to include in Export for later removal." : "Selections from both lists are included in Export.");
     });
   }
   refreshButton.addEventListener("click", refreshApps);

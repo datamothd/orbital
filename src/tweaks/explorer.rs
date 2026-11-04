@@ -12,7 +12,7 @@ use options::*;
 
 pub use folder_views::{FolderGrouping, FolderSort, FolderView, SortColumn};
 pub use profiles::{
-    SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
+    AppIdentityKind, AppRemoval, SettingsCommand, TweakProfile, apply_batch, apply_imported_tweaks, export_tweaks,
     set_explorer_launch, toggle_preference,
 };
 

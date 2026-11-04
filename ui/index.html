@@ -12,6 +12,7 @@
   <script src="js/app.js" defer></script>
   <script src="js/batch.js" defer></script>
   <script src="js/profiles.js" defer></script>
+  <script src="js/default-apps.js" defer></script>
   <script src="js/debloat.js" defer></script>
   <script src="js/answer.js" defer></script>
   <script src="js/inject.js" defer></script>
@@ -352,7 +353,10 @@
                   <div class="tweaks-output uninstall-terminal" aria-label="Installed apps terminal">
                     <div class="tweaks-output-header">
                       <span class="tweaks-output-icon" aria-hidden="true">&gt;_</span>
-                      <span>Installed apps</span>
+                      <div class="uninstall-view-switch" role="group" aria-label="App list">
+                        <button id="apps-installed" type="button" aria-pressed="true">Installed apps</button>
+                        <button id="apps-default" type="button" aria-pressed="false">Default Windows apps</button>
+                      </div>
                       <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
                         <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M4 1h7v2H4zM2 3h2v3H2zM11 3h2v2h2v2H9V1h2zM1 9h6v6H5v-2H3v-2H1zM12 10h2v3h-2zM5 13h7v2H5z"/></svg>
                         <span>Refresh</span>
