@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    io::Write,
+    io::{BufRead, BufReader, Read, Write},
     os::windows::process::CommandExt,
-    process::{Command, Stdio},
+    process::{Child, ChildStdout, Command, Stdio},
     sync::{Arc, Mutex},
+    thread::JoinHandle,
 };
 use tauri::{State, ipc::Channel};
 
@@ -98,52 +99,92 @@ pub struct UninstallEvent {
     output: String,
 }
 
-fn run_native(request: serde_json::Value) -> Result<String, String> {
-    let executable = std::env::var_os("SystemRoot")
-        .map(std::path::PathBuf::from)
-        .ok_or("Windows system directory is unavailable.")?
-        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
-    let mut child = Command::new(executable)
-        .args([
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            SCRIPT,
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .creation_flags(0x0800_0000)
-        .spawn()
-        .map_err(|error| format!("Could not start Windows app servicing: {error}"))?;
-    let payload = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
-    let input_result = child
-        .stdin
-        .take()
-        .ok_or("App servicing input is unavailable.")?
-        .write_all(&payload);
-    if let Err(error) = input_result {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(format!("Could not send the removal request: {error}"));
+struct NativeService {
+    child: Child,
+    stdout: BufReader<ChildStdout>,
+    stderr: Option<JoinHandle<std::io::Result<String>>>,
+}
+
+impl NativeService {
+    fn start() -> Result<Self, String> {
+        Self::start_script(SCRIPT)
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| error.to_string())?;
-    let stdout = String::from_utf8_lossy(&output.stdout)
-        .trim_start_matches('\u{feff}')
-        .trim()
-        .to_owned();
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "Windows app servicing failed.\n{}\n{}",
+
+    fn start_script(script: &str) -> Result<Self, String> {
+        let executable = std::env::var_os("SystemRoot")
+            .map(std::path::PathBuf::from)
+            .ok_or("Windows system directory is unavailable.")?
+            .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+        let mut child = Command::new(executable)
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|error| format!("Could not start Windows app servicing: {error}"))?;
+        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut stderr = child.stderr.take().unwrap();
+        let stderr = std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            stderr.read_to_end(&mut bytes)?;
+            Ok(String::from_utf8_lossy(&bytes).trim().to_owned())
+        });
+        Ok(Self {
+            child,
             stdout,
-            stderr.trim()
-        ));
+            stderr: Some(stderr),
+        })
     }
-    Ok(stdout)
+
+    fn errors(&mut self) -> String {
+        self.stderr
+            .take()
+            .and_then(|reader| reader.join().ok())
+            .and_then(Result::ok)
+            .unwrap_or_default()
+    }
+
+    fn request(&mut self, request: serde_json::Value) -> Result<String, String> {
+        let mut payload = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
+        payload.push(b'\n');
+        let input = self.child.stdin.as_mut()
+            .ok_or("App servicing input is unavailable.")?;
+        if let Err(error) = input.write_all(&payload).and_then(|_| input.flush()) {
+            return Err(format!("Could not send the removal request: {error}"));
+        }
+        let mut output = String::new();
+        if self.stdout.read_line(&mut output).map_err(|error| error.to_string())? == 0 {
+            let _ = self.child.wait();
+            return Err(format!("Windows app servicing stopped before returning a result.\n{}", self.errors()));
+        }
+        Ok(output.trim_start_matches('\u{feff}').trim().to_owned())
+    }
+
+    fn finish(&mut self) -> Result<(), String> {
+        drop(self.child.stdin.take());
+        let status = self.child.wait().map_err(|error| error.to_string())?;
+        let stderr = self.errors();
+        if !status.success() {
+            return Err(format!("Windows app servicing failed.\n{stderr}"));
+        }
+        Ok(())
+    }
+}
+
+impl Drop for NativeService {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let _ = self.errors();
+    }
+}
+
+fn run_native(request: serde_json::Value) -> Result<String, String> {
+    let mut service = NativeService::start()?;
+    let output = service.request(request)?;
+    service.finish()?;
+    Ok(output)
 }
 
 fn parse_list(output: &str, generation: u64) -> Result<AppList, String> {
@@ -241,12 +282,18 @@ pub async fn uninstall_apps(
         let apps = selected_apps(&inventory, &keys)?;
         inventory.valid = false;
         let mut results = Vec::new();
+        let mut service = None;
         for app in apps {
             let command = format!("Remove {} [{}]{}", app.name, app.kind,
                 if inventory.permanent { " · permanent component removal enabled" } else { "" });
             let _ = on_event.send(UninstallEvent { phase: "started", name: app.name.clone(), command, success: false, output: String::new() });
             let request = serde_json::json!({"action": "remove", "kind": app.kind, "id": app.id, "version": app.version, "permanent": inventory.permanent});
-            let result = run_native(request).and_then(|output| serde_json::from_str::<UninstallResult>(&output).map_err(|error| format!("Could not read the removal result: {error}\n{output}")));
+            let result = (|| {
+                if service.is_none() { service = Some(NativeService::start()?); }
+                let output = service.as_mut().unwrap().request(request)?;
+                serde_json::from_str::<UninstallResult>(&output).map_err(|error| format!("Could not read the removal result: {error}\n{output}"))
+            })();
+            if result.is_err() { service = None; }
             let result = match result {
                 Ok(mut result) => { result.key = app.key; result.name = app.name.clone(); result },
                 Err(output) => UninstallResult { key: app.key, name: app.name.clone(), success: false, output, restart_required: false },
@@ -254,6 +301,7 @@ pub async fn uninstall_apps(
             let _ = on_event.send(UninstallEvent { phase: "finished", name: app.name, command: String::new(), success: result.success, output: result.output.clone() });
             results.push(result);
         }
+        if let Some(mut service) = service { let _ = service.finish(); }
         Ok(results)
     }).await.map_err(|error| error.to_string())?
 }
@@ -261,6 +309,55 @@ pub async fn uninstall_apps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_worker_reuses_one_process_and_preserves_request_boundaries() {
+        let script = r#"
+[Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$sequence = 0
+while ($null -ne ($line = [Console]::ReadLine())) {
+    $request = $line | ConvertFrom-Json
+    $sequence++
+    [Console]::WriteLine((@{ sequence = $sequence; pid = $PID; text = $request.text } | ConvertTo-Json -Compress))
+    [Console]::Out.Flush()
+}
+"#;
+        let mut service = NativeService::start_script(script).unwrap();
+        let mut pid = None;
+        for (index, text) in ["应用 👩‍💻", "two\nlines"].into_iter().enumerate() {
+            let output = service.request(serde_json::json!({"text": text})).unwrap();
+            let result: serde_json::Value = serde_json::from_str(&output).unwrap();
+            assert_eq!(result["text"], text);
+            assert_eq!(result["sequence"], index + 1);
+            assert_eq!(pid.get_or_insert_with(|| result["pid"].clone()), &result["pid"]);
+        }
+        service.finish().unwrap();
+    }
+
+    #[test]
+    fn native_worker_reports_crashes_without_blocking_on_stderr() {
+        let mut service = NativeService::start_script(
+            "[void][Console]::ReadLine(); [Console]::Error.WriteLine(('x' * 100000)); exit 7"
+        ).unwrap();
+        let error = service.request(serde_json::json!({})).unwrap_err();
+        assert!(error.contains("stopped before returning a result"));
+        assert!(error.contains(&"x".repeat(100000)));
+        assert!(service.finish().is_err());
+    }
+
+    #[test]
+    fn native_removal_errors_do_not_end_the_session() {
+        let mut service = NativeService::start().unwrap();
+        for id in ["", "Example.NotInstalled"] {
+            let output = service.request(serde_json::json!({"action": "remove", "kind": "invalid", "id": id})).unwrap();
+            let result: UninstallResult = serde_json::from_str(&output).unwrap();
+            assert!(!result.success);
+            assert!(!result.restart_required);
+            assert!(result.output.contains(if id.is_empty() { "Invalid app identity" } else { "Unsupported app identity type" }));
+        }
+        service.finish().unwrap();
+    }
 
     #[test]
     fn relaunch_cannot_start_while_app_servicing_holds_the_inventory() {

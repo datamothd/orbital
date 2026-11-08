@@ -1192,13 +1192,18 @@ button.primary:hover:not(:disabled) {
   margin-top: var(--space-2);
 }
 
+.inject-choices > button:not(.inject-dismiss) {
+  padding: var(--space-4);
+  line-height: 1.4;
+}
+
 .inject-choices button {
   text-align: left;
 }
 
 .inject-choices button span {
   display: block;
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   line-height: 1.4;
   opacity: 0.75;
 }

@@ -247,6 +247,18 @@ function Remove-BundledFiles([string]$Catalog) {
     }
 }
 
+$script:provisioningValid = $false
+$script:removalProvisioning = @()
+
+function Get-RemovalProvisioning([switch]$Refresh) {
+    if ($Refresh -or -not $script:provisioningValid) {
+        $script:provisioningValid = $false
+        $script:removalProvisioning = @(Get-AppxProvisionedPackage -Online)
+        $script:provisioningValid = $true
+    }
+    return $script:removalProvisioning
+}
+
 function Remove-NativeApp($Request) {
     $script:messages = [Collections.Generic.List[string]]::new()
     $script:restart = $false
@@ -254,17 +266,19 @@ function Remove-NativeApp($Request) {
         $id = [string]$Request.id
         if (-not $id -or $id -match '[\x00-\x1f]') { throw 'Invalid app identity.' }
         $permanent = $Request.permanent -is [bool] -and $Request.permanent
+        if ($Request.kind -ne 'appx') { $script:provisioningValid = $false }
         switch ($Request.kind) {
             'appx' {
                 Assert-Administrator
-                $packages = @(Get-AppxPackage -AllUsers -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.Name -eq $id })
-                $staged = @(Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -eq $id })
+                $packageName = [WildcardPattern]::Escape($id)
+                $packages = @(Get-AppxPackage -AllUsers -Name $packageName -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.Name -eq $id })
+                $staged = @(Get-RemovalProvisioning | Where-Object { $_.DisplayName -eq $id })
                 if (@($packages | Where-Object { $_.NonRemovable -or $_.IsFramework -or $_.IsResourcePackage }).Count) { throw 'Windows protects this package or other apps depend on it.' }
                 if (-not $packages.Count -and -not $staged.Count) { throw 'This app is no longer installed or provisioned. Refresh the list.' }
                 $errors = [Collections.Generic.List[string]]::new()
                 foreach ($package in ($packages | Sort-Object @{ Expression = { $_.IsBundle }; Descending = $true })) {
                     try {
-                        $stillInstalled = @(Get-AppxPackage -AllUsers -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.PackageFullName -eq $package.PackageFullName })
+                        $stillInstalled = @(Get-AppxPackage -AllUsers -Name $packageName -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.PackageFullName -eq $package.PackageFullName })
                         if (-not $stillInstalled.Count) { continue }
                         Remove-AppxPackage -Package $package.PackageFullName -AllUsers
                         $script:messages.Add("Removed for all users: $($package.PackageFullName)")
@@ -277,8 +291,8 @@ function Remove-NativeApp($Request) {
                         $script:messages.Add("Removed provisioning for new accounts: $($package.PackageName)")
                     } catch { $errors.Add($_.Exception.Message) }
                 }
-                $remaining = @(Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq $id })
-                $remainingStaged = @(Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -eq $id })
+                $remaining = @(Get-AppxPackage -AllUsers -Name $packageName | Where-Object { $_.Name -eq $id })
+                $remainingStaged = @(Get-RemovalProvisioning -Refresh | Where-Object { $_.DisplayName -eq $id })
                 if ($remaining.Count -or $remainingStaged.Count) { $errors.Add('Windows still reports installed or provisioned packages. A restart may be required.') }
                 if ($errors.Count) { throw ($errors -join "`n") }
             }
@@ -346,20 +360,24 @@ function Remove-NativeApp($Request) {
         if ($script:restart) { $script:messages.Add('Restart Windows to finish removal.') }
         return @{ success = $true; output = ($script:messages -join "`n"); restart_required = $script:restart }
     } catch {
+        $script:provisioningValid = $false
         $script:messages.Add($_.Exception.Message)
         return @{ success = $false; output = ($script:messages -join "`n"); restart_required = $script:restart }
     }
 }
 
-try {
-    $request = [Console]::In.ReadToEnd() | ConvertFrom-Json
+while ($null -ne ($line = [Console]::ReadLine())) {
+  try {
+    $request = $line | ConvertFrom-Json
     switch ($request.action) {
         'list' { $result = Get-NativeInventory }
         'remove' { $result = Remove-NativeApp $request }
         default { throw 'Unknown app servicing request.' }
     }
     [Console]::WriteLine((ConvertTo-Json -InputObject $result -Depth 8 -Compress))
-} catch {
+    [Console]::Out.Flush()
+  } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 1
+  }
 }
