@@ -135,8 +135,7 @@
   scrollbar-gutter: stable;
 }
 
-.uninstall-table-scroll:focus-visible,
-.uninstall-log:focus-visible {
+.uninstall-table-scroll:focus-visible {
   outline: 1px solid var(--green);
   outline-offset: -1px;
 }
@@ -335,22 +334,6 @@
   opacity: 0.45;
 }
 
-.uninstall-log {
-  max-height: 180px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  margin: 0;
-  padding: var(--space-3);
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  user-select: text;
-}
-
 .uninstall-footer {
   display: flex;
   align-items: center;
@@ -372,15 +355,6 @@
 
 #uninstall-selection[data-selected="true"] {
   color: var(--green);
-}
-
-#uninstall-status {
-  margin-top: var(--space-1);
-  overflow-wrap: anywhere;
-}
-
-#uninstall-status.error {
-  color: var(--red);
 }
 
 #uninstall-start {

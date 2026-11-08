@@ -701,16 +701,34 @@ button:disabled {
   padding: var(--space-3) var(--space-3);
 }
 
-#status {
+#tweaks-output-history {
+  position: relative;
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+#tweaks-output-history:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: -1px;
+}
+
+#tweaks-output-history .tweaks-output-line + .tweaks-output-line {
+  border-top: 1px solid rgb(255 255 255 / 5%);
+}
+
+.tweaks-output-message {
   min-width: 0;
   color: var(--text);
   font-size: 12px;
   line-height: 1.5;
   min-height: 18px;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
 }
 
-#status.error {
+.tweaks-output-line.error .tweaks-output-message {
   color: var(--red);
   font-weight: 700;
 }

@@ -11,7 +11,6 @@
   const refreshDots = byId("uninstall-refresh-dots");
   const uninstallButton = byId("uninstall-start");
   const permanentCheckbox = byId("uninstall-permanent");
-  const log = byId("uninstall-log");
   const selected = new Set();
   let apps = [];
   let installed = { headers: ["Name", "Id", "Version"], apps: [] };
@@ -84,9 +83,8 @@
     updateControls();
   }
 
-  function status(message, error = false) {
-    byId("uninstall-status").textContent = message;
-    byId("uninstall-status").classList.toggle("error", error);
+  function status(message, error = false, reveal = false) {
+    writeTweaksOutput(message, { error, reveal });
   }
 
   function updateControls() {
@@ -382,7 +380,7 @@
     } catch (reason) {
       if (!apps.length) byId("uninstall-empty").textContent = "Could not load installed apps. Try Refresh.";
       const message = reason?.message || String(reason).split(/\r?\n/, 1)[0];
-      appendLog(reason?.output || (typeof reason === "string" ? reason : message));
+      appendLog(reason?.output || (typeof reason === "string" ? reason : message), true);
       return { error: message };
     } finally {
       refreshDots.hidden = true;
@@ -402,14 +400,12 @@
     status("Reading Windows apps and components…");
     const { error, warning } = await loadApps();
     operation = "";
-    status(error || `${installed.apps.length} apps and components found. ${warning || "Selections are included in Export."}`, Boolean(error));
+    status(error || warning || "Ready.", Boolean(error), true);
     updateControls();
   }
 
-  function appendLog(text) {
-    log.hidden = false;
-    log.textContent += `${log.textContent ? "\n\n" : ""}${text}`;
-    log.scrollTop = log.scrollHeight;
+  function appendLog(text, error = false) {
+    writeTweaksOutput(text, { error, reveal: true });
   }
 
   async function uninstallSelected(event) {
@@ -432,7 +428,6 @@
     }
     operation = "uninstall";
     updateControls();
-    log.textContent = "";
     let results = null;
     let failure = null;
     try {
@@ -444,22 +439,23 @@
           appendLog(`> ${event.command}`);
         } else {
           completed += 1;
-          appendLog(`${event.success ? "Removed" : "Could not remove"}: ${event.name}\n${event.output}`);
+          appendLog(`${event.success ? "Removed" : "Could not remove"}: ${event.name}\n${event.output}`, !event.success);
         }
       };
       results = await invoke("uninstall_apps", { keys: chosen.map(app => app.key), onEvent });
     } catch (reason) {
       failure = String(reason);
-      appendLog(failure);
+      appendLog(failure, true);
     }
     status("Refreshing installed apps…");
-    const { error: refreshError, warning } = await loadApps();
+    const { error: refreshError } = await loadApps();
     operation = "";
     const removed = results?.filter(result => result.success).length || 0;
     const failed = results ? results.length - removed : 0;
-    const summary = failure || `${removed} ${removed === 1 ? "app" : "apps"} uninstalled.${failed ? ` ${failed} could not be removed. See the output above.` : ""}`;
+    const summary = failure || `${removed} ${removed === 1 ? "app" : "apps"} uninstalled.${failed ? ` ${failed} could not be removed.` : ""}`;
+    const failureDetails = results?.filter(result => !result.success).map(result => `${result.name}: ${result.output}`).join("\n\n");
     const restartRequired = results?.some(result => result.restart_required);
-    status(`${summary}${restartRequired ? " Restart Windows to finish removal." : ""}${refreshError ? ` Could not refresh: ${refreshError}` : warning ? ` ${warning}` : ""}`, Boolean(failure || failed || refreshError));
+    status([`${summary}${restartRequired ? " Restart Windows to finish removal." : ""}${refreshError ? ` Could not refresh: ${refreshError}` : ""}`, failureDetails].filter(Boolean).join("\n\n"), Boolean(failure || failed || refreshError), true);
     updateControls();
   }
 
@@ -474,7 +470,6 @@
       finishDrag(true);
       view = next;
       renderView();
-      status(view === "default" ? "Select apps to include in Export for later removal." : "Selections from both lists are included in Export.");
     });
   }
   refreshButton.addEventListener("click", refreshApps);
@@ -506,6 +501,5 @@
     }
   });
   uninstallButton.addEventListener("click", uninstallSelected);
-  log.tabIndex = 0;
   updateControls();
 })();

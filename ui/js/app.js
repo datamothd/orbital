@@ -95,6 +95,7 @@ function preferenceValue(enabled) {
 }
 
 function setStatus(message, error = false) {
+  writeTweaksOutput(message || "Ready.", { error });
   const notice = byId("administrator-notice");
   if (error && message.includes("requires administrator access")) {
     byId("administrator-description").textContent = message;
@@ -102,9 +103,6 @@ function setStatus(message, error = false) {
     return;
   }
   if (notice.open) notice.close();
-  const status = byId("status");
-  status.textContent = message || "Ready.";
-  status.classList.toggle("error", error);
 }
 
 function setBusy(value) {
