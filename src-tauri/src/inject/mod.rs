@@ -45,10 +45,27 @@ impl Selection {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct InjectionState {
     selection: Arc<Mutex<Selection>>,
     cancelled: Arc<AtomicBool>,
+}
+
+impl InjectionState {
+    pub fn while_idle<T>(&self, operation: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+        let _selection = self.selection.try_lock().map_err(|_| "Wait for the current ISO operation to finish before relaunching.")?;
+        operation()
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn relaunch_cannot_start_while_an_iso_operation_holds_the_selection() {
+    let state = InjectionState::default();
+    let guard = state.selection.lock().unwrap();
+    assert!(state.while_idle::<()>(|| panic!("Relaunch must not run during ISO work")).is_err());
+    drop(guard);
+    assert!(state.while_idle(|| Ok(())).is_ok());
 }
 
 struct Workspace(PathBuf);

@@ -68,8 +68,15 @@ struct Inventory {
     permanent: bool,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct RemovalState(Arc<Mutex<Inventory>>);
+
+impl RemovalState {
+    pub fn while_idle<T>(&self, operation: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+        let _inventory = self.0.try_lock().map_err(|_| "Wait for app removal or inventory refresh to finish before relaunching.")?;
+        operation()
+    }
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct UninstallResult {
@@ -254,6 +261,15 @@ pub async fn uninstall_apps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn relaunch_cannot_start_while_app_servicing_holds_the_inventory() {
+        let state = RemovalState::default();
+        let guard = state.0.lock().unwrap();
+        assert!(state.while_idle::<()>(|| panic!("Relaunch must not run during servicing")).is_err());
+        drop(guard);
+        assert!(state.while_idle(|| Ok(())).is_ok());
+    }
 
     fn inventory() -> Inventory {
         let list = parse_list(r#"{"apps":[{"name":"应用 👩‍💻","id":"Example.App","kind":"appx","version":"2026.10","details":[],"selectable":true},{"name":"Framework","id":"Example.Framework","kind":"appx","version":"1","details":[],"selectable":false,"blocked_reason":"Dependency"}],"warnings":[]}"#, 4).unwrap();

@@ -57,7 +57,7 @@ pub fn set_desktop_layout_safe_mode(enabled: bool) -> io::Result<()> {
     key.set_value("DesktopLayoutSafeMode", &u32::from(enabled))
 }
 
-fn is_administrator() -> io::Result<bool> {
+pub fn is_administrator() -> io::Result<bool> {
     use std::ffi::c_void;
 
     #[repr(C)]

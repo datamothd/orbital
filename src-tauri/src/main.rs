@@ -9,6 +9,7 @@ mod debloat;
 mod files;
 mod inject;
 mod profiles;
+mod administrator;
 
 fn preference_error(error: std::io::Error) -> serde_json::Value {
     if let Some(conflict) = error
@@ -161,6 +162,8 @@ fn main() {
             debloat::list_installed_apps,
             debloat::uninstall_apps,
             debloat::set_permanent_removal,
+            administrator::administrator_status,
+            administrator::relaunch_as_administrator,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");

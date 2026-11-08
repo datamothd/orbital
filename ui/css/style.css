@@ -100,7 +100,28 @@ main {
 
 .profile-actions {
   margin-left: auto;
+  align-items: center;
 }
+
+#administrator-access {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 30px;
+  width: 34px;
+  padding: 2px 4px;
+  justify-content: center;
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+#administrator-access[data-state="granted"] { color: var(--green); }
+#administrator-access[data-state="missing"] { color: var(--red); }
+.administrator-access-check, .administrator-access-cross { display: none; }
+#administrator-access[data-state="granted"] .administrator-access-check { display: inline; }
+#administrator-access[data-state="missing"] .administrator-access-cross { display: inline; }
+#administrator-access-error { color: var(--red); }
 
 .navigation-tabs button,
 .profile-actions button {
@@ -111,7 +132,8 @@ main {
   border-color: var(--border);
 }
 
-.navigation-tabs button {
+.navigation-tabs button,
+.profile-actions button {
   font-size: 13px;
 }
 
