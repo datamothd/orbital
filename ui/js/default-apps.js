@@ -1,6 +1,5 @@
 "use strict";
 
-// Package identities, not display-name guesses. Research and scope: docs/default-windows-apps.md.
 const defaultWindowsApps = (() => {
   const current = [
     ["Calculator", "Microsoft.WindowsCalculator"], ["Camera", "Microsoft.WindowsCamera"],
@@ -32,13 +31,13 @@ const defaultWindowsApps = (() => {
   return [
     ...current.map(([name, id]) => ({ name, id, kind: "appx", availability: "Windows 11; availability varies by image, region and edition" })),
     ...components.map(([name, id]) => ({ name, id, kind: "appx", availability: "Bundled component; release/device dependent", caution: "Other apps may depend on this component." })),
-    { name: "Microsoft Edge", id: "Microsoft.Edge", kind: "winget", availability: "Windows 11; removal availability varies by region" },
-    { name: "OneDrive", id: "Microsoft.OneDrive", kind: "winget", availability: "Windows 11; availability varies by edition and image" },
+    { name: "Microsoft Edge", id: "Microsoft.Edge", kind: "desktop", availability: "Windows 11; removal availability varies by region" },
+    { name: "OneDrive", id: "Microsoft.OneDrive", kind: "desktop", availability: "Windows 11; availability varies by edition and image" },
   ].sort((a, b) => a.name.localeCompare(b.name));
 })();
 
 function defaultAppMatch(entry, app) {
-  const ids = [app.id, ...(app.details || [])
+  const ids = [app.id, app.catalog_id || "", ...(app.details || [])
     .filter(field => /^(local identifier|package family name|package name)$/i.test(field.label))
     .map(field => field.value)].map(value => String(value).toLowerCase());
   const id = entry.id.toLowerCase();

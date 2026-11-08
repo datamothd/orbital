@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn app_removal_profiles_preserve_absent_apps_and_reject_ambiguous_entries() {
-        let json = r#"{"format":"orbital-tweaks","version":5,"tweaks":[],"folder_sort":null,"folder_grouping":null,"apps_to_remove":[{"name":"Calculator","id":"Microsoft.WindowsCalculator","kind":"appx"},{"name":"OneDrive","id":"Microsoft.OneDrive","kind":"winget"}]}"#;
+        let json = r#"{"format":"orbital-tweaks","version":5,"tweaks":[],"folder_sort":null,"folder_grouping":null,"apps_to_remove":[{"name":"Calculator","id":"Microsoft.WindowsCalculator","kind":"appx"},{"name":"OneDrive","id":"Microsoft.OneDrive","kind":"desktop"}]}"#;
         let mut profile: TweakProfile = serde_json::from_str(json).unwrap();
         profile.normalize().unwrap();
         assert_eq!(
@@ -86,6 +86,12 @@ mod tests {
         profile.version = 4;
         assert!(profile.validate().is_err());
         assert!(serde_json::from_str::<TweakProfile>(&json.replace("appx", "command")).is_err());
+    }
+
+    #[test]
+    fn legacy_winget_profiles_migrate_to_native_desktop_identities() {
+        let app: AppRemoval = serde_json::from_str(r#"{"name":"OneDrive","id":"Microsoft.OneDrive","kind":"winget"}"#).unwrap();
+        assert_eq!(serde_json::to_value(app).unwrap()["kind"], "desktop");
     }
 
     #[test]

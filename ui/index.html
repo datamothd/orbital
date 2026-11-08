@@ -70,7 +70,7 @@
       <details id="visual-settings" class="tweak-category" aria-labelledby="visual-settings-title">
         <summary>
           <h2 id="visual-settings-title" class="tweak-heading">
-            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" fill-rule="evenodd" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M1 2h14v10H9v1h3v2H4v-2h3v-1H1zm2 2v6h10V4z"/></svg>
+            <svg viewBox="0 0 18 18" width="18" height="18" fill="currentColor" fill-rule="evenodd" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M1 2h16v11h-7v2h3v2H5v-2h3v-2H1zm2 2v7h12V4z"/></svg>
             <span>Visual Settings</span>
           </h2>
         </summary>
@@ -358,17 +358,30 @@
                         <button id="apps-default" type="button" aria-pressed="false">Default Windows apps</button>
                       </div>
                       <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
-                        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M4 1h7v2H4zM2 3h2v3H2zM11 3h2v2h2v2H9V1h2zM1 9h6v6H5v-2H3v-2H1zM12 10h2v3h-2zM5 13h7v2H5z"/></svg>
+                        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path d="M3 1h8v2h2v2h2v2h-2v2h-2V7H9V5h2V3H3v2H1V3h2z"/><path transform="rotate(180 8 8)" d="M3 1h8v2h2v2h2v2h-2v2h-2V7H9V5h2V3H3v2H1V3h2z"/></svg>
                         <span>Refresh</span>
                       </button>
                     </div>
-                    <div class="tweaks-output-line uninstall-command"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><span id="uninstall-command-text">winget list</span><span id="uninstall-refresh-dots" class="uninstall-command-dots" aria-hidden="true" hidden><span></span><span></span><span></span></span></div>
+                    <div class="tweaks-output-line uninstall-command"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><span id="uninstall-command-text">Read Windows apps and components</span><span id="uninstall-refresh-dots" class="uninstall-command-dots" aria-hidden="true" hidden><span></span><span></span><span></span></span></div>
                     <div id="uninstall-inventory" class="uninstall-inventory" aria-busy="false">
                       <p id="uninstall-empty" class="uninstall-empty">Open this dropdown to load installed apps.</p>
                       <div class="uninstall-table-scroll" tabindex="0" role="region" aria-label="Installed apps" hidden>
                         <table id="uninstall-table">
-                          <caption>Apps reported by winget list. Select apps to uninstall.</caption>
-                          <thead><tr id="uninstall-columns"></tr></thead>
+                          <caption>Windows apps, desktop programs and optional components. Select apps to uninstall.</caption>
+                          <thead>
+                            <tr id="uninstall-columns">
+                              <th scope="col">select</th>
+                              <th scope="col">
+                                <div class="uninstall-name-header">
+                                  <span id="uninstall-name-column">name</span>
+                                  <label class="uninstall-permanent" title="Allow permanent removal of component files for selected apps">
+                                    <input id="uninstall-permanent" type="checkbox" aria-describedby="permanent-removal-description" aria-controls="permanent-removal-confirm">
+                                    <span>Permanent removal</span>
+                                  </label>
+                                </div>
+                              </th>
+                            </tr>
+                          </thead>
                           <tbody id="uninstall-rows"></tbody>
                         </table>
                       </div>
@@ -555,11 +568,19 @@
   </dialog>
   <dialog id="uninstall-confirm" aria-labelledby="uninstall-confirm-title" aria-describedby="uninstall-confirm-description">
     <h2 id="uninstall-confirm-title">Uninstall selected apps?</h2>
-    <p id="uninstall-confirm-description" class="note">These apps will be removed from your PC. An app may open its own uninstaller or request administrator access.</p>
+    <p id="uninstall-confirm-description" class="note">Selected apps will be removed from your PC. Windows apps are removed for all users and from provisioning for new accounts. Administrator access may be required.</p>
     <ul id="uninstall-confirm-list"></ul>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
       <button value="apply" class="primary">Uninstall</button>
+    </form>
+  </dialog>
+  <dialog id="permanent-removal-confirm" aria-labelledby="permanent-removal-title" aria-describedby="permanent-removal-description">
+    <h2 id="permanent-removal-title">Enable permanent removal?</h2>
+    <p id="permanent-removal-description" class="note">Allows permanent deletion of bundled app files and Windows component payloads after you confirm an uninstall. Orbital cannot undo this; dependent apps or features may need reinstallation or repair. Permission lasts until you turn this off or close Orbital.</p>
+    <form method="dialog">
+      <button value="cancel" autofocus>Cancel</button>
+      <button value="apply" class="primary">I understand, enable</button>
     </form>
   </dialog>
   <dialog id="administrator-notice" aria-labelledby="administrator-title" aria-describedby="administrator-description">

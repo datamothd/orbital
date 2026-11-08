@@ -10,6 +10,7 @@
   const refreshButton = byId("uninstall-refresh");
   const refreshDots = byId("uninstall-refresh-dots");
   const uninstallButton = byId("uninstall-start");
+  const permanentCheckbox = byId("uninstall-permanent");
   const log = byId("uninstall-log");
   const selected = new Set();
   let apps = [];
@@ -19,13 +20,14 @@
   const selectionAllowed = () => view === "default" || inventoryValid;
   const selectionKey = app => {
     const entry = defaultWindowsApps.find(entry => defaultAppMatch(entry, app));
-    return entry ? `${entry.kind}:${entry.id.toLowerCase()}` : `winget:${app.id.toLowerCase()}`;
+    return entry ? `${entry.kind}:${entry.id.toLowerCase()}` : `${app.kind}:${app.id.toLowerCase()}`;
   };
-  const chosenInstalled = () => inventoryValid ? installed.apps.filter(app => app.selectable && selected.has(selectionKey(app))) : [];
+  const chosenInstalled = () => inventoryValid ? installed.apps.filter(app => app.selectable && (!app.requires_permanent || permanentRemoval) && selected.has(selectionKey(app))) : [];
   window.orbitalAppSelections = {
     export: () => [...selected].map(key => known.get(key)).filter(Boolean),
     restore: entries => {
-      for (const entry of entries || []) {
+      for (const imported of entries || []) {
+        const entry = { ...imported, kind: imported.kind === "winget" ? "desktop" : imported.kind };
         const key = `${entry.kind}:${entry.id.toLowerCase()}`;
         known.set(key, entry);
         selected.add(key);
@@ -36,10 +38,18 @@
   for (const entry of defaultWindowsApps) known.set(`${entry.kind}:${entry.id.toLowerCase()}`, { name: entry.name, id: entry.id, kind: entry.kind });
   let operation = "";
   let inventoryValid = false;
+  let permanentRemoval = false;
   let drag = null;
   let dragFrame = 0;
   let suppressClick = false;
   let suppressContextMenu = false;
+
+  function sortApps(list) {
+    const rank = app => app.protected ? 2 : app.requires_permanent && !permanentRemoval ? 1 : 0;
+    list.sort((a, b) => rank(a) - rank(b)
+      || (view === "default" ? Number(b.state === "Installed") - Number(a.state === "Installed") : 0)
+      || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  }
 
   function renderView() {
     byId("apps-installed").setAttribute("aria-pressed", String(view === "installed"));
@@ -47,21 +57,29 @@
     const label = view === "default" ? "Default Windows apps" : "Installed apps";
     tableScroll.setAttribute("aria-label", label);
     byId("uninstall-table").querySelector("caption").textContent = `${label}. Select apps for removal or export.`;
-    byId("uninstall-command-text").textContent = view === "default" ? "Windows app catalog" : "winget list --details";
+    byId("uninstall-command-text").textContent = view === "default" ? "Windows app catalog" : "Read Windows apps and components";
     byId("uninstall-command-text").removeAttribute("title");
-    const result = view === "installed" ? { ...installed, apps: installed.apps.map(app => ({ ...app, key: selectionKey(app) })) } : {
+    const result = view === "installed" ? { ...installed, apps: installed.apps.map(app => ({ ...app, key: selectionKey(app),
+      protected: !app.selectable,
+      selectable: app.selectable && (!app.requires_permanent || permanentRemoval),
+      blocked_reason: app.blocked_reason || (app.requires_permanent && !permanentRemoval ? "Enable permanent removal and acknowledge the warning to remove these component files." : ""),
+    })) } : {
       headers: ["Name", "Package", "Status"],
       apps: defaultWindowsApps.map(entry => {
         const matches = inventoryValid ? installed.apps.filter(app => defaultAppMatch(entry, app)) : [];
         return {
-          ...entry, key: `${entry.kind}:${entry.id.toLowerCase()}`, selectable: true,
+          ...entry, key: `${entry.kind}:${entry.id.toLowerCase()}`, selectable: !matches.length || matches.some(app => app.selectable && (!app.requires_permanent || permanentRemoval)),
+          requires_permanent: matches.some(app => app.selectable) && matches.filter(app => app.selectable).every(app => app.requires_permanent),
+          protected: matches.length > 0 && matches.every(app => !app.selectable),
+          blocked_reason: matches.find(app => !app.selectable)?.blocked_reason || "Enable permanent removal and acknowledge the warning to remove these component files.",
           version: matches[0]?.version || "—",
           state: matches.length ? "Installed" : inventoryValid ? "Not reported" : "Not checked",
-          cells: [entry.name, entry.id, matches.length ? `Installed · ${matches.map(app => app.version).join(", ")}` : inventoryValid ? "Not reported by WinGet" : "Installation status not checked"],
-          details: [{ label: "Availability", value: entry.availability }, { label: "Identity type", value: entry.kind === "appx" ? "Appx package name" : "WinGet package ID" }, { label: "Export", value: "Remove after Windows installation, including when absent now" }, ...(entry.caution ? [{ label: "Dependency", value: entry.caution }] : [])],
+          cells: [entry.name, entry.id, matches.length ? `Installed · ${matches.map(app => app.version).join(", ")}` : inventoryValid ? "Not reported by Windows" : "Installation status not checked"],
+          details: [{ label: "Availability", value: entry.availability }, { label: "Identity type", value: entry.kind === "appx" ? "Appx package name" : "Desktop app identity" }, { label: "Export", value: "Remove after Windows installation, including when absent now" }, ...(entry.caution ? [{ label: "Dependency", value: entry.caution }] : [])],
         };
       }),
     };
+    sortApps(result.apps);
     render(result);
     updateControls();
   }
@@ -73,9 +91,11 @@
 
   function updateControls() {
     refreshButton.disabled = Boolean(operation) || !invoke;
+    permanentCheckbox.disabled = Boolean(operation) || !invoke;
+    permanentCheckbox.checked = permanentRemoval;
     uninstallButton.disabled = Boolean(operation) || !chosenInstalled().length;
     uninstallButton.textContent = operation === "uninstall" ? "Uninstalling…" : "Uninstall apps";
-    inventory.setAttribute("aria-busy", String(Boolean(operation)));
+    inventory.setAttribute("aria-busy", String(Boolean(operation) && operation !== "permanent"));
     const selection = byId("uninstall-selection");
     selection.textContent = `${selected.size} ${selected.size === 1 ? "app" : "apps"} selected`;
     selection.dataset.selected = String(selected.size > 0);
@@ -83,6 +103,44 @@
       checkbox.disabled = Boolean(operation) || !selectionAllowed() || checkbox.dataset.selectable !== "true";
       checkbox.checked = selected.has(checkbox.value);
     }
+  }
+
+  function updateAvailability() {
+    const pairs = new Map();
+    for (const row of rows.querySelectorAll(".uninstall-app-row")) {
+      const app = apps[Number(row.dataset.index)];
+      const details = byId(row.dataset.detailsId);
+      pairs.set(app, [row, details]);
+      app.selectable = !app.protected && (!app.requires_permanent || permanentRemoval);
+      row.dataset.selectable = String(app.selectable);
+      const checkbox = row.querySelector("input");
+      checkbox.dataset.selectable = String(app.selectable);
+      const detailCell = details.firstChild;
+      let warning = detailCell.querySelector(".uninstall-app-warning");
+      if (app.selectable) {
+        row.removeAttribute("title");
+        checkbox.removeAttribute("aria-description");
+        if (warning) warning.hidden = true;
+      } else {
+        row.title = app.protected ? app.blocked_reason : "Enable permanent removal and acknowledge the warning to remove these component files.";
+        checkbox.setAttribute("aria-description", row.title);
+        if (!warning) {
+          warning = element("p", "uninstall-app-warning");
+          detailCell.append(warning);
+        }
+        warning.textContent = row.title;
+        warning.hidden = false;
+      }
+    }
+    const scrollTop = tableScroll.scrollTop;
+    sortApps(apps);
+    for (const [index, app] of apps.entries()) {
+      const [row, details] = pairs.get(app);
+      row.dataset.index = String(index);
+      details.dataset.index = String(index);
+      rows.append(row, details);
+    }
+    tableScroll.scrollTop = scrollTop;
   }
 
   function finishDrag(cancelled = false) {
@@ -215,16 +273,13 @@
   function render(result) {
     finishDrag();
     apps = result.apps;
-    const selectionHeader = element("th");
-    selectionHeader.scope = "col";
-    selectionHeader.textContent = "select";
-    const nameHeader = element("th", "", result.headers[0].toLocaleLowerCase());
-    nameHeader.scope = "col";
-    byId("uninstall-columns").replaceChildren(selectionHeader, nameHeader);
+    byId("uninstall-name-column").textContent = result.headers[0].toLocaleLowerCase();
     rows.replaceChildren(...apps.flatMap((app, index) => {
       const row = element("tr", "uninstall-app-row");
       row.dataset.index = String(index);
+      row.dataset.detailsId = `uninstall-details-${index}`;
       row.dataset.selectable = String(app.selectable);
+      row.dataset.state = app.protected ? "protected" : app.state === "Installed" ? "installed" : app.state === "Not reported" ? "not-reported" : "";
       const selectCell = element("td");
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
@@ -232,7 +287,7 @@
       checkbox.dataset.selectable = String(app.selectable);
       checkbox.setAttribute("aria-label", `Select ${app.name}, version ${app.version}`);
       if (!app.selectable) {
-        row.title = "Refresh the installed apps list before selecting this app.";
+        row.title = app.blocked_reason || "Windows does not allow this app to be removed.";
         checkbox.setAttribute("aria-description", row.title);
       }
       checkbox.addEventListener("change", () => {
@@ -246,7 +301,7 @@
       toggle.setAttribute("aria-expanded", "false");
       toggle.setAttribute("aria-controls", `uninstall-details-${index}`);
       toggle.append(element("span", "", app.name), element("span", "uninstall-app-arrow"));
-      if (app.state) toggle.firstChild.append(element("span", "uninstall-app-state", app.state));
+      if (app.state || app.protected) toggle.firstChild.append(element("span", "uninstall-app-state", app.protected ? "Protected" : app.state));
       toggle.lastChild.setAttribute("aria-hidden", "true");
       const details = element("tr", "uninstall-app-details");
       details.id = `uninstall-details-${index}`;
@@ -278,7 +333,7 @@
     }));
     tableScroll.hidden = !apps.length;
     byId("uninstall-empty").hidden = Boolean(apps.length);
-    byId("uninstall-empty").textContent = "WinGet did not report any installed apps.";
+    byId("uninstall-empty").textContent = "Windows did not report any installed apps or components.";
     tableScroll.scrollTop = 0;
   }
 
@@ -296,23 +351,24 @@
       onCommand.onmessage = command => {
         if (view !== "installed") return;
         const commandText = byId("uninstall-command-text");
-        commandText.textContent = "winget list --details";
+        commandText.textContent = "Read Windows apps and components";
         commandText.title = command;
       };
       const result = await invoke("list_installed_apps", { onCommand });
       installed = result;
       for (const app of result.apps) {
         const key = selectionKey(app);
-        if (!known.has(key)) known.set(key, { name: app.name, id: app.id, kind: "winget" });
+        if (!known.has(key)) known.set(key, { name: app.name, id: app.id, kind: app.kind });
       }
       inventoryValid = true;
       renderView();
-      return null;
+      for (const warning of result.warnings || []) appendLog(warning);
+      return { warning: (result.warnings || []).join(" ") };
     } catch (reason) {
       if (!apps.length) byId("uninstall-empty").textContent = "Could not load installed apps. Try Refresh.";
       const message = reason?.message || String(reason).split(/\r?\n/, 1)[0];
       appendLog(reason?.output || (typeof reason === "string" ? reason : message));
-      return message;
+      return { error: message };
     } finally {
       refreshDots.hidden = true;
       renderView();
@@ -322,16 +378,16 @@
   async function refreshApps() {
     if (operation) return;
     if (!invoke) {
-      byId("uninstall-empty").textContent = "Open the Orbital desktop app to read installed apps with WinGet.";
-      status("WinGet is available in the desktop app.");
+      byId("uninstall-empty").textContent = "Open the Orbital desktop app to read installed apps and Windows components.";
+      status("Windows app servicing is available in the desktop app.");
       updateControls();
       return;
     }
     operation = "refresh";
-    status("Running winget list…");
-    const error = await loadApps();
+    status("Reading Windows apps and components…");
+    const { error, warning } = await loadApps();
     operation = "";
-    status(error || `${installed.apps.length} installed apps found. Selections are included in Export.`, Boolean(error));
+    status(error || `${installed.apps.length} apps and components found. ${warning || "Selections are included in Export."}`, Boolean(error));
     updateControls();
   }
 
@@ -341,18 +397,20 @@
     log.scrollTop = log.scrollHeight;
   }
 
-  async function uninstallSelected() {
+  async function uninstallSelected(event) {
     if (operation || !chosenInstalled().length) return;
+    const skipConfirmation = skipPrompts.enabled || Boolean(event?.shiftKey);
     const chosen = chosenInstalled();
     operation = "confirm";
     updateControls();
     byId("uninstall-confirm-title").textContent = `Uninstall ${chosen.length} ${chosen.length === 1 ? "app" : "apps"}?`;
+    byId("uninstall-confirm-description").textContent = `Selected apps will be removed from your PC. Windows apps are removed for all users and from provisioning for new accounts. Administrator access may be required.${permanentRemoval ? " Permanent removal is enabled: bundled component files and selected capability payloads may be deleted. Orbital cannot undo these changes." : " Windows capabilities require permanent removal to be enabled."}`;
     byId("uninstall-confirm-list").replaceChildren(...chosen.map(app => {
       const item = element("li", "", app.name);
       item.append(element("span", "", `${app.id} · ${app.version}`));
       return item;
     }));
-    if (!await confirmDialog(byId("uninstall-confirm"))) {
+    if (!skipConfirmation && !await confirmDialog(byId("uninstall-confirm"))) {
       operation = "";
       updateControls();
       return;
@@ -380,12 +438,13 @@
       appendLog(failure);
     }
     status("Refreshing installed apps…");
-    const refreshError = await loadApps();
+    const { error: refreshError, warning } = await loadApps();
     operation = "";
     const removed = results?.filter(result => result.success).length || 0;
     const failed = results ? results.length - removed : 0;
     const summary = failure || `${removed} ${removed === 1 ? "app" : "apps"} uninstalled.${failed ? ` ${failed} could not be removed. See the output above.` : ""}`;
-    status(`${summary}${refreshError ? ` Could not refresh: ${refreshError}` : ""}`, Boolean(failure || failed || refreshError));
+    const restartRequired = results?.some(result => result.restart_required);
+    status(`${summary}${restartRequired ? " Restart Windows to finish removal." : ""}${refreshError ? ` Could not refresh: ${refreshError}` : warning ? ` ${warning}` : ""}`, Boolean(failure || failed || refreshError));
     updateControls();
   }
 
@@ -404,6 +463,33 @@
     });
   }
   refreshButton.addEventListener("click", refreshApps);
+  permanentCheckbox.addEventListener("change", async () => {
+    const enable = permanentCheckbox.checked;
+    if (operation || !invoke) {
+      permanentCheckbox.checked = permanentRemoval;
+      return;
+    }
+    finishDrag(true);
+    const previous = permanentRemoval;
+    permanentRemoval = enable;
+    operation = "permanent";
+    updateControls();
+    try {
+      if (enable && !await confirmDialog(byId("permanent-removal-confirm"))) {
+        permanentRemoval = previous;
+        return;
+      }
+      await invoke("set_permanent_removal", { enabled: enable, acknowledged: enable });
+      updateAvailability();
+      status(enable ? "Permanent component removal enabled for this session." : "Permanent component removal disabled.");
+    } catch (reason) {
+      permanentRemoval = previous;
+      status(String(reason), true);
+    } finally {
+      operation = "";
+      updateControls();
+    }
+  });
   uninstallButton.addEventListener("click", uninstallSelected);
   log.tabIndex = 0;
   updateControls();

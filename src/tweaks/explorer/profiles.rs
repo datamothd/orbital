@@ -30,7 +30,10 @@ pub struct AppRemoval {
 #[serde(rename_all = "snake_case")]
 pub enum AppIdentityKind {
     Appx,
-    Winget,
+    #[serde(alias = "winget")]
+    Desktop,
+    Feature,
+    Capability,
 }
 
 pub enum SettingsCommand {

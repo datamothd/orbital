@@ -136,7 +136,7 @@ fn main() {
             Ok(())
         })
         .manage(inject::InjectionState::default())
-        .manage(debloat::WingetState::default())
+        .manage(debloat::RemovalState::default())
         .invoke_handler(tauri::generate_handler![
             system_info,
             explorer_settings,
@@ -160,6 +160,7 @@ fn main() {
             profiles::apply_imported_tweaks,
             debloat::list_installed_apps,
             debloat::uninstall_apps,
+            debloat::set_permanent_removal,
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Orbital");
