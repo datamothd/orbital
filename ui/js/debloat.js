@@ -474,7 +474,8 @@
     });
   }
   refreshButton.addEventListener("click", refreshApps);
-  permanentCheckbox.addEventListener("change", async () => {
+  permanentCheckbox.addEventListener("click", async event => {
+    const skipConfirmation = skipPrompts.enabled || event.shiftKey;
     const enable = permanentCheckbox.checked;
     if (operation || !invoke) {
       permanentCheckbox.checked = permanentRemoval;
@@ -486,7 +487,7 @@
     operation = "permanent";
     updateControls();
     try {
-      if (enable && !await confirmDialog(byId("permanent-removal-confirm"))) {
+      if (enable && !skipConfirmation && !await confirmDialog(byId("permanent-removal-confirm"))) {
         permanentRemoval = previous;
         return;
       }
