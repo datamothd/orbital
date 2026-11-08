@@ -278,7 +278,7 @@
 }
 
 #uninstall-table .uninstall-app-details > td {
-  padding: var(--space-3);
+  padding: 0 var(--space-3);
   background: #070707;
 }
 

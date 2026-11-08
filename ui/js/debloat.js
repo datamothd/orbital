@@ -321,13 +321,14 @@
         ["location", location],
         ["publisher", valueFor(/^publisher$/i)],
         ["version", version],
+        ["scope", valueFor(/^scope$/i)],
       ]) {
         const fieldRow = element("div", "uninstall-metadata-row");
         fieldRow.append(element("dt", "", label), element("dd", "", value));
         metadata.append(fieldRow);
       }
       detailCell.append(metadata);
-      const notes = fields.filter(field => /^(scope|permanent removal|dependency)$/i.test(field.label)
+      const notes = fields.filter(field => /^(permanent removal|dependency)$/i.test(field.label)
         || (app.kind === "capability" && field.label === "Component files")).map(field => field.value);
       for (const note of new Set(notes.filter(Boolean))) detailCell.append(element("p", "uninstall-app-notice", note));
       if (!app.selectable) {
