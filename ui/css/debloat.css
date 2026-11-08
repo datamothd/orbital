@@ -160,7 +160,12 @@
 
 #uninstall-table :is(th, td) {
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+}
+
+#uninstall-columns > th:first-child,
+#uninstall-table .uninstall-app-row > td:first-child {
+  border-right: 1px solid rgb(255 255 255 / 6%);
 }
 
 #uninstall-table th {
@@ -235,8 +240,20 @@
 
 .uninstall-app-toggle > span:first-child {
   min-width: 0;
-  overflow-wrap: anywhere;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.uninstall-app-indicators {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.uninstall-app-indicators .uninstall-app-state { margin-left: 0; }
 
 .uninstall-app-toggle:hover:not(:disabled) {
   background: transparent;
@@ -257,7 +274,7 @@
   transform: translateY(-2px) rotate(45deg);
 }
 
-[aria-expanded="true"] > .uninstall-app-arrow {
+[aria-expanded="true"] .uninstall-app-arrow {
   transform: translateY(2px) rotate(225deg);
 }
 
@@ -267,9 +284,29 @@
 }
 
 .uninstall-app-details dl {
-  grid-template-columns: minmax(0, 80px) minmax(0, 1fr);
-  gap: var(--space-2) var(--space-3);
+  display: block;
   white-space: normal;
+}
+
+.uninstall-metadata-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  padding: 6px 0;
+  border-top: 1px solid rgb(255 255 255 / 5%);
+}
+
+.uninstall-metadata-row:first-child { border-top: 0; }
+.uninstall-metadata-row dd {
+  padding-left: var(--space-3);
+  border-left: 1px solid rgb(255 255 255 / 5%);
+  white-space: pre-wrap;
+}
+
+.uninstall-app-notice {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .uninstall-app-details :is(dt, dd) {

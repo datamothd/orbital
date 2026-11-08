@@ -75,7 +75,7 @@
           version: matches[0]?.version || "—",
           state: matches.length ? "Installed" : inventoryValid ? "Not reported" : "Not checked",
           cells: [entry.name, entry.id, matches.length ? `Installed · ${matches.map(app => app.version).join(", ")}` : inventoryValid ? "Not reported by Windows" : "Installation status not checked"],
-          details: [{ label: "Availability", value: entry.availability }, { label: "Identity type", value: entry.kind === "appx" ? "Appx package name" : "Desktop app identity" }, { label: "Export", value: "Remove after Windows installation, including when absent now" }, ...(entry.caution ? [{ label: "Dependency", value: entry.caution }] : [])],
+          details: [...matches.flatMap(app => app.details || []), ...(entry.caution ? [{ label: "Dependency", value: entry.caution }] : [])],
         };
       }),
     };
@@ -300,9 +300,13 @@
       toggle.type = "button";
       toggle.setAttribute("aria-expanded", "false");
       toggle.setAttribute("aria-controls", `uninstall-details-${index}`);
-      toggle.append(element("span", "", app.name), element("span", "uninstall-app-arrow"));
-      if (app.state || app.protected) toggle.firstChild.append(element("span", "uninstall-app-state", app.protected ? "Protected" : app.state));
-      toggle.lastChild.setAttribute("aria-hidden", "true");
+      toggle.title = app.name;
+      const indicators = element("span", "uninstall-app-indicators");
+      if (app.state || app.protected) indicators.append(element("span", "uninstall-app-state", app.protected ? "Protected" : app.state));
+      const arrow = element("span", "uninstall-app-arrow");
+      arrow.setAttribute("aria-hidden", "true");
+      indicators.append(arrow);
+      toggle.append(element("span", "uninstall-app-name", app.name), indicators);
       const details = element("tr", "uninstall-app-details");
       details.id = `uninstall-details-${index}`;
       details.dataset.index = String(index);
@@ -310,17 +314,28 @@
       const detailCell = element("td");
       detailCell.colSpan = 2;
       const metadata = element("dl");
-      for (let column = 1; column < result.headers.length; column += 1) {
-        metadata.append(element("dt", "", result.headers[column].toLocaleLowerCase()), element("dd", "", app.cells[column] || "—"));
+      const fields = app.details || [];
+      const valueFor = labels => [...new Set(fields.filter(field => labels.test(field.label)).map(field => field.value).filter(Boolean))].join("\n") || "—";
+      const version = ["feature", "capability"].includes(app.kind) || app.version === "Bundled component files" ? "—" : app.version || "—";
+      const location = valueFor(app.kind === "capability" ? /^(install location|location)$/i : /^(install location|location|component files)$/i);
+      for (const [label, value] of [
+        ["package", app.catalog_id || app.id],
+        ["location", location],
+        ["publisher", valueFor(/^publisher$/i)],
+        ["version", version],
+      ]) {
+        const fieldRow = element("div", "uninstall-metadata-row");
+        fieldRow.append(element("dt", "", label), element("dd", "", value));
+        metadata.append(fieldRow);
       }
-      for (const field of app.details || []) {
-        metadata.append(element("dt", "", field.label.toLocaleLowerCase()), element("dd", "", field.value || "—"));
-      }
+      detailCell.append(metadata);
+      const notes = fields.filter(field => /^(scope|permanent removal|dependency)$/i.test(field.label)
+        || (app.kind === "capability" && field.label === "Component files")).map(field => field.value);
+      for (const note of new Set(notes.filter(Boolean))) detailCell.append(element("p", "uninstall-app-notice", note));
       if (!app.selectable) {
         const warning = element("p", "uninstall-app-warning", row.title);
         detailCell.append(warning);
       }
-      detailCell.prepend(metadata);
       details.append(detailCell);
       toggle.addEventListener("click", () => {
         details.hidden = !details.hidden;

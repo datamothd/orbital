@@ -83,6 +83,8 @@ function Get-NativeInventory {
         }
         $versions = @(@($installed | ForEach-Object { [string]$_.Version }) + @($staged | ForEach-Object { [string]$_.Version }) | Sort-Object -Unique)
         $details = @(
+            (New-Detail 'Install location' (($installed | ForEach-Object { $_.InstallLocation } | Where-Object { $_ } | Sort-Object -Unique) -join "`n")),
+            (New-Detail 'Publisher' (($installed | ForEach-Object { $_.Publisher } | Where-Object { $_ } | Sort-Object -Unique) -join "`n")),
             (New-Detail 'Removal method' 'Windows Appx and provisioning'),
             (New-Detail 'Scope' $(if ($admin) { 'All users and new accounts' } else { 'Current user' })),
             (New-Detail 'Provisioned' $(if ($staged.Count) { 'Yes' } else { 'No' })),
