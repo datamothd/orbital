@@ -112,17 +112,63 @@ main {
   width: 172px;
 }
 
-.navigation-logo {
-  margin: var(--space-2) 5px var(--space-1);
-  flex-shrink: 0;
-  fill: none;
-  stroke: var(--text);
-  stroke-width: 1.8;
+.icon,
+.picker-arrow,
+summary::after {
+  background-color: currentColor;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
 }
 
-.navigation-orbit {
-  transform-origin: center;
-  animation: bohr-spin 12s linear infinite;
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  mask-image: var(--icon-image);
+}
+
+.icon-orbital { --icon-image: url("../icons/orbital.png"); }
+.icon-tweaks { --icon-image: url("../icons/tweaks.png"); }
+.icon-inject { --icon-image: url("../icons/inject.png"); }
+.icon-settings { --icon-image: url("../icons/settings.png"); }
+.icon-import { --icon-image: url("../icons/import.png"); }
+.icon-export { --icon-image: url("../icons/export.png"); }
+.icon-shield { --icon-image: url("../icons/shield.png"); }
+.icon-collapse { --icon-image: url("../icons/collapse.png"); }
+.icon-monitor { --icon-image: url("../icons/monitor.png"); }
+.icon-folder { --icon-image: url("../icons/folder.png"); }
+.icon-chip { --icon-image: url("../icons/chip.png"); }
+.icon-sparkle { --icon-image: url("../icons/sparkle.png"); }
+.icon-apps { --icon-image: url("../icons/apps.png"); }
+.icon-refresh { --icon-image: url("../icons/refresh.png"); }
+.icon-trash { --icon-image: url("../icons/trash.png"); }
+.icon-info { --icon-image: url("../icons/info.png"); }
+.icon-close { --icon-image: url("../icons/close.png"); }
+.icon-check { --icon-image: url("../icons/check.png"); }
+.icon-minus { --icon-image: url("../icons/minus.png"); }
+.icon-warning { --icon-image: url("../icons/warning.png"); }
+.icon-external { --icon-image: url("../icons/external.png"); }
+.icon-back { --icon-image: url("../icons/back.png"); }
+.icon-terminal { --icon-image: url("../icons/terminal.png"); }
+.icon-disc { --icon-image: url("../icons/disc.png"); }
+.icon-nucleus { --icon-image: url("../icons/nucleus.png"); }
+.icon-electron { --icon-image: url("../icons/electron.png"); }
+
+.changes-count .icon,
+.icon-external,
+.icon-back {
+  width: 12px;
+  height: 12px;
+}
+
+.navigation-logo {
+  margin: var(--space-2) 5px var(--space-1);
+  width: 32px;
+  height: 32px;
+  animation: orbit-spin 12s linear infinite;
 }
 
 .navigation-tablist {
@@ -181,7 +227,7 @@ main {
   transition: opacity calc(var(--sidebar-duration) / 3) linear;
 }
 
-.navigation-tabs .sidebar-actions button svg {
+.navigation-tabs .sidebar-actions button .icon {
   flex-basis: 14px;
   width: 14px;
   height: 14px;
@@ -210,7 +256,7 @@ main {
   transition: left var(--sidebar-motion), width var(--sidebar-motion);
 }
 
-.navigation-tabs #administrator-access svg {
+.navigation-tabs #administrator-access .icon {
   flex-basis: auto;
   width: 19px;
   height: 19px;
@@ -222,7 +268,7 @@ main {
   width: var(--action-size);
 }
 
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access svg {
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access .icon {
   width: 14px;
   height: 14px;
 }
@@ -237,27 +283,18 @@ main {
   outline-offset: -2px;
 }
 
-.navigation-tabs button svg {
+.navigation-tabs button .icon {
   flex: 0 0 19px;
   width: 19px;
   height: 19px;
 }
 
-.navigation-tablist svg,
-.sidebar-actions button:not(#administrator-access) svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.navigation-tabs button span {
+.navigation-tabs button .icon + span {
   opacity: 0;
   transition: opacity var(--sidebar-motion);
 }
 
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) button span {
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) button .icon + span {
   opacity: 1;
 }
 
@@ -285,12 +322,8 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded
   .navigation-tabs,
   .navigation-tabs .sidebar-actions button:nth-child(n),
   .navigation-tabs #administrator-access,
-  .navigation-tabs #administrator-access svg {
+  .navigation-tabs #administrator-access .icon {
     transition: none;
-  }
-
-  .navigation-orbit {
-    animation: none;
   }
 }
 
@@ -386,8 +419,9 @@ summary h2 {
   font-weight: 700;
 }
 
-.tweak-heading svg {
-  flex-shrink: 0;
+.tweak-heading .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .tweak-category > .preferences-divider {
@@ -441,11 +475,10 @@ summary h2 {
 
 summary::after {
   content: "";
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--text);
-  border-bottom: 2px solid var(--text);
-  transform: translateY(-2px) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  color: var(--text);
+  mask-image: url("../icons/chevron.png");
   flex-shrink: 0;
   margin: 0 3px;
 }
@@ -469,7 +502,7 @@ details[open] > summary {
 }
 
 details[open] > summary::after {
-  transform: translateY(2px) rotate(225deg);
+  transform: rotate(180deg);
 }
 
 summary:focus-visible {
@@ -493,7 +526,7 @@ dl {
 }
 
 #bohr {
-  display: block;
+  position: relative;
   justify-self: end;
   width: 120px;
   max-width: 100%;
@@ -509,51 +542,55 @@ dl {
 }
 
 .bohr-shell {
-  transform-origin: center;
-  animation: bohr-spin 60s linear infinite;
+  position: absolute;
+  inset: 0;
+  animation: orbit-spin 60s linear infinite;
+  pointer-events: none;
+}
+
+.bohr-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #777;
+  mask: url("../icons/orbit.png") center / var(--orbit-size, 88%) no-repeat;
 }
 
 .bohr-shell:nth-child(even) {
   animation-direction: reverse;
 }
 
-.bohr-ring,
 .bohr-electron,
-.bohr-electron-pixel,
 .bohr-nucleus {
-  shape-rendering: crispEdges;
-}
-
-.bohr-ring {
-  fill: none;
-  stroke: #777;
+  position: absolute;
+  translate: -50% -50%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .bohr-electron {
-  fill: var(--surface);
-  stroke: var(--text);
+  width: var(--electron-size);
+  border-radius: 50%;
+  background: var(--surface) url("../icons/electron.png") center / contain no-repeat;
+  pointer-events: auto;
 }
 
-.bohr-electron-pixel {
-  transform-origin: 0 0;
-  animation: bohr-spin 60s linear infinite reverse;
-}
-
-.bohr-shell:nth-child(even) .bohr-electron-pixel {
-  animation-direction: normal;
-}
-
-.bohr-electron-outline,
 .bohr-nucleus {
-  fill: var(--text);
+  top: 50%;
+  left: 50%;
+  width: calc(var(--electron-size, 15.6%) * 2.2);
+  pointer-events: none;
 }
 
-.bohr-electron-core {
-  fill: var(--surface);
-}
-
-@keyframes bohr-spin {
+@keyframes orbit-spin {
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navigation-logo,
+  .bohr-shell {
+    animation: none;
+  }
 }
 
 dt,
@@ -610,11 +647,10 @@ dd {
 .tested-system-check,
 .older-system-dash,
 .unsupported-system-cross {
-  display: inline-block;
+  width: 12px;
+  height: 12px;
   margin-left: var(--space-2);
-  font-family: "Segoe UI Symbol", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
+  vertical-align: -2px;
 }
 
 button {
@@ -790,18 +826,14 @@ button:disabled {
 }
 
 .picker-arrow {
-  width: 6px;
-  height: 6px;
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  transform: rotate(45deg);
+  width: 10px;
+  height: 10px;
   flex-shrink: 0;
-  margin-bottom: 3px;
+  mask-image: url("../icons/chevron.png");
 }
 
 .folder-view-picker[aria-expanded="true"] .picker-arrow {
-  transform: rotate(225deg);
-  margin-bottom: -3px;
+  transform: rotate(180deg);
 }
 
 .folder-view-options {
@@ -965,7 +997,7 @@ dialog > :last-child {
   cursor: help;
 }
 
-.admin-warning svg {
+.admin-warning .icon {
   display: block;
   flex-shrink: 0;
   width: 16px;
@@ -1233,7 +1265,6 @@ button.primary:hover:not(:disabled) {
   height: 80px;
   margin: auto 0;
   color: #777;
-  image-rendering: pixelated;
 }
 
 .inject-name,
@@ -1333,10 +1364,6 @@ button.primary:hover:not(:disabled) {
   flex: 0 0 100px;
 }
 
-#progress-palette {
-  position: absolute;
-}
-
 #inject-progress {
   display: block;
   flex-shrink: 0;
@@ -1344,7 +1371,6 @@ button.primary:hover:not(:disabled) {
   height: 6px;
   margin: 0;
   accent-color: var(--green);
-  filter: url(#progress-green);
 }
 
 #inject-progress[hidden] {

@@ -57,7 +57,7 @@
 
 .uninstall-permanent > span { line-height: 12px; transform: translateY(0.5px); }
 
-#uninstall-refresh svg {
+#uninstall-refresh .icon {
   display: block;
   flex: 0 0 16px;
 }

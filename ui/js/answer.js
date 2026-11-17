@@ -112,8 +112,7 @@ const answer = (() => {
     title.append(caption);
     if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) caption.append(element("small", "answer-optional", "(optional)"));
     if (config.help) {
-      const help = element("span", "answer-info");
-      help.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M5 2h2v2H5zM5 5h2v5H5z"/></svg>';
+      const help = element("span", "answer-info icon icon-info");
       help.title = config.help; help.tabIndex = 0; help.setAttribute("aria-label", config.help);
       title.append(help);
     }
@@ -137,7 +136,7 @@ const answer = (() => {
       }
       const forget = actionButton("answer-forget", "", `Forget change: ${label}`);
       forget.title = "Forget change (Windows default)";
-      forget.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 1h4v2H6zM2 3h12v2H2zM3 6h2v7h6V6h2v7h-1v2H4v-2H3zM7 6h2v5H7z"/></svg>';
+      forget.append(element("span", "icon icon-trash"));
       forget.addEventListener("click", () => { input.value = ""; update(); }); buttons.append(forget); wrapper.append(buttons);
     }
     for (const picker of wrapper.querySelectorAll("select")) dropdown(picker, label);
@@ -156,7 +155,7 @@ const answer = (() => {
       if (values[key] != null) input.value = values[key];
     }
     const remove = actionButton("answer-row-remove", "", "Remove entry");
-    remove.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8"/></svg>';
+    remove.append(element("span", "icon icon-close"));
     remove.addEventListener("click", event => { event.preventDefault(); const focus = (row.nextElementSibling || row.previousElementSibling)?.querySelector("summary") || lists.get(kind).nextElementSibling; row.remove(); update(); focus.focus(); });
     summary.append(title, count, remove); row.append(summary, grid); lists.get(kind).append(row); update();
   }

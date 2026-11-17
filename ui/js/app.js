@@ -124,17 +124,6 @@ function setPreferenceValue(id, value, visual = false) {
   element.dataset.state = visual ? "visual" : value === "Enabled" ? "enabled" : value === "Disabled" ? "disabled" : "other";
 }
 
-function bohrPixelCircle(radius) {
-  const step = 0.5;
-  const pixels = Math.max(1, Math.round(radius / step));
-  const rows = [];
-  for (let y = -pixels; y < pixels; y++) {
-    const halfWidth = Math.floor(Math.sqrt(pixels ** 2 - (y + 0.5) ** 2) + 0.5);
-    rows.push(`M${-halfWidth * step} ${y * step}h${halfWidth * step * 2}v${step}h${-halfWidth * step * 2}Z`);
-  }
-  return rows.join("");
-}
-
 function renderBohr() {
   if (!settings) return;
   const available = [
@@ -155,54 +144,26 @@ function renderBohr() {
   if (diagram.dataset.changes === signature) return;
   diagram.dataset.changes = signature;
   const shellCount = 1 + Math.ceil(Math.max(0, changes.length - 2) / 8);
-  const center = 30;
-  const orbitScale = 29 / (13 + (shellCount - 1) * 8 + 2.5);
-  const electronRadius = Math.max(1, Math.round(2.5 * orbitScale * 2) / 2);
-  const electronOutline = bohrPixelCircle(electronRadius);
-  const electronCore = bohrPixelCircle(Math.min(1.7 * orbitScale, electronRadius - 0.5));
-  const circle = (radius, className, x = center, y = center) => {
-    const element = document.createElementNS(diagram.namespaceURI, "circle");
-    for (const [name, value] of Object.entries({ cx: x, cy: y, r: radius, class: className })) {
-      element.setAttribute(name, value);
-    }
-    return element;
-  };
+  const orbitScale = (29 / 60 * 100) / (13 + (shellCount - 1) * 8 + 2.5);
+  diagram.style.setProperty("--electron-size", `${5 * orbitScale}%`);
   const shells = [];
-  for (let index = 0, offset = 0; index === 0 || offset < changes.length; index++) {
+  for (let index = 0, offset = 0; index < shellCount; index++) {
     const electrons = changes.slice(offset, offset + (index === 0 ? 2 : 8));
     const radius = (13 + index * 8) * orbitScale;
-    const shell = document.createElementNS(diagram.namespaceURI, "g");
-    shell.classList.add("bohr-shell");
-    shell.append(circle(radius, "bohr-ring"));
+    const shell = element("div", "bohr-shell");
+    shell.style.setProperty("--orbit-size", `${radius * 2 * 12 / 11.36}%`);
     electrons.forEach((preference, position) => {
       const angle = position * Math.PI * 2 / electrons.length - Math.PI / 2;
-      const placement = document.createElementNS(diagram.namespaceURI, "g");
-      placement.setAttribute("transform", `translate(${center + Math.cos(angle) * radius} ${center + Math.sin(angle) * radius})`);
-      const electron = document.createElementNS(diagram.namespaceURI, "g");
-      electron.classList.add("bohr-electron-pixel");
-      for (const [className, outline] of [
-        ["bohr-electron-outline", electronOutline],
-        ["bohr-electron-core", electronCore],
-      ]) {
-        const path = document.createElementNS(diagram.namespaceURI, "path");
-        path.setAttribute("class", className);
-        path.setAttribute("d", outline);
-        electron.append(path);
-      }
-      const title = document.createElementNS(diagram.namespaceURI, "title");
-      title.textContent = preference.label;
-      electron.append(title);
-      placement.append(electron);
-      shell.append(placement);
+      const electron = element("span", "bohr-electron");
+      electron.style.left = `${50 + Math.cos(angle) * radius}%`;
+      electron.style.top = `${50 + Math.sin(angle) * radius}%`;
+      electron.title = preference.label;
+      shell.append(electron);
     });
     shells.push(shell);
     offset += electrons.length;
   }
-  const nucleus = document.createElementNS(diagram.namespaceURI, "path");
-  nucleus.setAttribute("class", "bohr-nucleus");
-  nucleus.setAttribute("d", bohrPixelCircle(5.5 * orbitScale));
-  nucleus.setAttribute("transform", `translate(${center} ${center})`);
-  diagram.replaceChildren(...shells, nucleus);
+  diagram.replaceChildren(...shells, diagram.querySelector(".bohr-nucleus"));
 }
 
 function renderSettings() {
@@ -298,7 +259,7 @@ async function loadSystem() {
     if (greenCheck || yellowDash || redCross) {
       const check = document.createElement("span");
       check.className = greenCheck ? "tested-system-check" : yellowDash ? "older-system-dash" : "unsupported-system-cross";
-      check.textContent = greenCheck ? "✓" : yellowDash ? "−" : "✕";
+      check.classList.add("icon", greenCheck ? "icon-check" : yellowDash ? "icon-minus" : "icon-close");
       check.title = label === "OS"
         ? supportedOs
           ? "Supported OS edition: Windows 11 Pro"
@@ -334,28 +295,10 @@ function adminWarning(warning = document.createElement("span")) {
   const administrator = settings?.is_administrator;
   warning.className = "admin-warning";
   warning.dataset.state = administrator === true ? "granted" : administrator === false ? "missing" : "unknown";
-  const icon = (pathData, detail) => {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    for (const [name, value] of Object.entries({ viewBox: "0 0 24 24", width: 16, height: 16, fill: "none", stroke: "currentColor", "stroke-width": 1.75, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false" })) {
-      svg.setAttribute(name, value);
-    }
-    const path = document.createElementNS(svg.namespaceURI, "path");
-    path.setAttribute("d", pathData);
-    svg.append(path);
-    if (detail) {
-      const mark = document.createElementNS(svg.namespaceURI, "path");
-      mark.setAttribute("d", detail);
-      mark.setAttribute("fill", "currentColor");
-      mark.setAttribute("stroke", "none");
-      svg.append(mark);
-    }
-    return svg;
-  };
-  const icons = [icon("M12 3 22 21H2Z", "M10.5 8h3v6h-3Z M10.5 16.5h3v3h-3Z")];
+  warning.replaceChildren(element("span", "icon icon-warning"));
   if (administrator != null) {
-    icons.push(icon(administrator ? "M3 12l6 9L21 3" : "M3 3l18 18 M21 3 3 21"));
+    warning.append(element("span", administrator ? "icon icon-check" : "icon icon-close"));
   }
-  warning.replaceChildren(...icons);
   warning.title = `Requires administrator access${administrator === true ? " · Access found" : administrator === false ? " · Access not found" : ""}`;
   warning.setAttribute("role", "img");
   warning.setAttribute("aria-label", warning.title);
