@@ -35,7 +35,7 @@
   --green: #4ade80;
   --yellow: #facc15;
   --red: #f87171;
-  font-family: "Anonymous Pro", monospace;
+  font-family: Bahnschrift, "Segoe UI", sans-serif;
   color: var(--text);
   background: var(--background);
   color-scheme: dark;
@@ -89,7 +89,7 @@ main {
 
 .navigation-tabs {
   position: fixed;
-  z-index: 12;
+  z-index: 13;
   inset: 0 auto 0 0;
   display: flex;
   flex-direction: column;
@@ -209,6 +209,7 @@ summary::after {
   padding-top: var(--space-2);
   align-items: center;
   border-top: 1px solid transparent;
+  transition: border-color calc(var(--sidebar-duration) / 3) linear;
 }
 
 .navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions {
@@ -527,6 +528,7 @@ dl {
 
 #bohr {
   position: relative;
+  z-index: 12;
   justify-self: end;
   width: 120px;
   max-width: 100%;
@@ -879,6 +881,7 @@ button:disabled {
 
 .tweaks-output {
   overflow: hidden;
+  font-family: "Anonymous Pro", monospace;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
