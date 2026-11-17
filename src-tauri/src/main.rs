@@ -11,6 +11,36 @@ mod inject;
 mod profiles;
 mod administrator;
 
+#[tauri::command]
+fn resize_from_top(window: tauri::Window, width: u32, height: u32) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos};
+
+    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+    let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    let inner = window.inner_size().map_err(|error| error.to_string())?;
+    let outer = window.outer_size().map_err(|error| error.to_string())?;
+    let position = window.outer_position().map_err(|error| error.to_string())?;
+    let width_delta = (f64::from(width) * scale).round() as i32 - inner.width as i32;
+    let height_delta = (f64::from(height) * scale).round() as i32 - inner.height as i32;
+    let top = window.current_monitor().map_err(|error| error.to_string())?
+        .map_or(i32::MIN, |monitor| monitor.work_area().position.y.min(position.y));
+    let resized = unsafe {
+        SetWindowPos(
+            hwnd.0,
+            std::ptr::null_mut(),
+            position.x,
+            (position.y - height_delta).max(top),
+            outer.width as i32 + width_delta,
+            outer.height as i32 + height_delta,
+            SWP_NOACTIVATE | SWP_NOZORDER,
+        )
+    };
+    if resized == 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    Ok(())
+}
+
 fn preference_error(error: std::io::Error) -> serde_json::Value {
     if let Some(conflict) = error
         .get_ref()
@@ -139,6 +169,7 @@ fn main() {
         .manage(inject::InjectionState::default())
         .manage(debloat::RemovalState::default())
         .invoke_handler(tauri::generate_handler![
+            resize_from_top,
             system_info,
             explorer_settings,
             set_desktop_layout_safe_mode,

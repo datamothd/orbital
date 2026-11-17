@@ -19,8 +19,8 @@ for (const [index, tab] of navigationTabs.entries()) {
   tab.addEventListener("click", () => selectNavigationTab(tab));
   tab.addEventListener("keydown", (event) => {
     let nextIndex;
-    if (event.key === "ArrowRight") nextIndex = (index + 1) % navigationTabs.length;
-    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + navigationTabs.length) % navigationTabs.length;
+    if (event.key === "ArrowDown") nextIndex = (index + 1) % navigationTabs.length;
+    else if (event.key === "ArrowUp") nextIndex = (index - 1 + navigationTabs.length) % navigationTabs.length;
     else if (event.key === "Home") nextIndex = 0;
     else if (event.key === "End") nextIndex = navigationTabs.length - 1;
     else return;

@@ -466,7 +466,8 @@ const answer = (() => {
     return finish();
   }
   function show(open) {
-    closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open; document.querySelector(".top-bar").hidden = open;
+    closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open;
+    byId("navigation-sidebar").hidden = open;
     if (typeof stopScrolling === "function") stopScrolling(); window.scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
   }
   function showImportedChanges() {

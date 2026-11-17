@@ -87,8 +87,9 @@ if (window.__TAURI__) {
   const appWindow = window.__TAURI__.window.getCurrentWindow();
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
+  const sidebar = byId("navigation-sidebar");
   const root = document.documentElement;
-  const baseWidth = 640;
+  const baseWidth = 700;
   const maxHeight = 720;
   const scrollbar = document.createElement("div");
   scrollbar.className = "scrollbar-probe";
@@ -100,6 +101,7 @@ if (window.__TAURI__) {
   let needsScrollbar = false;
   let lastWidth = 0;
   let lastHeight = 0;
+  let settingsOpen = false;
   let injectHeight = 0;
   const layoutWaiters = [];
 
@@ -144,12 +146,30 @@ if (window.__TAURI__) {
         if (!byId("inject-panel").hidden) injectHeight = height;
         needsScrollbar = contentHeight > height;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
+        const nextSettingsOpen = !byId("settings-panel").hidden;
+        const resizeFromTop = settingsOpen !== nextSettingsOpen;
+        settingsOpen = nextSettingsOpen;
         if (width !== lastWidth || height !== lastHeight) {
+          const growing = resizeFromTop && height > innerHeight;
           lastWidth = width;
           lastHeight = height;
           syncScrollbar();
-          await appWindow.setSize(new LogicalSize(width, height));
+          if (resizeFromTop) {
+            sidebar.toggleAttribute("data-resize-expanded", sidebar.matches(":hover, :has(:focus-visible)"));
+            if (growing) {
+              sidebar.setAttribute("data-resize-growing", "");
+              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            }
+            await invoke("resize_from_top", { width, height });
+          } else {
+            await appWindow.setSize(new LogicalSize(width, height));
+          }
           await waitForSize(width, height);
+          if (resizeFromTop) {
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            sidebar.removeAttribute("data-resize-growing");
+            sidebar.removeAttribute("data-resize-expanded");
+          }
         }
         syncScrollbar();
       } while (pending);
@@ -159,6 +179,8 @@ if (window.__TAURI__) {
       root.removeAttribute("data-window-content-fits");
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
+      sidebar.removeAttribute("data-resize-growing");
+      sidebar.removeAttribute("data-resize-expanded");
       resizing = false;
       for (const resolve of layoutWaiters.splice(0)) resolve();
     }

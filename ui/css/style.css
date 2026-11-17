@@ -22,6 +22,10 @@
   --space-5: 20px;
   --space-6: 24px;
   --panel-padding: var(--space-5);
+  --gutter: var(--space-2);
+  --sidebar-width: 60px;
+  --sidebar-duration: 260ms;
+  --sidebar-motion: var(--sidebar-duration) cubic-bezier(.2, .75, .25, 1);
   --text: #fff;
   --background: #000;
   --surface: #0a0a0a;
@@ -74,80 +78,229 @@ body {
 }
 
 main {
-  width: min(640px, 100vw);
-  max-width: 640px;
-  padding: var(--panel-padding);
+  width: min(700px, 100%);
+  padding: var(--gutter);
   margin: 0;
+}
+
+.navigation-tabs:not([hidden]) + main {
+  padding-left: calc(var(--sidebar-width) + var(--gutter));
+}
+
+.navigation-tabs {
+  position: fixed;
+  z-index: 12;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: var(--sidebar-width);
+  padding: var(--gutter);
+  overflow: hidden auto;
+  scrollbar-width: none;
+  --sidebar-background: #111;
+  background: var(--sidebar-background);
+  border-right: 1px solid var(--border);
+  transition: width var(--sidebar-motion);
+}
+
+.navigation-tabs[hidden] {
+  display: none;
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) {
+  width: 172px;
+}
+
+.navigation-logo {
+  margin: var(--space-2) 5px var(--space-1);
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.8;
+}
+
+.navigation-orbit {
+  transform-origin: center;
+  animation: bohr-spin 12s linear infinite;
+}
+
+.navigation-tablist {
+  display: contents;
+}
+
+.navigation-tabs button {
+  display: flex;
+  align-items: center;
+  flex: 0 0 42px;
+  gap: var(--space-3);
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#settings-tab {
+  order: 1;
+}
+
+.navigation-tabs[data-resize-growing] :is(#settings-tab, .sidebar-actions) {
+  opacity: 0;
+}
+
+.sidebar-actions {
+  --action-size: 28px;
+  position: relative;
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  flex-shrink: 0;
+  margin-top: auto;
+  margin-bottom: var(--space-1);
+  padding-top: var(--space-2);
+  align-items: center;
+  border-top: 1px solid transparent;
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions {
+  border-color: var(--border);
+}
+
+.sidebar-actions button {
+  flex: 0 0 var(--action-size);
+  height: var(--action-size);
+  justify-content: center;
+  padding: 0;
+  border-color: var(--border);
+  border-radius: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity calc(var(--sidebar-duration) / 3) linear;
+}
+
+.navigation-tabs .sidebar-actions button svg {
+  flex-basis: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions button {
+  opacity: 1;
+  visibility: visible;
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions button:disabled {
+  opacity: 0.45;
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions button:nth-child(2) {
+  transition-delay: calc(var(--sidebar-duration) / 3);
+}
+
+#administrator-access {
+  position: absolute;
+  top: var(--space-2);
+  left: 0;
+  width: calc(var(--sidebar-width) - 2 * var(--gutter) - 1px);
+  opacity: 1;
+  visibility: visible;
+  transition: left var(--sidebar-motion), width var(--sidebar-motion);
+}
+
+.navigation-tabs #administrator-access svg {
+  flex-basis: auto;
+  width: 19px;
+  height: 19px;
+  transition: width var(--sidebar-motion), height var(--sidebar-motion);
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access {
+  left: calc(2 * (var(--action-size) + var(--space-1)));
+  width: var(--action-size);
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access svg {
+  width: 14px;
+  height: 14px;
+}
+
+.navigation-tabs button[aria-selected="true"] {
+  color: var(--text);
+  background: var(--control);
+  border-color: var(--border);
+}
+
+.navigation-tabs button:focus-visible {
+  outline-offset: -2px;
+}
+
+.navigation-tabs button svg {
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+}
+
+.navigation-tablist svg,
+.sidebar-actions button:not(#administrator-access) svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.navigation-tabs button span {
+  opacity: 0;
+  transition: opacity var(--sidebar-motion);
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) button span {
+  opacity: 1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  z-index: 11;
+  inset: 0 0 0 var(--sidebar-width);
+  pointer-events: none;
+  opacity: 0;
+  backdrop-filter: blur(5px);
+  background-color: rgb(0 0 0 / 25%);
+  transition: opacity var(--sidebar-motion);
+}
+
+body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]))::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sidebar-motion: 160ms ease;
+  }
+
+  .navigation-tabs,
+  .navigation-tabs .sidebar-actions button:nth-child(n),
+  .navigation-tabs #administrator-access,
+  .navigation-tabs #administrator-access svg {
+    transition: none;
+  }
+
+  .navigation-orbit {
+    animation: none;
+  }
 }
 
 [role="tabpanel"] > :is(section, details):last-child {
   margin-bottom: 0;
 }
 
-.top-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.navigation-tabs,
-.profile-actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.profile-actions {
-  margin-left: auto;
-  align-items: center;
-}
-
-#administrator-access {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  min-height: 30px;
-  width: 34px;
-  padding: 2px 4px;
-  justify-content: center;
-  color: var(--muted);
-  border-color: transparent;
-  background: transparent;
-}
-
 #administrator-access[data-state="granted"] { color: var(--green); }
 #administrator-access[data-state="missing"] { color: var(--red); }
-.administrator-access-check, .administrator-access-cross { display: none; }
-#administrator-access[data-state="granted"] .administrator-access-check { display: inline; }
-#administrator-access[data-state="missing"] .administrator-access-cross { display: inline; }
 #administrator-access-error { color: var(--red); }
-
-.navigation-tabs button,
-.profile-actions button {
-  padding: var(--space-2) var(--space-3);
-  min-height: 30px;
-  color: var(--muted);
-  background: var(--surface);
-  border-color: var(--border);
-}
-
-.navigation-tabs button,
-.profile-actions button {
-  font-size: 13px;
-}
-
-.profile-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.navigation-tabs button[aria-selected="true"] {
-  color: var(--text);
-  background: var(--control);
-  border-color: #777;
-}
 
 .section-header,
 summary,
@@ -171,8 +324,7 @@ summary,
 }
 
 .section-header button,
-.preference > button,
-.profile-actions svg {
+.preference > button {
   flex-shrink: 0;
 }
 
@@ -265,8 +417,26 @@ summary h2 {
   position: relative;
   min-height: 58px;
   margin: 0;
-  padding: var(--space-5) 0;
+  padding: var(--space-5) 0 var(--space-5) 36px;
   line-height: 18px;
+}
+
+.tweak-subgroups > details > summary::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  bottom: 50%;
+  left: 5px;
+  width: 23px;
+  border-left: 1px solid #777;
+  border-bottom: 1px solid #777;
+  border-bottom-left-radius: 10px;
+  pointer-events: none;
+}
+
+.tweak-subgroups > details:has(+ details) > summary,
+.tweak-subgroups > details[open]:has(> .tweak-subgroups) > summary {
+  background: linear-gradient(#777, #777) 5px 0 / 1px 100% no-repeat;
 }
 
 summary::after {
@@ -278,6 +448,10 @@ summary::after {
   transform: translateY(-2px) rotate(45deg);
   flex-shrink: 0;
   margin: 0 3px;
+}
+
+.tweak-subgroups > details > summary::after {
+  margin-inline-start: auto;
 }
 
 details[open] > summary {
@@ -1215,18 +1389,6 @@ button.primary:hover:not(:disabled) {
 @media (max-width: 440px) {
   .system-content {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .profile-actions button {
-    padding: var(--space-2);
-  }
-
-  .profile-actions button span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
   }
 
   .folder-view-preference {

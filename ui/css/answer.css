@@ -39,7 +39,7 @@
   margin-top: var(--space-2);
 }
 
-.top-bar[hidden], #answer-page[hidden], #answer-page [hidden] {
+#answer-page[hidden], #answer-page [hidden] {
   display: none;
 }
 
