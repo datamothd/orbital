@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="css/debloat.css">
   <script src="js/shared.js" defer></script>
   <script src="js/folder-views.js" defer></script>
+  <script src="js/pending.js" defer></script>
   <script src="js/app.js" defer></script>
-  <script src="js/batch.js" defer></script>
   <script src="js/profiles.js" defer></script>
   <script src="js/default-apps.js" defer></script>
   <script src="js/debloat.js" defer></script>
@@ -38,18 +38,18 @@
       </button>
     </div>
     <div class="sidebar-actions" role="group" aria-label="Sidebar actions">
+      <button id="administrator-access" type="button" data-state="unknown" aria-label="Checking administrator access" title="Checking administrator access" aria-haspopup="dialog" aria-controls="administrator-access-dialog">
+        <span class="icon icon-shield" aria-hidden="true"></span>
+      </button>
       <button id="import-tweaks" type="button" disabled aria-label="Import tweaks" title="Import tweaks from a JSON file">
         <span class="icon icon-import" aria-hidden="true"></span>
       </button>
       <button id="export-tweaks" type="button" disabled aria-label="Export tweaks" title="Export current tweak values as JSON">
         <span class="icon icon-export" aria-hidden="true"></span>
       </button>
-      <button id="administrator-access" type="button" data-state="unknown" aria-label="Checking administrator access" title="Checking administrator access" aria-haspopup="dialog" aria-controls="administrator-access-dialog">
-        <span class="icon icon-shield" aria-hidden="true"></span>
-      </button>
     </div>
   </aside>
-  <main>
+  <div id="workspace"><main>
     <div id="tweaks-panel" role="tabpanel" aria-labelledby="tweaks-tab">
       <section aria-labelledby="system-title">
         <header class="section-header">
@@ -70,10 +70,7 @@
       <div class="settings-actions" role="group" aria-label="Settings actions">
         <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Apply recommended preferences</button>
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
-        <div class="settings-action-row">
-          <button id="batch-changes" disabled aria-haspopup="dialog" aria-controls="batch-dialog" title="Enable or disable preferences together with one Explorer restart">Batch changes</button>
-          <button id="tweaks-collapse" class="collapse-button" type="button" aria-label="Collapse all" title="Collapse all"><span class="icon icon-collapse" aria-hidden="true"></span></button>
-        </div>
+        <button id="tweaks-collapse" class="collapse-button" type="button" aria-label="Collapse all" title="Collapse all"><span class="icon icon-collapse" aria-hidden="true"></span></button>
       </div>
       <hr class="preferences-divider settings-actions-divider" aria-hidden="true">
       <details id="visual-settings" class="tweak-category" aria-labelledby="visual-settings-title">
@@ -93,7 +90,7 @@
               </h3>
             </summary>
             <hr class="preferences-divider" aria-hidden="true">
-            <p class="note">Changing a preference restarts Windows Explorer. Your taskbar and desktop will briefly disappear. Hold Shift while clicking to skip confirmation, or enable Skip confirmation prompts in Settings.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
+            <p class="note">Windows Explorer restarts once when you apply your pending changes. Your taskbar and desktop will briefly disappear. Hold Shift while clicking Continue to skip confirmation.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
             <h3 class="preference-group">Taskbar</h3>
             <div class="preference" data-preference="taskbar-centering">
               <div>
@@ -144,7 +141,6 @@
                   <span id="explorer-launch-selection">Choose a location</span>
                   <span class="picker-arrow" aria-hidden="true"></span>
                 </button>
-                <button id="explorer-launch-apply" disabled>Apply</button>
               </div>
             </div>
             <div class="preference" data-preference="item-checkboxes">
@@ -189,7 +185,6 @@
                   <span id="folder-view-selection">Choose a view</span>
                   <span class="picker-arrow" aria-hidden="true"></span>
                 </button>
-                <button id="folder-view-apply" disabled>Apply</button>
               </div>
             </div>
             <div class="preference folder-view-preference">
@@ -203,7 +198,6 @@
                   <span id="folder-sort-selection">Choose sorting</span>
                   <span class="picker-arrow" aria-hidden="true"></span>
                 </button>
-                <button id="folder-sort-apply" disabled>Apply</button>
               </div>
             </div>
             <div class="preference folder-view-preference">
@@ -217,7 +211,6 @@
                   <span id="folder-grouping-selection">Choose grouping</span>
                   <span class="picker-arrow" aria-hidden="true"></span>
                 </button>
-                <button id="folder-grouping-apply" disabled>Apply</button>
               </div>
             </div>
             <h3 class="preference-group">File Explorer · File visibility</h3>
@@ -496,7 +489,7 @@
         <div class="preference">
           <div>
             <h3 id="skip-prompts-label">Skip confirmation prompts</h3>
-            <p id="skip-prompts-description" class="preference-description">Apply changes immediately without holding Shift. Windows Explorer will still restart.</p>
+            <p id="skip-prompts-description" class="preference-description">Skip the confirmation when you continue with pending changes. Windows Explorer will still restart.</p>
             <p id="skip-prompts-value" class="preference-value" data-state="disabled">Disabled</p>
           </div>
           <button id="skip-prompts-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="skip-prompts-label" aria-describedby="skip-prompts-description">Toggle</button>
@@ -541,7 +534,13 @@
         <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
       </form>
     </section>
-  </main>
+  </main></div>
+  <footer id="pending-bar" aria-label="Pending preference changes" hidden>
+    <p id="pending-count" role="status"></p>
+    <button id="pending-review" type="button" aria-haspopup="dialog" aria-controls="pending-dialog">List of changes</button>
+    <button id="pending-ignore" type="button">Ignore</button>
+    <button id="pending-continue" type="button" class="primary" title="Hold Shift to skip confirmation">Continue</button>
+  </footer>
   <dialog id="answer-source" aria-labelledby="answer-source-title">
     <h2 id="answer-source-title">Choose your answer file</h2>
     <form method="dialog" class="answer-source-form">
@@ -634,25 +633,20 @@
       <button id="replace-icon-apply" value="apply" class="primary" hidden>Replace</button>
     </form>
   </dialog>
-  <dialog id="batch-dialog" class="changes-dialog" aria-labelledby="batch-title" aria-describedby="batch-description">
-    <h2 id="batch-title">Batch changes</h2>
-    <p id="batch-description">Check preferences to enable them. Uncheck preferences to disable them.</p>
-    <details id="batch-options" class="changes-options" open>
+  <dialog id="pending-dialog" class="changes-dialog" aria-labelledby="pending-title" aria-describedby="pending-description">
+    <h2 id="pending-title">Pending changes</h2>
+    <p id="pending-description">Uncheck any changes you want to skip.</p>
+    <details id="pending-options" class="changes-options" open>
       <summary>List of changes</summary>
       <div class="changes-scroll recommendation-scroll">
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
-        <div id="batch-list" class="changes-list recommendation-list" role="group" aria-label="Preference states"></div>
-        <p class="note">Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Reverting restores the earlier folder snapshot and replaces later folder layout changes.</p>
+        <div id="pending-list" class="changes-list recommendation-list" role="group" aria-label="Pending preferences"></div>
       </div>
     </details>
-    <p class="note">Windows Explorer will restart once to apply these changes.</p>
-    <form method="dialog" class="confirmation-footer">
-      <p id="batch-summary" class="note selection-note" role="status" hidden></p>
-      <span class="confirmation-buttons">
-        <button value="cancel" autofocus>Cancel</button>
-        <button id="batch-apply" value="apply" class="primary" disabled>Apply &amp; restart</button>
-      </span>
+    <form method="dialog">
+      <button value="cancel">Cancel</button>
+      <button value="apply" class="primary" autofocus>Done</button>
     </form>
   </dialog>
   <dialog id="import-preview" class="changes-dialog" aria-labelledby="import-title" aria-describedby="import-description">

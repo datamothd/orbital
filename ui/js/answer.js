@@ -311,7 +311,7 @@ const answer = (() => {
       for (const section of affected) counts.set(section, (counts.get(section) || 0) + 1);
     }
     for (const section of [...sections.values(), ...Object.keys(rowFields).flatMap(rows)]) { const badge = section.querySelector(".answer-count"), count = counts.get(section) || 0; badge.hidden = !count; badge.firstChild.textContent = count; badge.setAttribute("aria-label", `${count} blocking issues`); }
-    if (scroll && issues.length) { window.scrollTo(0, window.scrollY + byId("answer-search").getBoundingClientRect().bottom); summary.focus({ preventScroll: true }); }
+    if (scroll && issues.length) { const page = byId("workspace"); page.scrollTo(0, page.scrollTop + byId("answer-search").getBoundingClientRect().bottom); summary.focus({ preventScroll: true }); }
   }
   function status(text, error = false) {
     const notice = byId("answer-status");
@@ -467,7 +467,7 @@ const answer = (() => {
   function show(open) {
     closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open;
     byId("navigation-sidebar").hidden = open;
-    if (typeof stopScrolling === "function") stopScrolling(); window.scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
+    if (typeof stopScrolling === "function") stopScrolling(); byId("workspace").scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
   }
   function showImportedChanges() {
     byId("answer-search").value = "";

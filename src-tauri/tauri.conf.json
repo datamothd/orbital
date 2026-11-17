@@ -15,7 +15,6 @@
       "backgroundColor": "#000000",
       "width": 700,
       "height": 360,
-      "maxHeight": 720,
       "resizable": false,
       "maximizable": false
     }],

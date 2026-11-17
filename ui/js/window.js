@@ -27,7 +27,7 @@ function scrollContainer(target, axis, delta) {
     }
     if (node.matches("dialog[open]")) return null;
   }
-  return document.querySelector("dialog:modal") ? null : document.scrollingElement;
+  return null;
 }
 
 function animateScroll(now) {
@@ -88,7 +88,7 @@ if (window.__TAURI__) {
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
   const sidebar = byId("navigation-sidebar");
-  const root = document.documentElement;
+  const workspace = byId("workspace");
   const baseWidth = 700;
   const maxHeight = 720;
   const scrollbar = document.createElement("div");
@@ -101,6 +101,7 @@ if (window.__TAURI__) {
   let needsScrollbar = false;
   let lastWidth = 0;
   let lastHeight = 0;
+  let lastWorkspaceHeight = 0;
   let settingsOpen = false;
   let injectHeight = 0;
   const layoutWaiters = [];
@@ -125,7 +126,7 @@ if (window.__TAURI__) {
   function syncScrollbar() {
     const sizeReady = Math.abs(window.innerWidth - lastWidth) <= 1
       && Math.abs(window.innerHeight - lastHeight) <= 1;
-    root.toggleAttribute("data-window-content-fits", !needsScrollbar || pending || !sizeReady);
+    workspace.toggleAttribute("data-window-content-fits", !needsScrollbar || pending || !sizeReady);
   }
 
   async function fitWindow() {
@@ -139,35 +140,40 @@ if (window.__TAURI__) {
     try {
       do {
         pending = false;
-        root.setAttribute("data-window-content-fits", "");
+        workspace.setAttribute("data-window-content-fits", "");
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
         const editorOpen = !byId("answer-page").hidden;
-        const height = editorOpen ? injectHeight || maxHeight : Math.min(maxHeight, contentHeight);
-        if (!byId("inject-panel").hidden) injectHeight = height;
-        needsScrollbar = contentHeight > height;
+        const workspaceHeight = editorOpen ? injectHeight || maxHeight : Math.min(maxHeight, contentHeight);
+        const height = workspaceHeight + pendingBar.offsetHeight;
+        if (!byId("inject-panel").hidden) injectHeight = workspaceHeight;
+        needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
         const nextSettingsOpen = !byId("settings-panel").hidden;
         const resizeFromTop = settingsOpen !== nextSettingsOpen;
         settingsOpen = nextSettingsOpen;
-        if (width !== lastWidth || height !== lastHeight) {
-          const growing = resizeFromTop && height > innerHeight;
+        if (width !== lastWidth || height !== lastHeight || workspaceHeight !== lastWorkspaceHeight) {
+          const moving = lastWorkspaceHeight > 0 && workspaceHeight !== lastWorkspaceHeight;
           lastWidth = width;
           lastHeight = height;
+          lastWorkspaceHeight = workspaceHeight;
           syncScrollbar();
-          if (resizeFromTop) {
+          if (resizeFromTop || moving) {
             sidebar.toggleAttribute("data-resize-expanded", sidebar.matches(":hover, :has(:focus-visible)"));
-            if (growing) {
-              sidebar.setAttribute("data-resize-growing", "");
-              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            }
+          }
+          if (moving) {
+            sidebar.setAttribute("data-resize-moving", "");
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          }
+          document.body.style.setProperty("--workspace-height", `${workspaceHeight}px`);
+          if (resizeFromTop) {
             await invoke("resize_from_top", { width, height });
           } else {
             await appWindow.setSize(new LogicalSize(width, height));
           }
           await waitForSize(width, height);
-          if (resizeFromTop) {
+          if (resizeFromTop || moving) {
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            sidebar.removeAttribute("data-resize-growing");
+            sidebar.removeAttribute("data-resize-moving");
             sidebar.removeAttribute("data-resize-expanded");
           }
         }
@@ -176,10 +182,11 @@ if (window.__TAURI__) {
     } catch (error) {
       observer.disconnect();
       window.removeEventListener("resize", syncScrollbar);
-      root.removeAttribute("data-window-content-fits");
+      workspace.removeAttribute("data-window-content-fits");
+      document.body.style.removeProperty("--workspace-height");
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
-      sidebar.removeAttribute("data-resize-growing");
+      sidebar.removeAttribute("data-resize-moving");
       sidebar.removeAttribute("data-resize-expanded");
       resizing = false;
       for (const resolve of layoutWaiters.splice(0)) resolve();
@@ -194,6 +201,7 @@ if (window.__TAURI__) {
 
   const observer = new ResizeObserver(fitWindow);
   observer.observe(main);
+  observer.observe(pendingBar);
   window.addEventListener("resize", syncScrollbar);
   document.fonts.ready.then(fitWindow);
 }

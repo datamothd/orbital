@@ -57,16 +57,17 @@
 }
 
 html {
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-html[data-window-content-fits] {
-  overflow-y: hidden;
-}
-
-html:has(dialog:modal) {
   overflow: hidden;
+}
+
+#workspace {
+  grid-area: 1 / 1;
+  overflow: hidden auto;
+}
+
+#workspace[data-window-content-fits],
+body:has(dialog:modal) #workspace {
+  overflow-y: hidden;
 }
 
 :where(h1, h2, h3, p, dl, dd, ul, ol, figure, fieldset) {
@@ -74,6 +75,11 @@ html:has(dialog:modal) {
 }
 
 body {
+  position: relative;
+  display: grid;
+  grid-template-rows: var(--workspace-height, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
   margin: 0;
 }
 
@@ -83,12 +89,13 @@ main {
   margin: 0;
 }
 
-.navigation-tabs:not([hidden]) + main {
+.navigation-tabs:not([hidden]) + #workspace main {
   padding-left: calc(var(--sidebar-width) + var(--gutter));
 }
 
 .navigation-tabs {
-  position: fixed;
+  position: absolute;
+  grid-area: 1 / 1 / 2 / 2;
   z-index: 13;
   inset: 0 auto 0 0;
   display: flex;
@@ -193,13 +200,12 @@ summary::after {
   order: 1;
 }
 
-.navigation-tabs[data-resize-growing] :is(#settings-tab, .sidebar-actions) {
+.navigation-tabs[data-resize-moving] :is(#settings-tab, .sidebar-actions) {
   opacity: 0;
 }
 
 .sidebar-actions {
   --action-size: 28px;
-  position: relative;
   display: flex;
   gap: var(--space-1);
   min-width: 0;
@@ -243,18 +249,16 @@ summary::after {
   opacity: 0.45;
 }
 
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) .sidebar-actions button:nth-child(2) {
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #export-tweaks {
   transition-delay: calc(var(--sidebar-duration) / 3);
 }
 
 #administrator-access {
-  position: absolute;
-  top: var(--space-2);
-  left: 0;
+  flex-basis: auto;
   width: calc(var(--sidebar-width) - 2 * var(--gutter) - 1px);
   opacity: 1;
   visibility: visible;
-  transition: left var(--sidebar-motion), width var(--sidebar-motion);
+  transition: width var(--sidebar-motion);
 }
 
 .navigation-tabs #administrator-access .icon {
@@ -265,7 +269,6 @@ summary::after {
 }
 
 .navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access {
-  left: calc(2 * (var(--action-size) + var(--space-1)));
   width: var(--action-size);
 }
 
@@ -301,7 +304,8 @@ summary::after {
 
 body::after {
   content: "";
-  position: fixed;
+  position: absolute;
+  grid-area: 1 / 1 / 2 / 2;
   z-index: 11;
   inset: 0 0 0 var(--sidebar-width);
   pointer-events: none;
@@ -682,70 +686,33 @@ button:disabled {
 
 .settings-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr auto;
   gap: var(--space-2);
   margin: calc(-1 * var(--space-2)) 0 0;
 }
 
-.settings-action-row {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: var(--space-2);
-}
-
-#batch-changes {
-  flex: 1;
-}
-
-.batch-folder-view {
+#pending-bar:not([hidden]) {
+  grid-area: 2 / 1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-2) var(--space-2);
-  border-top: 1px solid #292929;
-  border-bottom: 1px solid #292929;
+  padding: var(--space-2);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
 }
 
-.batch-folder-view > span {
+body:has(#tweaks-panel[hidden]) #pending-bar {
+  display: none;
+}
+
+#pending-count {
   flex: 1;
+  white-space: nowrap;
 }
 
-.batch-folder-view + .batch-folder-view {
-  border-top: 0;
-}
-
-.recommendation-list > label:has(+ .batch-folder-view) {
-  margin-bottom: 3px;
-}
-
-.batch-folder-view + label {
-  margin-top: 3px;
-}
-
-.batch-folder-view select {
-  max-width: 55%;
-  padding: var(--space-1) var(--space-2);
-  font: inherit;
-  font-size: 12px;
-  color: var(--yellow);
-  background: var(--control);
-  border: 1px solid #555;
-  border-radius: 3px;
-}
-
-.batch-folder-view select:hover {
-  border-color: #888;
-}
-
-.batch-folder-view select:focus-visible {
-  outline: 2px solid var(--yellow);
-  outline-offset: 2px;
-}
-
-#batch-list label:has(input:disabled) {
-  opacity: 0.6;
-  cursor: default;
+#pending-review {
+  padding-inline: var(--space-2);
 }
 
 .settings-actions button {
@@ -978,11 +945,6 @@ dialog > :not([hidden]) ~ :not([hidden]) {
   max-width: 460px;
 }
 
-#batch-dialog {
-  --list-space: 360px;
-  --list-max-height: 240px;
-}
-
 dialog > :first-child {
   margin-top: 0;
 }
@@ -1048,6 +1010,10 @@ dialog > :last-child {
 
 .recommendation-scroll > .changes-list {
   padding-bottom: 0;
+}
+
+.recommendation-scroll > #pending-list {
+  padding: var(--space-2);
 }
 
 .changes-list label {

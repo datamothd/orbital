@@ -16,7 +16,7 @@ function revealTweaksOutput(entry) {
     if (generation !== tweaksOutputReveal || byId("tweaks-panel").hidden || document.querySelector("dialog:modal")) return;
     const output = byId("tweaks-output-history");
     output.scrollTop = entry.offsetTop;
-    const page = document.scrollingElement;
+    const page = byId("workspace");
     if (typeof moveScroll === "function") moveScroll(page, 0, page.scrollHeight);
     else page.scrollTop = page.scrollHeight;
     pendingTweaksOutput = null;

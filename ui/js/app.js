@@ -32,41 +32,41 @@ const skipPrompts = createSettingToggle("skip-prompts", "skipPrompts", false);
 const debugMode = createSettingToggle("debug-mode", "debugMode", false, () => document.dispatchEvent(new Event("orbital-debug-mode-change")));
 
 const explorerPreferences = [
-  { id: "transfer-details", field: "expand_transfer_details", apply: "Expand details by default during file transfers?", restore: "Use the compact file-transfer dialog by default?" },
-  { id: "network", field: "show_network", apply: "Show Network in the navigation pane?", restore: "Hide Network from the navigation pane?" },
-  { id: "taskbar-flashing", field: "show_taskbar_flashing", apply: "Allow taskbar app icons to flash when they need your attention?", restore: "Stop taskbar app icons from flashing for attention?", supported: "windows11_supported" },
-  { id: "restore-folder-windows", field: "restore_folder_windows", apply: "Restore previous folder windows when you sign in?", restore: "Stop restoring folder windows at sign-in?" },
-  { id: "taskbar-centering", field: "center_taskbar_icons", apply: "Center taskbar icons?", restore: "Align taskbar icons to the left?", supported: "windows11_supported" },
-  { id: "task-view", field: "show_task_view", apply: "Show the Task View button?", restore: "Hide the Task View button? Win+Tab will still work." },
-  { id: "widgets", field: "allow_widgets", apply: "Allow Widgets, including the widgets board and taskbar content?", restore: "Disable Widgets?", supported: "windows11_supported", requiresAdmin: true },
-  { id: "taskbar-end-task", field: "enable_taskbar_end_task", apply: "Add End task to app menus on the taskbar? It force-closes apps and can discard unsaved work.", restore: "Remove End task from app menus on the taskbar?", supported: "taskbar_end_task_supported" },
-  { id: "explorer-spacing", personal: false, field: "use_compact_mode", apply: "Use compact spacing in File Explorer?", restore: "Restore extra spacing in File Explorer?", supported: "windows11_supported" },
-  { id: "modern-context-menu", personal: false, field: "use_classic_context_menu", apply: "Use the classic Windows 10-style right-click menu?", restore: "Restore the Windows 11 right-click menu?", supported: "windows11_supported" },
-  { id: "recent-files", field: "show_recent_files", apply: "Show recently used files in File Explorer Home?", restore: "Hide recently used files in File Explorer Home?" },
-  { id: "recommendations", field: "show_recommendations", apply: "Show the Recommended section in File Explorer Home?", restore: "Hide the Recommended section in File Explorer Home?", supported: "windows11_supported" },
-  { id: "frequent-folders", field: "show_frequent_folders", apply: "Show frequently used folders in Quick access?", restore: "Hide frequently used folders in Quick access?" },
-  { id: "office-files", field: "show_cloud_files", apply: "Allow cloud files and account-based recommendations in File Explorer?", restore: "Hide cloud files and account-based recommendations in File Explorer?", supported: "windows11_supported" },
-  { id: "home-folder", personal: true, field: "show_home_folder", apply: "Show Home in the navigation pane?", restore: "Hide Home in the navigation pane?", supported: "home_supported", requiresAdmin: true },
-  { id: "gallery", personal: true, field: "show_gallery", apply: "Show Gallery in the navigation pane?", restore: "Hide Gallery in the navigation pane?", supported: "gallery_supported", requiresAdmin: true },
-  { id: "file-extensions", field: "hide_file_extensions", apply: "Hide known file extensions?", restore: "Show file extensions?" },
-  { id: "hidden-files", personal: false, field: "show_hidden_files", apply: "Show hidden files, folders and drives?", restore: "Hide hidden files, folders and drives?" },
-  { id: "item-checkboxes", field: "show_item_checkboxes", apply: "Show selection checkboxes?", restore: "Hide selection checkboxes?" },
-  { id: "libraries", field: "show_libraries", apply: "Show Libraries in the navigation pane?", restore: "Hide Libraries in the navigation pane?" },
-  { id: "full-path", field: "show_full_path", apply: "Show the full folder path in the title bar?", restore: "Hide the full folder path in the title bar?" },
-  { id: "single-click", field: "double_click_open", apply: "Require a double-click to open files and folders?", restore: "Open files and folders with a single click?" },
-  { id: "empty-drives", field: "hide_empty_drives", apply: "Hide drives with no media?", restore: "Show empty drives?" },
-  { id: "confirm-delete", field: "confirm_file_delete", apply: "Confirm before moving items to the Recycle Bin?", restore: "Stop asking before moving items to the Recycle Bin?", supported: "confirm_file_delete_supported" },
-  { id: "icons-only", field: "icons_only", apply: "Show icons instead of thumbnails?", restore: "Allow file thumbnails?" },
-  { id: "info-tips", field: "show_info_tips", apply: "Show file and folder hover descriptions?", restore: "Hide file and folder hover descriptions?" },
-  { id: "system-files", field: "show_system_files", apply: "Show protected operating system files? Show hidden files must also be enabled.", restore: "Hide protected operating system files?" },
-  { id: "shortcut-arrow", field: "hide_shortcut_arrow", apply: "Hide the arrow overlay on desktop shortcuts?", restore: "Show the arrow overlay on desktop shortcuts?", requiresAdmin: true },
+  { id: "transfer-details", field: "expand_transfer_details" },
+  { id: "network", field: "show_network" },
+  { id: "taskbar-flashing", field: "show_taskbar_flashing", supported: "windows11_supported" },
+  { id: "restore-folder-windows", field: "restore_folder_windows" },
+  { id: "taskbar-centering", field: "center_taskbar_icons", supported: "windows11_supported" },
+  { id: "task-view", field: "show_task_view" },
+  { id: "widgets", field: "allow_widgets", supported: "windows11_supported", requiresAdmin: true },
+  { id: "taskbar-end-task", field: "enable_taskbar_end_task", supported: "taskbar_end_task_supported" },
+  { id: "explorer-spacing", personal: false, field: "use_compact_mode", supported: "windows11_supported" },
+  { id: "modern-context-menu", personal: false, field: "use_classic_context_menu", supported: "windows11_supported" },
+  { id: "recent-files", field: "show_recent_files" },
+  { id: "recommendations", field: "show_recommendations", supported: "windows11_supported" },
+  { id: "frequent-folders", field: "show_frequent_folders" },
+  { id: "office-files", field: "show_cloud_files", supported: "windows11_supported" },
+  { id: "home-folder", personal: true, field: "show_home_folder", supported: "home_supported", requiresAdmin: true },
+  { id: "gallery", personal: true, field: "show_gallery", supported: "gallery_supported", requiresAdmin: true },
+  { id: "file-extensions", field: "hide_file_extensions" },
+  { id: "hidden-files", personal: false, field: "show_hidden_files" },
+  { id: "item-checkboxes", field: "show_item_checkboxes" },
+  { id: "libraries", field: "show_libraries" },
+  { id: "full-path", field: "show_full_path" },
+  { id: "single-click", field: "double_click_open" },
+  { id: "empty-drives", field: "hide_empty_drives" },
+  { id: "confirm-delete", field: "confirm_file_delete", supported: "confirm_file_delete_supported" },
+  { id: "icons-only", field: "icons_only" },
+  { id: "info-tips", field: "show_info_tips" },
+  { id: "system-files", field: "show_system_files" },
+  { id: "shortcut-arrow", field: "hide_shortcut_arrow", requiresAdmin: true },
 ];
 
 const explorerChoices = [
-  { id: "folder-view", picker: folderView, field: "folder_view", command: "set_folder_view", argument: "view", label: "view", personal: true, recommendedValue: "details", recommendation: "Set default folder view to Details" },
-  { id: "explorer-launch", picker: explorerLaunch, field: "open_explorer_to", command: "set_explorer_launch", argument: "target", label: "starting location", personal: true, recommendedValue: "downloads", recommendation: "Open Explorer to Downloads" },
-  { id: "folder-sort", picker: folderSorting, field: "folder_sort", command: "set_folder_sort", argument: "sort", label: "sorting", personal: true, recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
-  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", command: "set_folder_grouping", argument: "grouping", label: "grouping", personal: true, recommendedValue: "none", recommendation: "Set folder grouping to None" },
+  { id: "folder-view", picker: folderView, field: "folder_view", personal: true, recommendedValue: "details", recommendation: "Set default folder view to Details" },
+  { id: "explorer-launch", picker: explorerLaunch, field: "open_explorer_to", personal: true, recommendedValue: "downloads", recommendation: "Open Explorer to Downloads" },
+  { id: "folder-sort", picker: folderSorting, field: "folder_sort", personal: true, recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
+  { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", personal: true, recommendedValue: "none", recommendation: "Set folder grouping to None" },
 ];
 
 function preferenceRecommendation(preference) {
@@ -109,13 +109,14 @@ function setBusy(value) {
   busy = value;
   byId("refresh").disabled = busy || !invoke;
   byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
-  for (const id of ["apply-recommended", "restore-original", "batch-changes", "import-tweaks", "export-tweaks"]) {
+  for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
   for (const view of explorerChoices) view.picker.setDisabled(busy || !settings);
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !preferenceAvailable(preference);
   }
+  renderPendingChanges();
 }
 
 function setPreferenceValue(id, value, visual = false) {
@@ -167,6 +168,7 @@ function renderBohr() {
 }
 
 function renderSettings() {
+  renderPendingChanges();
   const safeMode = Boolean(settings?.desktop_layout_safe_mode);
   byId("desktop-layout-safe-mode-toggle").setAttribute("aria-checked", String(safeMode));
   byId("desktop-layout-safe-mode-toggle").disabled = busy || !settings;
@@ -176,16 +178,22 @@ function renderSettings() {
     note.dataset.state = settings?.is_administrator === true ? "granted" : settings?.is_administrator === false ? "missing" : "unknown";
   });
   for (const view of explorerChoices) {
-    view.picker.load(settings?.[view.field] ?? null, Boolean(settings));
-    byId(`${view.id}-value`).dataset.state = view.personal || view.recommendedValue === undefined ? "visual" : !settings ? "other"
-      : view.picker.matches(view.recommendedValue, settings[view.field]) ? "enabled" : "disabled";
+    const selected = pendingValue(view);
+    view.picker.load(selected ?? null, Boolean(settings));
+    const value = byId(`${view.id}-value`);
+    if (settings && pendingPreferences.get(view)?.selected) value.textContent += " · Pending";
+    value.dataset.state = view.personal || view.recommendedValue === undefined ? "visual" : !settings ? "other"
+      : view.picker.matches(view.recommendedValue, selected) ? "enabled" : "disabled";
   }
   for (const preference of explorerPreferences) {
-    setPreferenceValue(preference.id, preferenceAvailable(preference)
-      ? preferenceValue(settings[preference.field]) : "Unavailable",
-      preferencePersonal(preference));
-    if (preferenceAvailable(preference) && preferenceRecommended(preference) && !preferencePersonal(preference) && settings[preference.field] !== null) {
-      byId(preference.id).dataset.state = settings[preference.field] === preferenceRecommendation(preference) ? "enabled" : "disabled";
+    const available = preferenceAvailable(preference);
+    const selected = pendingValue(preference);
+    setPreferenceValue(preference.id, available ? preferenceValue(selected) : "Unavailable", preferencePersonal(preference));
+    if (available && pendingPreferences.get(preference)?.selected) {
+      byId(preference.id).textContent += " · Pending";
+    }
+    if (available && preferenceRecommended(preference) && !preferencePersonal(preference) && selected !== null) {
+      byId(preference.id).dataset.state = selected === preferenceRecommendation(preference) ? "enabled" : "disabled";
     }
   }
   renderBohr();
@@ -327,6 +335,7 @@ function confirmChange(description, title = "Change preference?", recommendation
   const dialog = byId("confirmation");
   dialog.classList.toggle("changes-dialog", recommendations.length > 0);
   byId("confirm-title").textContent = title;
+  byId("confirm-description").hidden = !description;
   byId("confirm-description").textContent = description;
   byId("confirm-note").textContent = note;
   byId("recommended-options").hidden = !recommendations.length;
@@ -394,11 +403,6 @@ async function applyChange(command, args, description, skipConfirmation = false,
   const recommended = command === "apply_recommended_settings";
   const reverting = command === "restore_original_settings";
   let skip = skipPrompts.enabled || skipConfirmation;
-  const preference = explorerPreferences.find(preference => preference.field === args.preference);
-  if (preference?.requiresAdmin && !settings.is_administrator) {
-    setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
-    return;
-  }
   setBusy(true);
   let changed;
   let error = null;
@@ -449,26 +453,13 @@ byId("restore-original").addEventListener("click", () => applyChange(
   "restore_original_settings", {}, "Revert your original settings?", false, "Original settings restored. Explorer restarted.",
 ));
 for (const view of explorerChoices) {
-  view.row = byId(`${view.id}-label`).closest(".preference");
-  view.title = byId(`${view.id}-label`).textContent.trim();
-  view.description = view.row.querySelector(".preference-description").textContent.trim();
-  byId(`${view.id}-apply`).addEventListener("click", (event) => {
-    const selected = view.picker.selected;
-    if (selected !== null) applyChange(
-      view.command,
-      { [view.argument]: selected },
-      view.field === "open_explorer_to" ? `Open new File Explorer windows to ${view.picker.label}?`
-        : `Use ${view.picker.label.toLowerCase()} for folder ${view.label} across all folder types? Saved folder views will be reset. Desktop icon layouts are preserved.`,
-      event.shiftKey,
-      view.field === "open_explorer_to" ? "Explorer starting location saved. Explorer restarted."
-        : `${view.title} saved. Explorer restarted.`,
-    );
-  });
+  const title = byId(`${view.id}-label`);
+  view.label = title.textContent.trim();
+  view.description = title.parentElement.querySelector(".preference-description").textContent.trim();
 }
 for (const preference of explorerPreferences) {
   const row = document.querySelector(`[data-preference="${preference.id}"]`);
   const title = row.querySelector("h3");
-  preference.row = row;
   preference.description = row.querySelector(".preference-description").textContent.trim();
   preference.label = title.textContent.trim();
   if (preference.requiresAdmin) title.append(adminWarning());
@@ -481,12 +472,14 @@ for (const preference of explorerPreferences) {
   toggle.textContent = "Toggle";
   toggle.disabled = true;
   row.append(toggle);
-  toggle.addEventListener("click", (event) => applyChange(
-    "toggle_preference",
-    { preference: preference.field },
-    settings?.[preference.field] ? preference.restore : preference.apply,
-    event.shiftKey,
-  ));
+  toggle.addEventListener("click", () => {
+    if (busy || !preferenceAvailable(preference)) return;
+    if (preference.requiresAdmin && !settings.is_administrator) {
+      setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
+      return;
+    }
+    stagePreference(preference, pendingPreferences.get(preference)?.selected ? settings[preference.field] : !settings[preference.field]);
+  });
 }
 
 if (invoke) {

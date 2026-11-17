@@ -15,13 +15,13 @@ function importedRows(profile) {
       matching, blocked,
     };
   });
-  for (const { field, picker, title } of explorerChoices) {
+  for (const { field, picker, label } of explorerChoices) {
     const value = profile[field];
     if (value == null) continue;
     const current = settings[field];
     rows.push({
       field,
-      label: title,
+      label,
       current: picker.labelFor(current),
       imported: picker.labelFor(value),
       matching: picker.matches(value, current),

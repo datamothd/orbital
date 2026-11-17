@@ -120,8 +120,9 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
 }
 
 function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
-  const picker = byId(`${id}-picker`), apply = byId(`${id}-apply`);
-  const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder, () => { apply.disabled = picker.disabled || control.selected === null; }, matches);
+  const picker = byId(`${id}-picker`);
+  const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder,
+    choice => stagePreference(explorerChoices.find(view => view.id === id), choice.value), matches);
   const availableChoices = () => typeof choices === "function" ? choices() : choices;
   return {
     matches,
@@ -130,11 +131,8 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
     load(current, available = true) {
       control.load(current);
       byId(`${id}-value`).textContent = !available ? "Unavailable" : control.label || fallback;
-      apply.disabled = picker.disabled || control.selected === null;
     },
-    setDisabled(disabled) { control.setDisabled(disabled); apply.disabled = disabled || control.selected === null; },
-    get selected() { return control.selected; },
-    get label() { return control.label; }
+    setDisabled: control.setDisabled,
   };
 }
 
