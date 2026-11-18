@@ -23,11 +23,22 @@ document.addEventListener("click", event => {
   if (dialog && dialogOutsideBounds(event) === dialog) dialog.close("cancel");
 });
 
+function openDialog(dialog) {
+  dialog.showModal();
+  const titleBar = byId("window-titlebar");
+  if (titleBar) {
+    dialog.append(titleBar);
+    dialog.addEventListener("close", () => {
+      if (titleBar.parentElement === dialog) document.body.prepend(titleBar);
+    }, { once: true });
+  }
+}
+
 function showDialog(dialog) {
   dialog.returnValue = "cancel";
   return new Promise((resolve) => {
     dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true });
-    dialog.showModal();
+    openDialog(dialog);
   });
 }
 

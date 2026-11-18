@@ -15,6 +15,7 @@
       "backgroundColor": "#000000",
       "width": 700,
       "height": 360,
+      "decorations": false,
       "resizable": false,
       "maximizable": false
     }],

@@ -209,7 +209,7 @@ function setStatus(message, error = false) {
   const notice = byId("administrator-notice");
   if (error && message.includes("requires administrator access")) {
     byId("administrator-description").textContent = message;
-    if (!notice.open) notice.showModal();
+    if (!notice.open) openDialog(notice);
     return;
   }
   if (notice.open) notice.close();
@@ -476,7 +476,7 @@ function showResult(title, description, error = "", replaceIcon = false) {
   errorNotice.textContent = error;
   byId("replace-icon-apply").hidden = !replaceIcon;
   if (replaceIcon) return confirmDialog(byId("apply-result"));
-  byId("apply-result").showModal();
+  openDialog(byId("apply-result"));
 }
 
 function showApplyResult(count, error) {

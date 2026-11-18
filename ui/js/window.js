@@ -84,10 +84,10 @@ window.addEventListener("wheel", event => {
   for (const [node, movement] of movements) moveScroll(node, movement.x, movement.y);
 }, { passive: false });
 
-if (window.__TAURI__) {
-  const appWindow = window.__TAURI__.window.getCurrentWindow();
+if (appWindow) {
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
+  const titleBar = byId("window-titlebar");
   const sidebar = byId("navigation-sidebar");
   const workspace = byId("workspace");
   const baseWidth = 700;
@@ -145,7 +145,7 @@ if (window.__TAURI__) {
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
         const editorOpen = !byId("answer-page").hidden;
         const workspaceHeight = editorOpen ? injectHeight || maxHeight : Math.min(maxHeight, contentHeight);
-        const height = workspaceHeight + pendingBar.offsetHeight;
+        const height = workspaceHeight + titleBar.offsetHeight + pendingBar.offsetHeight;
         if (!byId("inject-panel").hidden) injectHeight = workspaceHeight;
         needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);

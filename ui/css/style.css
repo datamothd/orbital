@@ -28,6 +28,7 @@
   --sidebar-motion: var(--sidebar-duration) cubic-bezier(.2, .75, .25, 1);
   --text: #fff;
   --background: #000;
+  --sidebar-background: #111;
   --surface: #0a0a0a;
   --control: #171717;
   --border: #333;
@@ -61,7 +62,7 @@ html {
 }
 
 #workspace {
-  grid-area: 1 / 1;
+  grid-area: 2 / 1;
   overflow: hidden auto;
 }
 
@@ -75,12 +76,98 @@ body:has(dialog:modal) #workspace {
 }
 
 body {
+  --action-size: 28px;
+  --sidebar-visible-width: var(--sidebar-width);
   position: relative;
   display: grid;
-  grid-template-rows: var(--workspace-height, minmax(0, 1fr)) auto;
+  grid-template-rows: var(--title-bar-height, 0px) var(--workspace-height, minmax(0, 1fr)) auto;
   grid-template-columns: minmax(0, 1fr);
   height: 100dvh;
   margin: 0;
+}
+
+body:has(#window-titlebar) {
+  --title-bar-height: 36px;
+  --title-bar-radius: var(--space-5);
+}
+
+body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded])) {
+  --sidebar-visible-width: calc(var(--sidebar-width) + 3 * (var(--action-size) + var(--space-1)));
+}
+
+#window-titlebar {
+  position: fixed;
+  z-index: 14;
+  inset: 0 0 auto;
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  height: var(--title-bar-height);
+  margin: 0;
+  padding-right: var(--space-1);
+  background: var(--sidebar-background);
+  border-bottom: 1px solid var(--border);
+}
+
+body:has(.navigation-tabs) #window-titlebar:where(:not(dialog:modal *)) {
+  border-bottom: 0;
+  background: linear-gradient(var(--border), var(--border)) right bottom /
+    calc(100% - var(--sidebar-visible-width) - var(--title-bar-radius) + 1px) 1px no-repeat var(--sidebar-background);
+  transition: background-size var(--sidebar-motion);
+}
+
+body:has(.navigation-tabs):has(#window-titlebar)::before {
+  content: "";
+  position: absolute;
+  z-index: 14;
+  top: calc(var(--title-bar-height) - 1px);
+  left: calc(var(--sidebar-visible-width) - 1px);
+  width: var(--title-bar-radius);
+  height: var(--title-bar-radius);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-top-left-radius: var(--title-bar-radius);
+  box-shadow: calc(-1 * var(--title-bar-radius)) calc(-1 * var(--title-bar-radius)) 0 var(--title-bar-radius) var(--sidebar-background);
+  clip-path: inset(0);
+  pointer-events: none;
+  transition: left var(--sidebar-motion);
+}
+
+.window-drag-region {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+#window-titlebar button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 26px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+#window-titlebar button:hover {
+  background: #292929;
+  color: var(--text);
+}
+
+#window-titlebar button:focus-visible {
+  outline-offset: -2px;
+}
+
+#window-titlebar #window-close:hover {
+  background: #822d35;
+}
+
+#window-titlebar button .icon {
+  width: 12px;
+  height: 12px;
 }
 
 main {
@@ -94,19 +181,17 @@ main {
 }
 
 .navigation-tabs {
-  --action-size: 28px;
   position: absolute;
-  grid-area: 1 / 1 / 2 / 2;
+  grid-area: 2 / 1 / 3 / 2;
   z-index: 13;
   inset: 0 auto 0 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  width: var(--sidebar-width);
+  width: var(--sidebar-visible-width);
   padding: var(--gutter);
   overflow: hidden auto;
   scrollbar-width: none;
-  --sidebar-background: #111;
   background: var(--sidebar-background);
   border-right: 1px solid var(--border);
   transition: width var(--sidebar-motion);
@@ -114,10 +199,6 @@ main {
 
 body:has(#answer-page:not([hidden])) .navigation-tabs :is(.navigation-tablist, .sidebar-actions) {
   display: none;
-}
-
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) {
-  width: calc(var(--sidebar-width) + 3 * (var(--action-size) + var(--space-1)));
 }
 
 .icon,
@@ -175,11 +256,45 @@ summary::after {
   height: 12px;
 }
 
+.navigation-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--gutter);
+  margin-bottom: calc(var(--gutter) - var(--space-1));
+  padding-left: 5px;
+}
+
 .navigation-logo {
-  margin: var(--space-2) 5px var(--space-1);
   width: 32px;
   height: 32px;
   animation: orbit-spin 12s linear infinite;
+}
+
+.navigation-wordmark {
+  box-sizing: content-box;
+  flex: none;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid var(--green);
+  opacity: 0;
+  font: 700 16px "Anonymous Pro", monospace;
+  transition: width 360ms steps(9), opacity 120ms ease;
+}
+
+.navigation-wordmark > span {
+  color: var(--green);
+}
+
+.navigation-tabs:where(:hover, :has(:focus-visible), [data-resize-expanded]) .navigation-wordmark {
+  width: 9ch;
+  opacity: 1;
+  animation: navigation-caret 800ms step-end 2;
+}
+
+@keyframes navigation-caret {
+  50% { border-right-color: transparent; }
 }
 
 .navigation-tablist {
@@ -314,7 +429,7 @@ body:where(:has(:is(#tweaks-panel, #answer-page):not([hidden]) details[open])) .
 body::after {
   content: "";
   position: absolute;
-  grid-area: 1 / 1 / 2 / 2;
+  grid-area: 2 / 1 / 3 / 2;
   z-index: 11;
   inset: 0 0 0 var(--sidebar-width);
   pointer-events: none;
@@ -334,8 +449,15 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded
   }
 
   .navigation-tabs,
+  body:has(.navigation-tabs) #window-titlebar,
+  body:has(.navigation-tabs):has(#window-titlebar)::before,
+  .navigation-tabs .navigation-wordmark,
   .navigation-tabs .sidebar-actions button:nth-child(n) {
     transition: none;
+  }
+
+  .navigation-tabs .navigation-wordmark {
+    animation: none;
   }
 }
 
@@ -699,7 +821,7 @@ button:disabled {
 }
 
 #pending-bar:not([hidden]) {
-  grid-area: 2 / 1;
+  grid-area: 3 / 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -907,6 +1029,7 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 }
 
 #tweaks-output-history {
+  grid-area: 2 / 1;
   width: 100%;
   padding: 0;
   border: 0;
@@ -949,11 +1072,13 @@ dialog {
   padding: var(--panel-padding);
   max-width: 380px;
   width: calc(100% - 40px);
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - var(--title-bar-height, 0px) - 32px);
+  inset-block-start: var(--title-bar-height, 0px);
   overflow-y: auto;
 }
 
 dialog::backdrop {
+  inset-block-start: var(--title-bar-height, 0px);
   background: #0009;
 }
 

@@ -24,6 +24,8 @@ async fn open_terminal(main: tauri::WebviewWindow) -> Result<(), String> {
         .map_err(|error| error.to_string())?
         .title("Orbital Terminal Output")
         .theme(Some(tauri::Theme::Dark))
+        .decorations(false)
+        .maximizable(false)
         .inner_size(600.0, 360.0)
         .devtools(false)
         .build()
