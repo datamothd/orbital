@@ -968,11 +968,11 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #555 var(--control);
+  scrollbar-color: #555 transparent;
   padding: var(--space-1);
-  background: var(--control);
-  border: 1px solid #555;
-  border-radius: 7px;
+  background: var(--sidebar-background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   box-shadow: 0 8px 24px #0009;
   font-size: 12px;
   outline: none;
@@ -980,7 +980,7 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 
 .folder-view-options [role="option"] {
   padding: var(--space-2) var(--space-3);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -1071,21 +1071,30 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 
 dialog {
   overscroll-behavior: contain;
-  background: var(--surface);
+  background: var(--sidebar-background);
   color: var(--text);
-  border: 1px solid #555;
-  border-radius: 12px;
-  padding: var(--panel-padding);
-  max-width: 380px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px #000a;
+  padding: var(--space-6);
+  max-width: 408px;
   width: calc(100% - 40px);
   max-height: calc(100vh - var(--title-bar-height, 0px) - 32px);
   inset-block-start: var(--title-bar-height, 0px);
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 dialog::backdrop {
   inset-block-start: var(--title-bar-height, 0px);
-  background: #0009;
+  background: rgb(0 0 0 / 48%);
+  backdrop-filter: blur(5px);
+}
+
+dialog > h2 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 dialog p {
@@ -1101,8 +1110,12 @@ dialog > :not([hidden]) ~ :not([hidden]) {
   margin-top: var(--space-4);
 }
 
+dialog > h2:not([hidden]) + p:not([hidden]) {
+  margin-top: var(--space-2);
+}
+
 .changes-dialog {
-  --list-space: 252px;
+  --list-space: 336px;
   --list-max-height: 300px;
   max-width: 460px;
 }
@@ -1135,20 +1148,22 @@ dialog > :last-child {
 .changes-options {
   margin: 0;
   padding: 0;
-  background: var(--background);
-  border-color: #555;
-  border-radius: 3px;
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: 9px;
 }
 
 .changes-options > summary {
   margin: 0;
   padding: var(--space-2) var(--space-3);
   background: var(--control);
+  border-radius: 8px;
   font-size: 12px;
 }
 
 .changes-options[open] > summary {
-  border-bottom: 1px solid #555;
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
 }
 
 .recommendation-scroll > .note {
@@ -1181,6 +1196,7 @@ dialog > :last-child {
 .changes-list label {
   display: flex;
   gap: var(--space-2);
+  border-radius: 6px;
   line-height: 1.4;
   cursor: pointer;
 }
@@ -1192,8 +1208,8 @@ dialog > :last-child {
 
 .recommendation-list > label:hover,
 .recommendation-list > label:has(input:focus-visible) {
-  background: #1f2937;
-  outline: 1px solid #475569;
+  background: var(--control);
+  outline: 1px solid var(--border);
   outline-offset: -1px;
 }
 
@@ -1204,15 +1220,35 @@ dialog > :last-child {
   accent-color: currentColor;
 }
 
-dialog form {
+dialog form:not(.answer-source-form, .inject-choices) {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+dialog :is(.answer-source-form, .inject-choices) {
+  display: grid;
+  gap: var(--space-2);
+}
+
+dialog form:not(.answer-source-form, .inject-choices),
+.answer-source-form > .answer-actions {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+dialog button:not(#window-titlebar button) {
+  min-height: 36px;
+  border-radius: 9px;
+}
+
+dialog button:where(:not(.primary, #window-titlebar button)) {
+  border-color: var(--border);
 }
 
 dialog .confirmation-footer {
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .selection-note {
@@ -1233,13 +1269,15 @@ dialog .confirmation-footer {
 
 .confirmation-buttons {
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
   margin-left: auto;
   align-self: flex-end;
 }
 
 #import-preview {
-  --list-space: 360px;
+  --list-space: 436px;
 }
 
 #import-description {
@@ -1257,7 +1295,7 @@ dialog .confirmation-footer {
 
 .import-row:has(input:enabled):hover,
 .import-row:has(input:focus-visible) {
-  background: #1f2937;
+  background: var(--control);
 }
 
 .import-row input {
@@ -1512,19 +1550,14 @@ button.primary:hover:not(:disabled) {
   max-width: 420px;
 }
 
-.inject-choices {
-  display: grid;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
 .inject-choices > .note,
 .inject-choices > .inject-dismiss {
   margin-top: var(--space-2);
 }
 
 .inject-choices > button:not(.inject-dismiss) {
-  padding: var(--space-4);
+  padding: var(--space-3);
+  font-size: 13px;
   line-height: 1.4;
 }
 
@@ -1536,7 +1569,8 @@ button.primary:hover:not(:disabled) {
   display: block;
   margin-top: var(--space-1);
   line-height: 1.4;
-  opacity: 0.75;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .inject-dismiss {

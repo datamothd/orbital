@@ -385,7 +385,11 @@
   max-height: 200px;
   overflow: auto;
   margin: 0;
-  padding: 0;
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  scrollbar-width: thin;
   list-style: none;
 }
 

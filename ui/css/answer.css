@@ -7,36 +7,40 @@
   opacity: 0;
 }
 
-.answer-source-form {
-  display: grid;
-  gap: var(--space-3);
-}
-
 .answer-source-form > .answer-actions {
-  margin-top: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
 }
 
 .answer-source-form > label {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid #444;
-  border-radius: 5px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--control);
   cursor: pointer;
 }
 
+.answer-source-form > label:hover {
+  background: #292929;
+}
+
 .answer-source-form > label:has(:checked) {
-  border-color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
 }
 
 .answer-source-form input {
+  flex-shrink: 0;
+  margin: 0;
   accent-color: var(--green);
 }
 
 .answer-source-form .note {
   display: block;
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 #answer-page[hidden], #answer-page [hidden] {
