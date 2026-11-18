@@ -1,5 +1,6 @@
 "use strict";
 
+let collapseFromTop = false;
 let scrollFrame = 0;
 const scrollAnimations = new Map();
 const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", false, stopScrolling);
@@ -149,7 +150,9 @@ if (window.__TAURI__) {
         needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
         const nextSettingsOpen = !byId("settings-panel").hidden;
-        const resizeFromTop = settingsOpen !== nextSettingsOpen && byId("tweaks-panel").hidden;
+        const resizeFromTop = (collapseFromTop && height < lastHeight)
+          || (settingsOpen !== nextSettingsOpen && byId("tweaks-panel").hidden);
+        collapseFromTop = false;
         settingsOpen = nextSettingsOpen;
         if (width !== lastWidth || height !== lastHeight || workspaceHeight !== lastWorkspaceHeight) {
           const moving = lastWorkspaceHeight > 0 && workspaceHeight !== lastWorkspaceHeight;

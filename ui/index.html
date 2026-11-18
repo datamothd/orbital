@@ -38,6 +38,10 @@
         <span>Settings</span>
       </button>
     </div>
+    <button id="collapse-all" type="button" aria-label="Collapse all" title="Collapse all">
+      <span class="icon icon-collapse" aria-hidden="true"></span>
+      <span>Collapse all</span>
+    </button>
     <div class="sidebar-actions" role="group" aria-label="Sidebar actions">
       <button id="administrator-access" type="button" data-state="unknown" aria-label="Checking administrator access" title="Checking administrator access" aria-haspopup="dialog" aria-controls="administrator-access-dialog">
         <span class="icon icon-shield" aria-hidden="true"></span>
@@ -74,7 +78,6 @@
       <div class="settings-actions" role="group" aria-label="Settings actions">
         <button id="apply-recommended" disabled title="Review recommended changes and restart Explorer. Hold Shift to apply all without confirmation.">Apply recommended preferences</button>
         <button id="restore-original" disabled title="Restore saved settings and folder layouts, replacing later layout changes, and restart Explorer">Revert changes</button>
-        <button id="tweaks-collapse" class="collapse-button" type="button" aria-label="Collapse all" title="Collapse all"><span class="icon icon-collapse" aria-hidden="true"></span></button>
       </div>
       <hr class="preferences-divider settings-actions-divider" aria-hidden="true">
       <details id="visual-settings" class="tweak-category" aria-labelledby="visual-settings-title">
@@ -557,7 +560,7 @@
         <button type="button" data-answer-save="xml">Download XML</button>
         <button id="answer-preset-picker" class="folder-view-picker" type="button" role="combobox" aria-labelledby="answer-preset-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="answer-preset-options"><span id="answer-preset-selection">Choose a preset</span><span class="picker-arrow" aria-hidden="true"></span></button>
       </div>
-      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"><button id="answer-collapse" type="button" aria-label="Collapse all" title="Collapse all"><span class="icon icon-collapse" aria-hidden="true"></span></button></div>
+      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"></div>
       <form id="answer-form" novalidate autocomplete="off">
         <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
         <div id="answer-groups"></div>

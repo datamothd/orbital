@@ -466,7 +466,6 @@ const answer = (() => {
   }
   function show(open) {
     closeChoicePicker(); initialize(); byId("answer-page").hidden = !open; byId("inject-panel").hidden = open;
-    byId("navigation-sidebar").hidden = open;
     if (typeof stopScrolling === "function") stopScrolling(); byId("workspace").scrollTo(0, 0); (open ? byId("answer-search") : byId("inject-xml")).focus({ preventScroll: true });
   }
   function showImportedChanges() {
@@ -570,7 +569,6 @@ const answer = (() => {
     for (const section of byId("answer-groups").querySelectorAll("details")) section.open = false;
   });
   byId("answer-search").addEventListener("input", update);
-  byId("answer-collapse").addEventListener("click", () => { for (const section of byId("answer-groups").querySelectorAll("details")) section.open = false; });
   byId("answer-import").addEventListener("click", () => attempt(async () => {
     if (invoke) { const text = await invoke("answer_document", { content: null, kind: "open" }); if (text !== null) importText(text); }
     else await upload(true);

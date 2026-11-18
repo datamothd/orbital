@@ -89,7 +89,7 @@ main {
   margin: 0;
 }
 
-.navigation-tabs:not([hidden]) + #workspace main {
+.navigation-tabs + #workspace main {
   padding-left: calc(var(--sidebar-width) + var(--gutter));
 }
 
@@ -112,7 +112,7 @@ main {
   transition: width var(--sidebar-motion);
 }
 
-.navigation-tabs[hidden] {
+body:has(#answer-page:not([hidden])) .navigation-tabs :is(.navigation-tablist, .sidebar-actions) {
   display: none;
 }
 
@@ -204,8 +204,22 @@ summary::after {
   order: 1;
 }
 
-.navigation-tabs[data-resize-moving] :is(#settings-tab, .sidebar-actions) {
+.navigation-tabs #collapse-all {
+  flex-basis: 30px;
+  margin-top: auto;
   opacity: 0;
+  visibility: hidden;
+  transition: opacity calc(var(--sidebar-duration) / 3) linear;
+}
+
+body:where(:has(:is(#tweaks-panel, #answer-page):not([hidden]) details[open])) .navigation-tabs #collapse-all {
+  opacity: 1;
+  visibility: visible;
+}
+
+.navigation-tabs[data-resize-moving] :is(#settings-tab, #collapse-all, .sidebar-actions) {
+  opacity: 0;
+  transition: none;
 }
 
 .sidebar-actions {
@@ -213,7 +227,6 @@ summary::after {
   gap: var(--space-1);
   min-width: 0;
   flex-shrink: 0;
-  margin-top: auto;
   margin-bottom: var(--space-1);
   padding-top: var(--space-2);
   align-items: center;

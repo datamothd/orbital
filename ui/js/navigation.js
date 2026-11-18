@@ -2,8 +2,11 @@
 
 const navigationTabs = [...document.querySelectorAll('.navigation-tabs [role="tab"]')];
 
-byId("tweaks-collapse").addEventListener("click", () => {
-  for (const section of byId("tweaks-panel").querySelectorAll("details")) section.open = false;
+byId("collapse-all").addEventListener("click", () => {
+  const panel = byId("answer-page").hidden ? byId("tweaks-panel") : byId("answer-groups");
+  collapseFromTop = true;
+  for (const section of panel.querySelectorAll("details[open]")) section.open = false;
+  void waitForWindowLayout();
 });
 
 const visualSections = [...byId("visual-settings").querySelectorAll(".tweak-subgroups > details")];
