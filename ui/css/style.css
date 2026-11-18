@@ -109,13 +109,6 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded
   border-bottom: 1px solid var(--border);
 }
 
-body:has(.navigation-tabs) #window-titlebar:where(:not(dialog:modal *)) {
-  border-bottom: 0;
-  background: linear-gradient(var(--border), var(--border)) right bottom /
-    calc(100% - var(--sidebar-visible-width) - var(--title-bar-radius) + 1px) 1px no-repeat var(--sidebar-background);
-  transition: background-size var(--sidebar-motion);
-}
-
 body:has(.navigation-tabs):has(#window-titlebar)::before {
   content: "";
   position: absolute;
@@ -256,22 +249,21 @@ summary::after {
   height: 12px;
 }
 
-.navigation-brand {
+.window-brand {
   display: flex;
   flex: none;
   align-items: center;
   gap: var(--gutter);
-  margin-bottom: calc(var(--gutter) - var(--space-1));
-  padding-left: 5px;
+  padding-left: var(--gutter);
 }
 
-.navigation-logo {
-  width: 32px;
-  height: 32px;
+.window-logo {
+  width: 26px;
+  height: 26px;
   animation: orbit-spin 12s linear infinite;
 }
 
-.navigation-wordmark {
+.window-wordmark {
   box-sizing: content-box;
   flex: none;
   width: 0;
@@ -283,17 +275,17 @@ summary::after {
   transition: width 360ms steps(9), opacity 120ms ease;
 }
 
-.navigation-wordmark > span {
+.window-wordmark > span {
   color: var(--green);
 }
 
-.navigation-tabs:where(:hover, :has(:focus-visible), [data-resize-expanded]) .navigation-wordmark {
+:where(.window-brand:hover, body:has(.navigation-tabs:hover) .window-brand) .window-wordmark {
   width: 9ch;
   opacity: 1;
-  animation: navigation-caret 800ms step-end 2;
+  animation: window-caret 800ms step-end 2;
 }
 
-@keyframes navigation-caret {
+@keyframes window-caret {
   50% { border-right-color: transparent; }
 }
 
@@ -449,14 +441,13 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded
   }
 
   .navigation-tabs,
-  body:has(.navigation-tabs) #window-titlebar,
   body:has(.navigation-tabs):has(#window-titlebar)::before,
-  .navigation-tabs .navigation-wordmark,
+  .window-brand .window-wordmark,
   .navigation-tabs .sidebar-actions button:nth-child(n) {
     transition: none;
   }
 
-  .navigation-tabs .navigation-wordmark {
+  .window-brand .window-wordmark {
     animation: none;
   }
 }
@@ -722,7 +713,7 @@ dl {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .navigation-logo,
+  .window-logo,
   .bohr-shell {
     animation: none;
   }
