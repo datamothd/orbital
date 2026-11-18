@@ -1,6 +1,25 @@
+#debloat-preferences {
+  --debloat-indent: 32px;
+}
+
 #debloat-preferences > .preferences-divider {
-  margin-left: 32px;
+  margin-left: var(--debloat-indent);
   border-top-color: var(--border);
+}
+
+.debloat-subgroups {
+  position: relative;
+  margin-inline-start: var(--debloat-indent);
+}
+
+.debloat-subgroups::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: calc(5px - var(--debloat-indent));
+  width: calc(var(--debloat-indent) + 1px);
+  border-top: 1px solid #777;
+  pointer-events: none;
 }
 
 .uninstall-title-icon {

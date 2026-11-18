@@ -1,6 +1,5 @@
 "use strict";
 
-let collapseFromTop = false;
 let scrollFrame = 0;
 const scrollAnimations = new Map();
 const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", false, stopScrolling);
@@ -88,10 +87,8 @@ if (appWindow) {
   const { LogicalSize } = window.__TAURI__.dpi;
   const main = document.querySelector("main");
   const titleBar = byId("window-titlebar");
-  const sidebar = byId("navigation-sidebar");
   const workspace = byId("workspace");
   const baseWidth = 700;
-  const maxHeight = 720;
   const scrollbar = document.createElement("div");
   scrollbar.className = "scrollbar-probe";
   document.body.append(scrollbar);
@@ -102,9 +99,6 @@ if (appWindow) {
   let needsScrollbar = false;
   let lastWidth = 0;
   let lastHeight = 0;
-  let lastWorkspaceHeight = 0;
-  let settingsOpen = false;
-  let injectHeight = 0;
   const layoutWaiters = [];
 
   function waitForSize(width, height) {
@@ -143,42 +137,16 @@ if (appWindow) {
         pending = false;
         workspace.setAttribute("data-window-content-fits", "");
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
-        const editorOpen = !byId("answer-page").hidden;
-        const workspaceHeight = editorOpen ? injectHeight || maxHeight : Math.min(maxHeight, contentHeight);
+        const workspaceHeight = workspace.clientHeight;
         const height = workspaceHeight + titleBar.offsetHeight + pendingBar.offsetHeight;
-        if (!byId("inject-panel").hidden) injectHeight = workspaceHeight;
         needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
-        const nextSettingsOpen = !byId("settings-panel").hidden;
-        const resizeFromTop = (collapseFromTop && height < lastHeight)
-          || (settingsOpen !== nextSettingsOpen && byId("tweaks-panel").hidden);
-        collapseFromTop = false;
-        settingsOpen = nextSettingsOpen;
-        if (width !== lastWidth || height !== lastHeight || workspaceHeight !== lastWorkspaceHeight) {
-          const moving = lastWorkspaceHeight > 0 && workspaceHeight !== lastWorkspaceHeight;
+        if (width !== lastWidth || height !== lastHeight) {
           lastWidth = width;
           lastHeight = height;
-          lastWorkspaceHeight = workspaceHeight;
           syncScrollbar();
-          if (resizeFromTop || moving) {
-            sidebar.toggleAttribute("data-resize-expanded", sidebar.matches(":hover, :has(:focus-visible)"));
-          }
-          if (moving) {
-            sidebar.setAttribute("data-resize-moving", "");
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-          }
-          document.body.style.setProperty("--workspace-height", `${workspaceHeight}px`);
-          if (resizeFromTop) {
-            await invoke("resize_from_top", { width, height });
-          } else {
-            await appWindow.setSize(new LogicalSize(width, height));
-          }
+          await appWindow.setSize(new LogicalSize(width, height));
           await waitForSize(width, height);
-          if (resizeFromTop || moving) {
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            sidebar.removeAttribute("data-resize-moving");
-            sidebar.removeAttribute("data-resize-expanded");
-          }
         }
         syncScrollbar();
       } while (pending);
@@ -186,11 +154,8 @@ if (appWindow) {
       observer.disconnect();
       window.removeEventListener("resize", syncScrollbar);
       workspace.removeAttribute("data-window-content-fits");
-      document.body.style.removeProperty("--workspace-height");
       setStatus(`Could not fit window to content: ${error}`, true);
     } finally {
-      sidebar.removeAttribute("data-resize-moving");
-      sidebar.removeAttribute("data-resize-expanded");
       resizing = false;
       for (const resolve of layoutWaiters.splice(0)) resolve();
     }

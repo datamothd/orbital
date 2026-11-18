@@ -507,6 +507,28 @@
           <button id="inject-start" type="button" class="primary" disabled aria-describedby="inject-status">Inject ISO</button>
         </footer>
       </section>
+      <section id="answer-page" aria-labelledby="answer-title" hidden>
+        <header class="answer-actions">
+          <button id="answer-back" type="button"><span class="icon icon-back" aria-hidden="true"></span> Back</button>
+          <button id="answer-reset" type="reset" form="answer-form">
+            <span class="icon icon-trash" aria-hidden="true"></span>
+            <span>Reset all changes</span>
+          </button>
+        </header>
+        <h1 id="answer-title">Configure your installation.</h1>
+        <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords. Presets are available.</p>
+        <div class="answer-actions answer-files">
+          <button id="answer-import" type="button">Import settings / XML</button>
+          <button type="button" data-answer-save="xml">Download XML</button>
+          <button id="answer-preset-picker" class="folder-view-picker" type="button" role="combobox" aria-labelledby="answer-preset-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="answer-preset-options"><span id="answer-preset-selection">Choose a preset</span><span class="picker-arrow" aria-hidden="true"></span></button>
+        </div>
+        <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"></div>
+        <form id="answer-form" novalidate autocomplete="off">
+          <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
+          <div id="answer-groups"></div>
+          <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
+        </form>
+      </section>
     </div>
     <div id="settings-panel" role="tabpanel" aria-labelledby="settings-tab" hidden>
       <section aria-labelledby="settings-title">
@@ -545,28 +567,6 @@
         </div>
       </section>
     </div>
-    <section id="answer-page" aria-labelledby="answer-title" hidden>
-      <header class="answer-actions">
-        <button id="answer-back" type="button"><span class="icon icon-back" aria-hidden="true"></span> Back</button>
-        <button id="answer-reset" type="reset" form="answer-form">
-          <span class="icon icon-trash" aria-hidden="true"></span>
-          <span>Reset all changes</span>
-        </button>
-      </header>
-      <h1 id="answer-title">Configure your installation.</h1>
-      <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords. Presets are available.</p>
-      <div class="answer-actions answer-files">
-        <button id="answer-import" type="button">Import settings / XML</button>
-        <button type="button" data-answer-save="xml">Download XML</button>
-        <button id="answer-preset-picker" class="folder-view-picker" type="button" role="combobox" aria-labelledby="answer-preset-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="answer-preset-options"><span id="answer-preset-selection">Choose a preset</span><span class="picker-arrow" aria-hidden="true"></span></button>
-      </div>
-      <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"></div>
-      <form id="answer-form" novalidate autocomplete="off">
-        <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
-        <div id="answer-groups"></div>
-        <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
-      </form>
-    </section>
   </main></div>
   <footer id="pending-bar" aria-label="Pending preference changes" hidden>
     <p id="pending-count" role="status"></p>
