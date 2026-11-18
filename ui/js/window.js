@@ -149,7 +149,7 @@ if (window.__TAURI__) {
         needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
         const nextSettingsOpen = !byId("settings-panel").hidden;
-        const resizeFromTop = settingsOpen !== nextSettingsOpen;
+        const resizeFromTop = settingsOpen !== nextSettingsOpen && byId("tweaks-panel").hidden;
         settingsOpen = nextSettingsOpen;
         if (width !== lastWidth || height !== lastHeight || workspaceHeight !== lastWorkspaceHeight) {
           const moving = lastWorkspaceHeight > 0 && workspaceHeight !== lastWorkspaceHeight;

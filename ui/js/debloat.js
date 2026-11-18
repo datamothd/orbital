@@ -83,8 +83,8 @@
     updateControls();
   }
 
-  function status(message, error = false, reveal = false) {
-    writeTweaksOutput(message, { error, reveal });
+  function status(message, error = false) {
+    writeTweaksOutput(message, { error });
   }
 
   function updateControls() {
@@ -401,12 +401,12 @@
     status("Reading Windows apps and components…");
     const { error, warning } = await loadApps();
     operation = "";
-    status(error || warning || "Ready.", Boolean(error), true);
+    status(error || warning || "Ready.", Boolean(error));
     updateControls();
   }
 
   function appendLog(text, error = false) {
-    writeTweaksOutput(text, { error, reveal: true });
+    writeTweaksOutput(text, { error });
   }
 
   async function uninstallSelected(event) {
@@ -456,7 +456,7 @@
     const summary = failure || `${removed} ${removed === 1 ? "app" : "apps"} uninstalled.${failed ? ` ${failed} could not be removed.` : ""}`;
     const failureDetails = results?.filter(result => !result.success).map(result => `${result.name}: ${result.output}`).join("\n\n");
     const restartRequired = results?.some(result => result.restart_required);
-    status([`${summary}${restartRequired ? " Restart Windows to finish removal." : ""}${refreshError ? ` Could not refresh: ${refreshError}` : ""}`, failureDetails].filter(Boolean).join("\n\n"), Boolean(failure || failed || refreshError), true);
+    status([`${summary}${restartRequired ? " Restart Windows to finish removal." : ""}${refreshError ? ` Could not refresh: ${refreshError}` : ""}`, failureDetails].filter(Boolean).join("\n\n"), Boolean(failure || failed || refreshError));
     updateControls();
   }
 

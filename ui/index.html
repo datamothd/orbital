@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="css/answer.css">
   <link rel="stylesheet" href="css/debloat.css">
   <script src="js/shared.js" defer></script>
+  <script src="js/terminal.js" defer></script>
   <script src="js/folder-views.js" defer></script>
   <script src="js/pending.js" defer></script>
   <script src="js/app.js" defer></script>
@@ -40,6 +41,9 @@
     <div class="sidebar-actions" role="group" aria-label="Sidebar actions">
       <button id="administrator-access" type="button" data-state="unknown" aria-label="Checking administrator access" title="Checking administrator access" aria-haspopup="dialog" aria-controls="administrator-access-dialog">
         <span class="icon icon-shield" aria-hidden="true"></span>
+      </button>
+      <button id="open-terminal" type="button" aria-label="Open terminal output" title="Open terminal output">
+        <span class="icon icon-terminal" aria-hidden="true"></span>
       </button>
       <button id="import-tweaks" type="button" disabled aria-label="Import tweaks" title="Import tweaks from a JSON file">
         <span class="icon icon-import" aria-hidden="true"></span>
@@ -430,12 +434,6 @@
           </details>
         </div>
       </details>
-      <div class="tweaks-output" aria-label="Tweaks output">
-        <div class="tweaks-output-header"><span class="icon icon-terminal tweaks-output-icon" aria-hidden="true"></span><span>Output</span></div>
-        <div id="tweaks-output-history" role="status" aria-label="Tweaks and app removal output" aria-live="polite" aria-atomic="true" tabindex="0">
-          <div class="tweaks-output-line"><span class="tweaks-output-prompt" aria-hidden="true">&gt;</span><p id="status" class="tweaks-output-message">Ready.</p></div>
-        </div>
-      </div>
     </div>
     <div id="inject-panel" role="tabpanel" aria-labelledby="inject-tab" hidden>
       <section id="inject-workspace" class="inject-workspace" aria-labelledby="inject-title">

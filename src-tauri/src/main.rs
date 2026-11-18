@@ -12,6 +12,27 @@ mod profiles;
 mod administrator;
 
 #[tauri::command]
+async fn open_terminal(main: tauri::WebviewWindow) -> Result<(), String> {
+    let window = match main.get_webview_window("terminal") {
+        Some(window) => window,
+        None => tauri::WebviewWindowBuilder::new(
+            &main,
+            "terminal",
+            tauri::WebviewUrl::App("terminal.html".into()),
+        )
+        .owner(&main)
+        .map_err(|error| error.to_string())?
+        .title("Orbital Terminal Output")
+        .theme(Some(tauri::Theme::Dark))
+        .inner_size(600.0, 360.0)
+        .devtools(false)
+        .build()
+        .map_err(|error| error.to_string())?,
+    };
+    window.unminimize().and_then(|()| window.set_focus()).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn resize_from_top(window: tauri::Window, width: u32, height: u32) -> Result<(), String> {
     use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos};
 
@@ -169,6 +190,7 @@ fn main() {
         .manage(inject::InjectionState::default())
         .manage(debloat::RemovalState::default())
         .invoke_handler(tauri::generate_handler![
+            open_terminal,
             resize_from_top,
             system_info,
             explorer_settings,

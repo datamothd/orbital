@@ -547,7 +547,7 @@ async function applyChange(command, args, description, skipConfirmation = false,
     setBusy(false);
   }
   if (recommended) {
-    setStatus("");
+    setStatus(error, Boolean(error));
     showApplyResult(changed, error);
   } else {
     setStatus(error || (changed === false || changed === 0 ? "" : success), Boolean(error));

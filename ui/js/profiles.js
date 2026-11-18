@@ -121,7 +121,7 @@ byId("import-tweaks").addEventListener("click", async () => {
     };
     setStatus("Importing tweaks and restarting Explorer…");
     const { changed: count, error, cancelled } = await savePreferences("apply_imported_tweaks", { profile: selection });
-    setStatus("");
+    setStatus(error, Boolean(error));
     if (cancelled) return;
     if (error) {
       showResult("Could not complete import", `${error} Some changes may already have been applied. Review your current settings before trying again.`);
@@ -130,6 +130,7 @@ byId("import-tweaks").addEventListener("click", async () => {
         : `${count} ${count === 1 ? "change" : "changes"} applied. Explorer restarted.`);
     }
   } catch (error) {
+    setStatus(String(error), true);
     showResult("Could not import tweaks", String(error));
   } finally {
     setBusy(false);

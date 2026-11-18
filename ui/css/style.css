@@ -94,6 +94,7 @@ main {
 }
 
 .navigation-tabs {
+  --action-size: 28px;
   position: absolute;
   grid-area: 1 / 1 / 2 / 2;
   z-index: 13;
@@ -116,7 +117,7 @@ main {
 }
 
 .navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) {
-  width: 172px;
+  width: calc(var(--sidebar-width) + 3 * (var(--action-size) + var(--space-1)));
 }
 
 .icon,
@@ -208,7 +209,6 @@ summary::after {
 }
 
 .sidebar-actions {
-  --action-size: 28px;
   display: flex;
   gap: var(--space-1);
   min-width: 0;
@@ -252,8 +252,12 @@ summary::after {
   opacity: 0.45;
 }
 
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #export-tweaks {
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #import-tweaks {
   transition-delay: calc(var(--sidebar-duration) / 3);
+}
+
+.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #export-tweaks {
+  transition-delay: calc(var(--sidebar-duration) * 2 / 3);
 }
 
 #administrator-access {
@@ -261,23 +265,12 @@ summary::after {
   width: calc(var(--sidebar-width) - 2 * var(--gutter) - 1px);
   opacity: 1;
   visibility: visible;
-  transition: width var(--sidebar-motion);
 }
 
 .navigation-tabs #administrator-access .icon {
   flex-basis: auto;
   width: 19px;
   height: 19px;
-  transition: width var(--sidebar-motion), height var(--sidebar-motion);
-}
-
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access {
-  width: var(--action-size);
-}
-
-.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded]) #administrator-access .icon {
-  width: 14px;
-  height: 14px;
 }
 
 .navigation-tabs button[aria-selected="true"] {
@@ -328,9 +321,7 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible), [data-resize-expanded
   }
 
   .navigation-tabs,
-  .navigation-tabs .sidebar-actions button:nth-child(n),
-  .navigation-tabs #administrator-access,
-  .navigation-tabs #administrator-access .icon {
+  .navigation-tabs .sidebar-actions button:nth-child(n) {
     transition: none;
   }
 }
@@ -903,8 +894,10 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 }
 
 #tweaks-output-history {
-  position: relative;
-  max-height: 280px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   overflow: auto;
   overscroll-behavior: contain;
 }
