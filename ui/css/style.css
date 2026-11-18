@@ -101,7 +101,7 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible))) {
 
 #window-titlebar {
   position: fixed;
-  z-index: 14;
+  z-index: 15;
   inset: 0 0 auto;
   display: flex;
   gap: var(--space-1);
@@ -113,12 +113,20 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible))) {
   border-bottom: 1px solid var(--border);
 }
 
-body:has(.navigation-tabs):has(#window-titlebar)::before {
-  content: "";
+.workspace-corners {
+  position: absolute;
+  grid-area: 2 / 1;
+  inset: 0;
+  pointer-events: none;
+}
+
+body:not(:has(#window-titlebar)) .workspace-corners {
+  display: none;
+}
+
+.workspace-corners > span {
   position: absolute;
   z-index: 14;
-  top: calc(var(--title-bar-height) - 1px);
-  left: calc(var(--sidebar-visible-width) - 1px);
   width: var(--title-bar-radius);
   height: var(--title-bar-radius);
   border-top: 1px solid var(--border);
@@ -126,8 +134,26 @@ body:has(.navigation-tabs):has(#window-titlebar)::before {
   border-top-left-radius: var(--title-bar-radius);
   box-shadow: calc(-1 * var(--title-bar-radius)) calc(-1 * var(--title-bar-radius)) 0 var(--title-bar-radius) var(--sidebar-background);
   clip-path: inset(0);
-  pointer-events: none;
+}
+
+.workspace-corners > :nth-child(odd) {
+  left: calc(var(--sidebar-visible-width) - 1px);
   transition: left var(--sidebar-motion);
+}
+
+.workspace-corners > :nth-child(2) {
+  z-index: 16;
+  right: -1px;
+  scale: -1 1;
+}
+
+.workspace-corners > :nth-child(-n + 2) {
+  top: -1px;
+}
+
+.workspace-corners > :last-child {
+  bottom: -1px;
+  scale: 1 -1;
 }
 
 .window-drag-region {
@@ -185,7 +211,7 @@ main {
   position: absolute;
   grid-area: 2 / 1 / 3 / 2;
   z-index: 13;
-  inset: 0 auto 0 0;
+  inset: 0 auto -1px 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -455,7 +481,7 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible)))::after {
   }
 
   .navigation-tabs,
-  body:has(.navigation-tabs):has(#window-titlebar)::before,
+  .workspace-corners > :nth-child(odd),
   .window-brand .window-wordmark,
   .sidebar-actions,
   .navigation-tabs .sidebar-actions button:nth-child(n) {
@@ -1083,12 +1109,35 @@ dialog {
   inset-block-start: var(--title-bar-height, 0px);
   overflow-y: auto;
   scrollbar-width: thin;
+  transition: display var(--sidebar-motion) allow-discrete, overlay var(--sidebar-motion) allow-discrete;
+}
+
+dialog:not([open]) {
+  opacity: 0;
+  pointer-events: none;
 }
 
 dialog::backdrop {
   inset-block-start: var(--title-bar-height, 0px);
   background: rgb(0 0 0 / 48%);
   backdrop-filter: blur(5px);
+  opacity: 0;
+  transition: opacity var(--sidebar-motion), display var(--sidebar-motion) allow-discrete,
+    overlay var(--sidebar-motion) allow-discrete;
+}
+
+dialog[open]::backdrop {
+  opacity: 1;
+}
+
+dialog:not([open])::backdrop {
+  pointer-events: none;
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 dialog > h2 {
@@ -1325,6 +1374,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .inject-workspace {
+  margin-bottom: 0;
   padding-bottom: var(--space-2);
 }
 
