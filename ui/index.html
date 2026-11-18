@@ -103,13 +103,6 @@
               <div>
                 <h3 id="explorer-launch-label">Open Explorer to</h3>
                 <p class="preference-description">Choose the starting location for new File Explorer windows.</p>
-                <p id="explorer-launch-value" class="preference-value">Loading…</p>
-              </div>
-              <div class="folder-view-controls">
-                <button id="explorer-launch-picker" class="folder-view-picker" role="combobox" aria-labelledby="explorer-launch-label explorer-launch-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="explorer-launch-options" disabled>
-                  <span id="explorer-launch-selection">Choose a location</span>
-                  <span class="picker-arrow" aria-hidden="true"></span>
-                </button>
               </div>
             </div>
             <div class="preference" data-preference="item-checkboxes">
@@ -147,39 +140,18 @@
               <div>
                 <h3 id="folder-view-label">Default folder view</h3>
                 <p class="preference-description">Sets the view across all folder types. Resets saved views, including individual folder layouts.</p>
-                <p id="folder-view-value" class="preference-value">Loading…</p>
-              </div>
-              <div class="folder-view-controls">
-                <button id="folder-view-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-view-label folder-view-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-view-options" disabled>
-                  <span id="folder-view-selection">Choose a view</span>
-                  <span class="picker-arrow" aria-hidden="true"></span>
-                </button>
               </div>
             </div>
             <div class="preference folder-view-preference">
               <div>
                 <h3 id="folder-sort-label">Default folder sorting</h3>
                 <p class="preference-description">Sets sorting across all folder types. Resets saved views, including individual folder layouts.</p>
-                <p id="folder-sort-value" class="preference-value">Loading…</p>
-              </div>
-              <div class="folder-view-controls">
-                <button id="folder-sort-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-sort-label folder-sort-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-sort-options" disabled>
-                  <span id="folder-sort-selection">Choose sorting</span>
-                  <span class="picker-arrow" aria-hidden="true"></span>
-                </button>
               </div>
             </div>
             <div class="preference folder-view-preference">
               <div>
                 <h3 id="folder-grouping-label">Default folder grouping</h3>
                 <p class="preference-description">Sets grouping across all folder types. Resets saved views, including individual folder layouts.</p>
-                <p id="folder-grouping-value" class="preference-value">Loading…</p>
-              </div>
-              <div class="folder-view-controls">
-                <button id="folder-grouping-picker" class="folder-view-picker" role="combobox" aria-labelledby="folder-grouping-label folder-grouping-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="folder-grouping-options" disabled>
-                  <span id="folder-grouping-selection">Choose grouping</span>
-                  <span class="picker-arrow" aria-hidden="true"></span>
-                </button>
               </div>
             </div>
             <h3 class="preference-group" id="explorer-visibility">File visibility</h3>
@@ -520,7 +492,6 @@
         <div class="answer-actions answer-files">
           <button id="answer-import" type="button">Import settings / XML</button>
           <button type="button" data-answer-save="xml">Download XML</button>
-          <button id="answer-preset-picker" class="folder-view-picker" type="button" role="combobox" aria-labelledby="answer-preset-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="answer-preset-options"><span id="answer-preset-selection">Choose a preset</span><span class="picker-arrow" aria-hidden="true"></span></button>
         </div>
         <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"></div>
         <form id="answer-form" novalidate autocomplete="off">
@@ -588,11 +559,13 @@
     <span id="preferences-made">…</span>
     <span class="icon icon-electron" aria-hidden="true"></span>
   </template>
-  <div id="explorer-launch-options" class="folder-view-options" role="listbox" aria-labelledby="explorer-launch-label" tabindex="-1" hidden></div>
-  <div id="folder-view-options" class="folder-view-options" role="listbox" aria-labelledby="folder-view-label" tabindex="-1" hidden></div>
-  <div id="folder-sort-options" class="folder-view-options" role="listbox" aria-labelledby="folder-sort-label" tabindex="-1" hidden></div>
-  <div id="folder-grouping-options" class="folder-view-options" role="listbox" aria-labelledby="folder-grouping-label" tabindex="-1" hidden></div>
-  <div id="answer-preset-options" class="folder-view-options" role="listbox" aria-label="Presets" tabindex="-1" hidden></div>
+  <template id="choice-picker">
+    <button class="folder-view-picker" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+      <span></span>
+      <span class="picker-arrow" aria-hidden="true"></span>
+    </button>
+    <div class="folder-view-options" role="listbox" tabindex="-1" hidden></div>
+  </template>
   <dialog id="inject-confirm" aria-labelledby="inject-confirm-title" aria-describedby="inject-confirm-description inject-replace-note">
     <h2 id="inject-confirm-title">How do you want to inject?</h2>
     <p id="inject-confirm-description" class="note">Choose whether to update the selected ISO or save an injected copy.</p>

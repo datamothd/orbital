@@ -44,6 +44,17 @@ pub enum SettingsCommand {
 }
 
 impl TweakProfile {
+    fn set_tweak(&mut self, preference: Preference, enabled: bool) {
+        self.tweaks.retain(|item| *item != preference);
+        self.disabled_tweaks.retain(|item| *item != preference);
+        let tweaks = if enabled {
+            &mut self.tweaks
+        } else {
+            &mut self.disabled_tweaks
+        };
+        tweaks.push(preference);
+    }
+
     pub fn validate(&self) -> io::Result<()> {
         if self.format != "orbital-tweaks" || !matches!(self.version, 1..=5) {
             return Err(io::Error::other(
@@ -357,13 +368,7 @@ fn batch_profile(
                         preference.name()
                     )));
                 }
-                if let Some(index) = profile.tweaks.iter().position(|item| item == preference) {
-                    profile.tweaks.remove(index);
-                    profile.disabled_tweaks.push(*preference);
-                } else {
-                    profile.disabled_tweaks.retain(|item| item != preference);
-                    profile.tweaks.push(*preference);
-                }
+                profile.set_tweak(*preference, !profile.tweaks.contains(preference));
             }
             SettingsCommand::Recommended => {
                 profile.shell_preferences = current.shell_preferences.iter()
@@ -374,13 +379,7 @@ fn batch_profile(
                         .recommended_value()
                         .filter(|_| preference.supported(current))
                     {
-                        profile.tweaks.retain(|item| *item != preference);
-                        profile.disabled_tweaks.retain(|item| *item != preference);
-                        if enabled {
-                            profile.tweaks.push(preference);
-                        } else {
-                            profile.disabled_tweaks.push(preference);
-                        }
+                        profile.set_tweak(preference, enabled);
                     }
                 }
                 profile.folder_view = Some(FolderView::Details);
@@ -589,11 +588,6 @@ fn apply_profile(
         ));
     }
     let changes = pending_changes(changes)?;
-    save_original_settings()?;
-    let prepared = prepare_changes(&changes)?;
-    if profile.tweaks.contains(&Preference::HideShortcutArrow) {
-        ensure_blank_icon_at(&icon, replace_blank_icon)?;
-    }
     let views: Vec<_> = [
         profile.folder_view.map(folder_views::ViewChange::Mode),
         profile.folder_sort.map(folder_views::ViewChange::Sort),
@@ -604,13 +598,16 @@ fn apply_profile(
     .into_iter()
     .flatten()
     .collect();
-    folder_views::apply_in(HKCU, HKLM, &views, || apply_changes(&changes, &prepared))?;
-    restart_explorer(
+    apply_preference_changes(
         "Settings",
+        &changes,
+        &views,
+        profile
+            .tweaks
+            .contains(&Preference::HideShortcutArrow)
+            .then_some((icon.as_path(), replace_blank_icon)),
         selected().any(|tweak| *tweak == Preference::HideShortcutArrow),
-        !views.is_empty(),
     )?;
-    shell::refresh_start(&changes)?;
     Ok(count)
 }
 

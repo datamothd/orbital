@@ -68,6 +68,7 @@ const explorerChoices = [
   { id: "folder-sort", picker: folderSorting, field: "folder_sort", personal: true, recommendedValue: { column: "type", descending: false }, recommendation: "Sort folders by Type · A to Z" },
   { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", personal: true, recommendedValue: "none", recommendation: "Set folder grouping to None" },
 ];
+const folderViewFields = new Set(["folder_view", "folder_sort", "folder_grouping"]);
 
 const combineButtons = ["Always, hide labels", "When taskbar is full", "Never"];
 for (const [group, preferences] of Object.entries({
@@ -151,7 +152,9 @@ for (const [group, preferences] of Object.entries({
     heading.parentElement.insertBefore(row, nextGroup);
     const preference = { id, field, shell: true };
     if (options) {
-      preference.picker = addFolderPicker(row, title, id, options);
+      title.id = `${id}-label`;
+      preference.picker = createFolderPicker(id, options.map((label, value) => ({ label, value })).filter(choice => choice.label),
+        "Choose an option", "Unavailable");
       preference.personal = true;
       explorerChoices.push(preference);
     } else {
@@ -284,7 +287,7 @@ function renderSettings() {
   setPreferenceValue("desktop-layout-safe-mode-value", settings ? safeMode ? "Enabled" : "Disabled" : "Loading…");
   document.querySelectorAll(".admin-warning").forEach(adminWarning);
   document.querySelectorAll(".admin-requirement").forEach(note => {
-    note.dataset.state = settings?.is_administrator === true ? "granted" : settings?.is_administrator === false ? "missing" : "unknown";
+    note.dataset.state = administratorState(settings?.is_administrator);
   });
   for (const view of explorerChoices) {
     const selected = pendingValue(view);
@@ -413,7 +416,7 @@ async function refresh() {
 function adminWarning(warning = document.createElement("span")) {
   const administrator = settings?.is_administrator;
   warning.className = "admin-warning";
-  warning.dataset.state = administrator === true ? "granted" : administrator === false ? "missing" : "unknown";
+  warning.dataset.state = administratorState(administrator);
   warning.replaceChildren(element("span", "icon icon-warning"));
   if (administrator != null) {
     warning.append(element("span", administrator ? "icon icon-check" : "icon icon-close"));
@@ -422,6 +425,13 @@ function adminWarning(warning = document.createElement("span")) {
   warning.setAttribute("role", "img");
   warning.setAttribute("aria-label", warning.title);
   return warning;
+}
+
+function preferenceChangeRow(preference, label, checked = true) {
+  const { row, checkbox, text } = createChangeRow(preference.field, label, preference.description, preferencePersonal(preference));
+  checkbox.checked = checked;
+  if (preference.requiresAdmin) text.append(adminWarning());
+  return row;
 }
 
 function missingAdminCount(ids) {
@@ -453,10 +463,7 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("recommended-options").open = true;
   byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
     const preference = [...explorerPreferences, ...explorerChoices].find(preference => preference.field === id);
-    const { row, text } = createChangeRow(id, preferenceRecommendationLabel(preference),
-      preference.description, preferencePersonal(preference));
-    if (preference?.requiresAdmin) text.append(adminWarning());
-    return row;
+    return preferenceChangeRow(preference, preferenceRecommendationLabel(preference));
   }));
   if (recommendations.length) {
     updateRecommendedSelection();
@@ -530,7 +537,7 @@ async function applyChange(command, args, description, skipConfirmation = false,
     }
     if (!skip && !await confirmChange(description, recommended ? "Recommended preferences" : reverting ? "Revert preferences?" : undefined, recommendations,
       reverting ? "If folder views were changed, this also restores their saved layout snapshot and replaces folder layout changes made since then. Desktop icon layouts are preserved. Windows Explorer will restart to apply this change."
-        : recommendations.some(field => field === "folder_view" || field === "folder_sort" || field === "folder_grouping")
+        : recommendations.some(field => folderViewFields.has(field))
           ? "Changing the default folder view, sorting or grouping resets saved folder views. Desktop icon layouts are preserved. Windows Explorer will restart to apply these changes." : undefined)) return;
     if (recommended) {
       args.selected = skip ? recommendations : selectedValues("recommendation-list");

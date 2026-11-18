@@ -31,7 +31,9 @@
   --sidebar-background: #111;
   --surface: #0a0a0a;
   --control: #171717;
+  --control-hover: #292929;
   --border: #333;
+  --divider: #222;
   --muted: #b3b3b3;
   --green: #4ade80;
   --yellow: #facc15;
@@ -115,7 +117,7 @@ body:has(.navigation-tabs:is(:hover, :has(:focus-visible))) {
 
 .workspace-corners {
   position: absolute;
-  grid-area: 2 / 1;
+  grid-area: 2 / 1 / 3 / 2;
   inset: 0;
   pointer-events: none;
 }
@@ -176,21 +178,17 @@ body:not(:has(#window-titlebar)) .workspace-corners {
 }
 
 #window-titlebar button:hover {
-  background: #292929;
+  background: var(--control-hover);
   color: var(--text);
 }
 
-#window-titlebar button:focus-visible {
+#window-titlebar button:focus-visible,
+.navigation-tabs button:focus-visible {
   outline-offset: -2px;
 }
 
 #window-titlebar #window-close:hover {
   background: #822d35;
-}
-
-#window-titlebar button .icon {
-  width: 12px;
-  height: 12px;
 }
 
 main {
@@ -244,6 +242,12 @@ summary::after {
   mask-repeat: no-repeat;
 }
 
+.picker-arrow,
+summary::after {
+  flex-shrink: 0;
+  mask-image: url("../icons/chevron.png");
+}
+
 .icon {
   display: inline-block;
   flex-shrink: 0;
@@ -283,6 +287,7 @@ summary::after {
 .icon-nucleus { --icon-image: url("../icons/nucleus.png"); }
 .icon-electron { --icon-image: url("../icons/electron.png"); }
 
+#window-titlebar button .icon,
 .changes-count .icon,
 .icon-external,
 .icon-back {
@@ -439,10 +444,6 @@ body:where(:has(#tweaks-panel:not([hidden]) details[open], #inject-panel:not([hi
   border-color: var(--border);
 }
 
-.navigation-tabs button:focus-visible {
-  outline-offset: -2px;
-}
-
 .navigation-tabs button .icon {
   flex: 0 0 19px;
   width: 19px;
@@ -511,7 +512,8 @@ summary,
   gap: var(--space-4);
 }
 
-.folder-view-picker > :first-child {
+.folder-view-picker > :first-child,
+.system-os-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -606,7 +608,7 @@ summary h2 {
   border: 0;
   border-radius: 0;
   background: transparent;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--divider);
 }
 
 .tweak-subgroups > details:last-child {
@@ -644,8 +646,6 @@ summary::after {
   width: 14px;
   height: 14px;
   color: var(--text);
-  mask-image: url("../icons/chevron.png");
-  flex-shrink: 0;
   margin: 0 3px;
 }
 
@@ -667,7 +667,8 @@ details[open] > summary {
   margin: var(--space-4) 0;
 }
 
-details[open] > summary::after {
+details[open] > summary::after,
+.folder-view-picker[aria-expanded="true"] .picker-arrow {
   transform: rotate(180deg);
 }
 
@@ -804,13 +805,6 @@ dd {
   align-items: baseline;
 }
 
-.system-os-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .tested-system-check,
 .older-system-dash,
 .unsupported-system-cross {
@@ -832,7 +826,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #292929;
+  background: var(--control-hover);
 }
 
 button:focus-visible {
@@ -980,12 +974,6 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 .picker-arrow {
   width: 10px;
   height: 10px;
-  flex-shrink: 0;
-  mask-image: url("../icons/chevron.png");
-}
-
-.folder-view-picker[aria-expanded="true"] .picker-arrow {
-  transform: rotate(180deg);
 }
 
 .folder-view-options {
@@ -1012,7 +1000,7 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 
 .folder-view-options [role="option"]:hover,
 .folder-view-options .active {
-  background: #292929;
+  background: var(--control-hover);
 }
 
 .folder-view-options [aria-selected="true"] {
@@ -1269,7 +1257,8 @@ dialog > :last-child {
   accent-color: currentColor;
 }
 
-dialog form:not(.answer-source-form, .inject-choices) {
+dialog form:not(.answer-source-form, .inject-choices),
+.confirmation-buttons {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -1317,10 +1306,6 @@ dialog .confirmation-footer {
 }
 
 .confirmation-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
   margin-left: auto;
   align-self: flex-end;
 }
@@ -1339,7 +1324,7 @@ dialog .confirmation-footer {
 }
 
 .import-row + .import-row {
-  border-top: 1px solid #222;
+  border-top: 1px solid var(--divider);
 }
 
 .import-row:has(input:enabled):hover,

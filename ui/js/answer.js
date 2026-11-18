@@ -95,14 +95,13 @@ const answer = (() => {
     return button;
   }
   function dropdown(picker, label) {
-    const button = actionButton("folder-view-picker answer-dropdown", "", label);
-    const text = element("span"), arrow = element("span", "picker-arrow"), menu = element("div", "folder-view-options");
-    button.id = `${picker.id}-button`;
-    for (const [name, value] of Object.entries({ role: "combobox", "aria-haspopup": "listbox", "aria-expanded": "false", "aria-controls": `${picker.id}-options` })) button.setAttribute(name, value);
-    menu.id = `${picker.id}-options`; menu.hidden = true; menu.tabIndex = -1; menu.setAttribute("role", "listbox"); menu.setAttribute("aria-label", label);
-    arrow.setAttribute("aria-hidden", "true");
-    button.append(text, arrow); picker.hidden = true; picker.after(button, menu);
-    pickers.set(picker, createChoicePicker(button, menu, text, () => [...picker.options].filter(option => !option.hidden && !option.disabled).map(option => ({ value: option.value, label: option.textContent })), label, selected => {
+    const { picker: button, menu, selection } = choicePickerElements(`${picker.id}-button`, `${picker.id}-options`, label);
+    button.classList.add("answer-dropdown");
+    button.setAttribute("aria-label", label);
+    menu.setAttribute("aria-label", label);
+    picker.hidden = true;
+    picker.after(button, menu);
+    pickers.set(picker, createChoicePicker(button, menu, selection, () => [...picker.options].filter(option => !option.hidden && !option.disabled).map(option => ({ value: option.value, label: option.textContent })), label, selected => {
       picker.value = selected.value;
       for (const type of ["input", "change"]) picker.dispatchEvent(new Event(type, { bubbles: true }));
     }));
@@ -484,10 +483,18 @@ const answer = (() => {
       sections.get(id).open = changed || Boolean(lists.get(id)?.children.length);
     }
   }
+  const presetPlaceholder = "Choose a preset";
+  const { picker: presetButton, menu: presetMenu, selection: presetSelection } =
+    choicePickerElements("answer-preset-picker", "answer-preset-options", presetPlaceholder);
+  presetSelection.id = "answer-preset-selection";
+  presetButton.setAttribute("aria-labelledby", presetSelection.id);
+  presetMenu.setAttribute("aria-label", "Presets");
+  byId("answer-page").querySelector(".answer-files").append(presetButton);
+  document.body.append(presetMenu);
   const presetPicker = createChoicePicker(
-    byId("answer-preset-picker"), byId("answer-preset-options"), byId("answer-preset-selection"),
+    presetButton, presetMenu, presetSelection,
     () => [{ value: "easy", label: "Easy installation" }, { value: "defaults", label: "Windows defaults" }, ...(debugMode.enabled ? [{ value: "debug", label: "All preferences (debug)" }, { value: "debug-install", label: "Installation test (debug)" }] : [])],
-    "Choose a preset", choice => {
+    presetPlaceholder, choice => {
       initialize();
       if (choice.value === "defaults") {
         byId("answer-form").reset();
@@ -508,13 +515,13 @@ const answer = (() => {
         showImportedChanges();
         status("Debug preset loaded. Review the example account credentials; disk erasure still requires confirmation.");
       }
-      byId("answer-preset-picker").title = `${choice.label} (preset)`;
+      presetButton.title = `${choice.label} (preset)`;
     }
   );
   presetPicker.load(null);
   document.addEventListener("orbital-debug-mode-change", () => {
     presetPicker.load(presetPicker.selected);
-    if (presetPicker.selected !== null) byId("answer-preset-picker").title = `${presetPicker.label} preset`;
+    if (presetPicker.selected !== null) presetButton.title = `${presetPicker.label} preset`;
   });
   function importText(source) {
     initialize();

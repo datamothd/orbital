@@ -25,7 +25,7 @@
 }
 
 .answer-source-form > label:hover {
-  background: #292929;
+  background: var(--control-hover);
 }
 
 .answer-source-form > label:has(:checked) {

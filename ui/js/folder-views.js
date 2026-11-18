@@ -10,6 +10,16 @@ window.addEventListener("scroll", event => {
   if (activeChoicePicker && !activeChoicePicker.menu.contains(event.target)) closeChoicePicker();
 }, true);
 
+function choicePickerElements(pickerId, menuId, placeholder) {
+  const [picker, menu] = byId("choice-picker").content.cloneNode(true).children;
+  const selection = picker.firstElementChild;
+  picker.id = pickerId;
+  picker.setAttribute("aria-controls", menuId);
+  menu.id = menuId;
+  selection.textContent = placeholder;
+  return { picker, menu, selection };
+}
+
 function createChoicePicker(picker, menu, selection, getChoices, placeholder, changed, matches = (a, b) => a === b) {
   let choices = [], options = [];
   let selected = -1;
@@ -120,8 +130,22 @@ function createChoicePicker(picker, menu, selection, getChoices, placeholder, ch
 }
 
 function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b) => a === b) {
-  const picker = byId(`${id}-picker`);
-  const control = createChoicePicker(picker, byId(`${id}-options`), byId(`${id}-selection`), choices, placeholder,
+  const title = byId(`${id}-label`);
+  const row = title.closest(".preference");
+  row.classList.add("folder-view-preference");
+  const value = element("p", "preference-value", "Loading…");
+  value.id = `${id}-value`;
+  title.parentElement.append(value);
+  const { picker, menu, selection } = choicePickerElements(`${id}-picker`, `${id}-options`, placeholder);
+  selection.id = `${id}-selection`;
+  picker.setAttribute("aria-labelledby", `${title.id} ${selection.id}`);
+  picker.disabled = true;
+  menu.setAttribute("aria-labelledby", title.id);
+  const controls = element("div", "folder-view-controls");
+  controls.append(picker);
+  row.append(controls);
+  document.body.append(menu);
+  const control = createChoicePicker(picker, menu, selection, choices, placeholder,
     choice => stagePreference(explorerChoices.find(view => view.id === id), choice.value), matches);
   const availableChoices = () => typeof choices === "function" ? choices() : choices;
   return {
@@ -130,33 +154,10 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
     labelFor: value => availableChoices().find(choice => matches(choice.value, value))?.label || fallback,
     load(current, available = true) {
       control.load(current);
-      byId(`${id}-value`).textContent = !available ? "Unavailable" : control.label || fallback;
+      value.textContent = !available ? "Unavailable" : control.label || fallback;
     },
     setDisabled: control.setDisabled,
   };
-}
-
-function addFolderPicker(row, title, id, labels) {
-  row.classList.add("folder-view-preference");
-  title.id = `${id}-label`;
-  const value = element("p", "preference-value", "Loading…");
-  value.id = `${id}-value`;
-  title.parentElement.append(value);
-  const controls = element("div", "folder-view-controls");
-  controls.innerHTML = `<button id="${id}-picker" class="folder-view-picker" role="combobox" aria-labelledby="${title.id} ${id}-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-options" disabled>
-    <span id="${id}-selection">Choose an option</span>
-    <span class="picker-arrow" aria-hidden="true"></span>
-  </button>`;
-  row.append(controls);
-  const menu = element("div", "folder-view-options");
-  menu.id = `${id}-options`;
-  menu.hidden = true;
-  menu.tabIndex = -1;
-  menu.setAttribute("role", "listbox");
-  menu.setAttribute("aria-labelledby", title.id);
-  document.body.append(menu);
-  return createFolderPicker(id, labels.map((label, value) => ({ label, value })).filter(choice => choice.label),
-    "Choose an option", "Unavailable");
 }
 
 const folderSorting = createFolderPicker("folder-sort", [

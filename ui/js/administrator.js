@@ -21,7 +21,7 @@
   }
 
   function render() {
-    shield.dataset.state = administrator === true ? "granted" : administrator === false ? "missing" : "unknown";
+    shield.dataset.state = administratorState(administrator);
     shield.title = administrator === true ? "Administrator access detected" : administrator === false ? "Administrator access not detected" : "Administrator access could not be determined";
     shield.setAttribute("aria-label", shield.title);
     byId("administrator-access-title").textContent = shield.title;

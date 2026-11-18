@@ -5,77 +5,39 @@ pub(super) const CABINET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion
 pub(super) const POLICIES_KEY: &str =
     r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer";
 
-pub(super) const HIDE_FILE_EXTENSIONS: DwordPreference = DwordPreference {
-    name: "Hide known file extensions",
-    path: ADVANCED_KEY,
-    value: "HideFileExt",
-    default_value: true,
-    delete_when_default: false,
-};
-pub(super) const SHOW_ITEM_CHECKBOXES: DwordPreference = DwordPreference {
-    name: "Show selection checkboxes",
-    path: ADVANCED_KEY,
-    value: "AutoCheckSelect",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const SHOW_LIBRARIES: DwordPreference = DwordPreference {
-    name: "Show Libraries",
-    path: LIBRARIES_KEY,
-    value: "System.IsPinnedToNameSpaceTree",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const SHOW_FULL_PATH: DwordPreference = DwordPreference {
-    name: "Show full path in title bar",
-    path: CABINET_KEY,
-    value: "FullPath",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const HIDE_EMPTY_DRIVES: DwordPreference = DwordPreference {
-    name: "Hide empty drives",
-    path: ADVANCED_KEY,
-    value: "HideDrivesWithNoMedia",
-    default_value: true,
-    delete_when_default: false,
-};
-pub(super) const CONFIRM_FILE_DELETE: DwordPreference = DwordPreference {
-    name: "Confirm before recycling files",
-    path: POLICIES_KEY,
-    value: "ConfirmFileDelete",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const ICONS_ONLY: DwordPreference = DwordPreference {
-    name: "Show icons instead of thumbnails",
-    path: ADVANCED_KEY,
-    value: "IconsOnly",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const SHOW_INFO_TIPS: DwordPreference = DwordPreference {
-    name: "Show hover descriptions",
-    path: ADVANCED_KEY,
-    value: "ShowInfoTip",
-    default_value: true,
-    delete_when_default: false,
-};
-pub(super) const SHOW_SYSTEM_FILES: DwordPreference = DwordPreference {
-    name: "Show protected operating system files",
-    path: ADVANCED_KEY,
-    value: "ShowSuperHidden",
-    default_value: false,
-    delete_when_default: false,
-};
+pub(super) const HIDE_FILE_EXTENSIONS: DwordPreference =
+    DwordPreference::new("Hide known file extensions", ADVANCED_KEY, "HideFileExt", true);
+pub(super) const SHOW_ITEM_CHECKBOXES: DwordPreference =
+    DwordPreference::new("Show selection checkboxes", ADVANCED_KEY, "AutoCheckSelect", false);
+pub(super) const SHOW_LIBRARIES: DwordPreference =
+    DwordPreference::new("Show Libraries", LIBRARIES_KEY, "System.IsPinnedToNameSpaceTree", false);
+pub(super) const SHOW_FULL_PATH: DwordPreference =
+    DwordPreference::new("Show full path in title bar", CABINET_KEY, "FullPath", false);
+pub(super) const HIDE_EMPTY_DRIVES: DwordPreference =
+    DwordPreference::new("Hide empty drives", ADVANCED_KEY, "HideDrivesWithNoMedia", true);
+pub(super) const CONFIRM_FILE_DELETE: DwordPreference = DwordPreference::new(
+    "Confirm before recycling files",
+    POLICIES_KEY,
+    "ConfirmFileDelete",
+    false,
+);
+pub(super) const ICONS_ONLY: DwordPreference =
+    DwordPreference::new("Show icons instead of thumbnails", ADVANCED_KEY, "IconsOnly", false);
+pub(super) const SHOW_INFO_TIPS: DwordPreference =
+    DwordPreference::new("Show hover descriptions", ADVANCED_KEY, "ShowInfoTip", true);
+pub(super) const SHOW_SYSTEM_FILES: DwordPreference = DwordPreference::new(
+    "Show protected operating system files",
+    ADVANCED_KEY,
+    "ShowSuperHidden",
+    false,
+);
 
-pub(super) const RESTORE_FOLDER_WINDOWS: DwordPreference = DwordPreference {
-    name: "Restore folder windows at sign-in",
-    path: ADVANCED_KEY,
-    value: "PersistBrowsers",
-    default_value: false,
-    delete_when_default: false,
-};
+pub(super) const RESTORE_FOLDER_WINDOWS: DwordPreference = DwordPreference::new(
+    "Restore folder windows at sign-in",
+    ADVANCED_KEY,
+    "PersistBrowsers",
+    false,
+);
 
 pub(super) const OPTIONS: [&DwordPreference; 10] = [
     &HIDE_FILE_EXTENSIONS,
@@ -302,20 +264,18 @@ const THIS_PC_FOLDERS: [&str; 7] = [
     "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
 ];
 
-pub(super) const EXPAND_TRANSFER_DETAILS: DwordPreference = DwordPreference {
-    name: "Expand file-transfer details",
-    path: r"Software\Microsoft\Windows\CurrentVersion\Explorer\OperationStatusManager",
-    value: "EnthusiastMode",
-    default_value: false,
-    delete_when_default: false,
-};
-pub(super) const SHOW_NETWORK: DwordPreference = DwordPreference {
-    name: "Show Network in navigation pane",
-    path: NETWORK_KEY,
-    value: "System.IsPinnedToNameSpaceTree",
-    default_value: true,
-    delete_when_default: false,
-};
+pub(super) const EXPAND_TRANSFER_DETAILS: DwordPreference = DwordPreference::new(
+    "Expand file-transfer details",
+    r"Software\Microsoft\Windows\CurrentVersion\Explorer\OperationStatusManager",
+    "EnthusiastMode",
+    false,
+);
+pub(super) const SHOW_NETWORK: DwordPreference = DwordPreference::new(
+    "Show Network in navigation pane",
+    NETWORK_KEY,
+    "System.IsPinnedToNameSpaceTree",
+    true,
+);
 
 pub(super) fn retired_snapshot_slots<'a>(
     user: &'a RegKey,

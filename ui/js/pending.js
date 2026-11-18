@@ -34,11 +34,7 @@ byId("pending-review").addEventListener("click", async () => {
   byId("pending-options").open = true;
   byId("pending-list").replaceChildren(...[...pendingPreferences].map(([preference, change]) => {
     const value = preference.picker ? preference.picker.labelFor(change.value) : preferenceValue(change.value);
-    const { row, checkbox, text } = createChangeRow(preference.field, `${preference.label} · ${value}`,
-      preference.description, preferencePersonal(preference));
-    checkbox.checked = change.selected;
-    if (preference.requiresAdmin) text.append(adminWarning());
-    return row;
+    return preferenceChangeRow(preference, `${preference.label} · ${value}`, change.selected);
   }));
   if (!await confirmDialog(byId("pending-dialog"))) return;
   const selected = new Set(selectedValues("pending-list"));
@@ -60,7 +56,7 @@ pendingContinue.addEventListener("click", async event => {
     const skip = skipPrompts.enabled || event.shiftKey;
     const count = selected.length;
     const label = `${count} preference ${count === 1 ? "change" : "changes"}`;
-    const resetsViews = selected.some(([{ field }]) => ["folder_view", "folder_sort", "folder_grouping"].includes(field));
+    const resetsViews = selected.some(([{ field }]) => folderViewFields.has(field));
     const note = `${resetsViews ? "Saved folder views will be reset. Desktop icon layouts are preserved. " : ""}Windows Explorer will restart once.`;
     if (!skip && !await confirmChange("", `Apply ${label}?`, [], note)) return;
     const profile = { format: "orbital-tweaks", version: 4, tweaks: [], disabled_tweaks: [] };

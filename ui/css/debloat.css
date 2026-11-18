@@ -32,7 +32,7 @@
 }
 
 .debloat-subgroups > details[open] > summary {
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--divider);
   margin-bottom: var(--space-4);
 }
 
@@ -136,7 +136,7 @@
 }
 
 .uninstall-inventory {
-  border-top: 1px solid #222;
+  border-top: 1px solid var(--divider);
 }
 
 .uninstall-empty {
@@ -277,7 +277,8 @@
   background: transparent;
 }
 
-.uninstall-app-toggle:focus-visible {
+.uninstall-app-toggle:focus-visible,
+.uninstall-view-switch button:focus-visible {
   outline: 1px solid var(--green);
   outline-offset: -3px;
 }
@@ -395,7 +396,7 @@
 
 #uninstall-confirm-list li {
   padding: var(--space-2) 0;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--divider);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -428,7 +429,6 @@
 }
 .uninstall-view-switch button + button { border-left: 1px solid var(--border); }
 .uninstall-view-switch button[aria-pressed="true"] { background: #102018; color: var(--green); }
-.uninstall-view-switch button:focus-visible { outline: 1px solid var(--green); outline-offset: -3px; }
 .uninstall-terminal .tweaks-output-header { flex-wrap: nowrap; }
 .uninstall-app-state {
   display: inline-flex;

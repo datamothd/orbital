@@ -3,6 +3,7 @@
 const invoke = window.__TAURI__?.core.invoke;
 const byId = (id) => document.getElementById(id);
 const element = (tag, className = "", textContent = "") => Object.assign(document.createElement(tag), { className, textContent });
+const administratorState = value => value === true ? "granted" : value === false ? "missing" : "unknown";
 
 let backdropDialog = null;
 function dialogOutsideBounds(event) {

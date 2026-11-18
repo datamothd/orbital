@@ -479,78 +479,52 @@ struct DwordPreference {
     delete_when_default: bool,
 }
 
-const CENTER_TASKBAR_ICONS: DwordPreference = DwordPreference {
-    name: "Center taskbar icons",
-    path: ADVANCED_KEY,
-    value: "TaskbarAl",
-    default_value: true,
-    delete_when_default: false,
-};
-const SHOW_TASK_VIEW: DwordPreference = DwordPreference {
-    name: "Show Task View button",
-    path: ADVANCED_KEY,
-    value: "ShowTaskViewButton",
-    default_value: true,
-    delete_when_default: false,
-};
-const SHOW_TASKBAR_FLASHING: DwordPreference = DwordPreference {
-    name: "Show flashing on taskbar apps",
-    path: ADVANCED_KEY,
-    value: "TaskbarFlashing",
-    default_value: true,
-    delete_when_default: false,
-};
+const CENTER_TASKBAR_ICONS: DwordPreference =
+    DwordPreference::new("Center taskbar icons", ADVANCED_KEY, "TaskbarAl", true);
+const SHOW_TASK_VIEW: DwordPreference =
+    DwordPreference::new("Show Task View button", ADVANCED_KEY, "ShowTaskViewButton", true);
+const SHOW_TASKBAR_FLASHING: DwordPreference =
+    DwordPreference::new("Show flashing on taskbar apps", ADVANCED_KEY, "TaskbarFlashing", true);
 const ALLOW_WIDGETS: DwordPreference = DwordPreference {
-    name: "Allow Widgets",
-    path: WIDGETS_KEY,
-    value: "AllowNewsAndInterests",
-    default_value: true,
     delete_when_default: true,
+    ..DwordPreference::new("Allow Widgets", WIDGETS_KEY, "AllowNewsAndInterests", true)
 };
-const ENABLE_TASKBAR_END_TASK: DwordPreference = DwordPreference {
-    name: "Enable taskbar End task",
-    path: TASKBAR_DEVELOPER_KEY,
-    value: "TaskbarEndTask",
-    default_value: false,
-    delete_when_default: false,
-};
-const USE_COMPACT_MODE: DwordPreference = DwordPreference {
-    name: "Use compact spacing",
-    path: ADVANCED_KEY,
-    value: "UseCompactMode",
-    default_value: false,
-    delete_when_default: false,
-};
-const SHOW_RECENT_FILES: DwordPreference = DwordPreference {
-    name: "Show recently used files",
-    path: EXPLORER_KEY,
-    value: "ShowRecent",
-    default_value: true,
-    delete_when_default: false,
-};
-const SHOW_RECOMMENDATIONS: DwordPreference = DwordPreference {
-    name: "Show recommendations",
-    path: EXPLORER_KEY,
-    value: "ShowRecommendations",
-    default_value: true,
-    delete_when_default: false,
-};
-const SHOW_FREQUENT_FOLDERS: DwordPreference = DwordPreference {
-    name: "Show frequently used folders",
-    path: EXPLORER_KEY,
-    value: "ShowFrequent",
-    default_value: true,
-    delete_when_default: false,
-};
+const ENABLE_TASKBAR_END_TASK: DwordPreference =
+    DwordPreference::new("Enable taskbar End task", TASKBAR_DEVELOPER_KEY, "TaskbarEndTask", false);
+const USE_COMPACT_MODE: DwordPreference =
+    DwordPreference::new("Use compact spacing", ADVANCED_KEY, "UseCompactMode", false);
+const SHOW_RECENT_FILES: DwordPreference =
+    DwordPreference::new("Show recently used files", EXPLORER_KEY, "ShowRecent", true);
+const SHOW_RECOMMENDATIONS: DwordPreference =
+    DwordPreference::new("Show recommendations", EXPLORER_KEY, "ShowRecommendations", true);
+const SHOW_FREQUENT_FOLDERS: DwordPreference =
+    DwordPreference::new("Show frequently used folders", EXPLORER_KEY, "ShowFrequent", true);
 const SHOW_CLOUD_FILES: DwordPreference = DwordPreference {
-    name: "Show cloud files in Quick access",
-    path: EXPLORER_KEY,
-    value: "ShowCloudFilesInQuickAccess",
-    default_value: true,
     delete_when_default: true,
+    ..DwordPreference::new(
+        "Show cloud files in Quick access",
+        EXPLORER_KEY,
+        "ShowCloudFilesInQuickAccess",
+        true,
+    )
 };
 
 impl DwordPreference {
+    const fn new(
+        name: &'static str,
+        path: &'static str,
+        value: &'static str,
+        default_value: bool,
+    ) -> Self {
+        Self {
+            name,
+            path,
+            value,
+            default_value,
+            delete_when_default: false,
+        }
+    }
+
     fn enabled_in(&self, root: &RegKey) -> io::Result<bool> {
         read_toggle(root, self.path, self.value, self.default_value)
     }
@@ -829,21 +803,31 @@ pub fn apply_recommended_settings(
         return Ok(preferences);
     }
     changes.extend(shell::changes_in(HKCU, &shell_preferences)?);
-    save_original_settings()?;
-    let prepared = prepare_changes(&changes)?;
-    if missing_icon {
-        ensure_blank_icon_at(&icon, replace_blank_icon)?;
-    }
-    folder_views::apply_in(HKCU, HKLM, &view_changes, || {
-        apply_changes(&changes, &prepared)
-    })?;
-    restart_explorer(
+    apply_preference_changes(
         "Recommended settings",
+        &changes,
+        &view_changes,
+        missing_icon.then_some((icon.as_path(), replace_blank_icon)),
         preferences.contains(&Recommendation::HideShortcutArrow),
-        !view_changes.is_empty(),
     )?;
-    shell::refresh_start(&changes)?;
     Ok(preferences)
+}
+
+fn apply_preference_changes(
+    label: &str,
+    changes: &[RegistryChange<'_>],
+    views: &[folder_views::ViewChange],
+    blank_icon: Option<(&Path, bool)>,
+    refresh_icons: bool,
+) -> io::Result<()> {
+    save_original_settings()?;
+    let prepared = prepare_changes(changes)?;
+    if let Some((path, replace)) = blank_icon {
+        ensure_blank_icon_at(path, replace)?;
+    }
+    folder_views::apply_in(HKCU, HKLM, views, || apply_changes(changes, &prepared))?;
+    restart_explorer(label, refresh_icons, !views.is_empty())?;
+    shell::refresh_start(changes)
 }
 
 fn recommendation(change: &RegistryChange<'_>) -> Option<Recommendation> {

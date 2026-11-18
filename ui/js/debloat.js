@@ -98,44 +98,47 @@
     selection.textContent = `${selected.size} ${selected.size === 1 ? "app" : "apps"} selected`;
     selection.dataset.selected = String(selected.size > 0);
     for (const checkbox of rows.querySelectorAll("input")) {
-      checkbox.disabled = Boolean(operation) || !selectionAllowed() || checkbox.dataset.selectable !== "true";
+      checkbox.disabled = Boolean(operation) || !selectionAllowed() || checkbox.closest("tr").dataset.selectable !== "true";
       checkbox.checked = selected.has(checkbox.value);
     }
+  }
+
+  function renderAvailability(row, details, selectable, reason) {
+    row.dataset.selectable = String(selectable);
+    const checkbox = row.querySelector("input");
+    const detailCell = details.firstChild;
+    let warning = detailCell.querySelector(".uninstall-app-warning");
+    if (selectable) {
+      row.removeAttribute("title");
+      checkbox.removeAttribute("aria-description");
+      if (warning) warning.hidden = true;
+      return;
+    }
+    row.title = reason;
+    checkbox.setAttribute("aria-description", row.title);
+    if (!warning) {
+      warning = element("p", "uninstall-app-warning");
+      detailCell.append(warning);
+    }
+    warning.textContent = row.title;
+    warning.hidden = false;
   }
 
   function updateAvailability() {
     const pairs = new Map();
     for (const row of rows.querySelectorAll(".uninstall-app-row")) {
       const app = apps[Number(row.dataset.index)];
-      const details = byId(row.dataset.detailsId);
+      const details = row.nextElementSibling;
       pairs.set(app, [row, details]);
       app.selectable = !app.protected && (!app.requires_permanent || permanentRemoval);
-      row.dataset.selectable = String(app.selectable);
-      const checkbox = row.querySelector("input");
-      checkbox.dataset.selectable = String(app.selectable);
-      const detailCell = details.firstChild;
-      let warning = detailCell.querySelector(".uninstall-app-warning");
-      if (app.selectable) {
-        row.removeAttribute("title");
-        checkbox.removeAttribute("aria-description");
-        if (warning) warning.hidden = true;
-      } else {
-        row.title = app.protected ? app.blocked_reason : "Enable permanent removal and acknowledge the warning to remove these component files.";
-        checkbox.setAttribute("aria-description", row.title);
-        if (!warning) {
-          warning = element("p", "uninstall-app-warning");
-          detailCell.append(warning);
-        }
-        warning.textContent = row.title;
-        warning.hidden = false;
-      }
+      renderAvailability(row, details, app.selectable,
+        app.protected ? app.blocked_reason : "Enable permanent removal and acknowledge the warning to remove these component files.");
     }
     const scrollTop = tableScroll.scrollTop;
     sortApps(apps);
     for (const [index, app] of apps.entries()) {
       const [row, details] = pairs.get(app);
       row.dataset.index = String(index);
-      details.dataset.index = String(index);
       rows.append(row, details);
     }
     tableScroll.scrollTop = scrollTop;
@@ -275,19 +278,12 @@
     rows.replaceChildren(...apps.flatMap((app, index) => {
       const row = element("tr", "uninstall-app-row");
       row.dataset.index = String(index);
-      row.dataset.detailsId = `uninstall-details-${index}`;
-      row.dataset.selectable = String(app.selectable);
       row.dataset.state = app.protected ? "protected" : app.state === "Installed" ? "installed" : app.state === "Not reported" ? "not-reported" : "";
       const selectCell = element("td");
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.value = app.key;
-      checkbox.dataset.selectable = String(app.selectable);
       checkbox.setAttribute("aria-label", `Select ${app.name}, version ${app.version}`);
-      if (!app.selectable) {
-        row.title = app.blocked_reason || "Windows does not allow this app to be removed.";
-        checkbox.setAttribute("aria-description", row.title);
-      }
       checkbox.addEventListener("change", () => {
         if (checkbox.checked) selected.add(app.key);
         else selected.delete(app.key);
@@ -307,7 +303,6 @@
       toggle.append(element("span", "uninstall-app-name", app.name), indicators);
       const details = element("tr", "uninstall-app-details");
       details.id = `uninstall-details-${index}`;
-      details.dataset.index = String(index);
       details.hidden = true;
       const detailCell = element("td");
       detailCell.colSpan = 2;
@@ -331,10 +326,6 @@
       const notes = fields.filter(field => /^(permanent removal|dependency)$/i.test(field.label)
         || (app.kind === "capability" && field.label === "Component files")).map(field => field.value);
       for (const note of new Set(notes.filter(Boolean))) detailCell.append(element("p", "uninstall-app-notice", note));
-      if (!app.selectable) {
-        const warning = element("p", "uninstall-app-warning", row.title);
-        detailCell.append(warning);
-      }
       details.append(detailCell);
       toggle.addEventListener("click", () => {
         details.hidden = !details.hidden;
@@ -343,6 +334,7 @@
       selectCell.append(checkbox);
       nameCell.append(toggle);
       row.append(selectCell, nameCell);
+      renderAvailability(row, details, app.selectable, app.blocked_reason || "Windows does not allow this app to be removed.");
       return [row, details];
     }));
     tableScroll.hidden = !apps.length;
