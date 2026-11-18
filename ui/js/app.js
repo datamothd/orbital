@@ -126,6 +126,7 @@ for (const [group, preferences] of Object.entries({
     ["taskbar_share_window", "Share windows from the taskbar", "Shows a window sharing shortcut during supported calls."],
     ["taskbar_show_desktop", "Use the far corner to show the desktop", "Minimizes open windows when you click the far edge of the taskbar."],
     ["taskbar_combine", "Combine taskbar buttons", "Choose when buttons and labels are combined on the primary taskbar.", combineButtons],
+    ["taskbar_last_active_click", "Open the last active window on click", "Clicking a grouped taskbar button switches directly to its last active window."],
   ],
   "taskbar-tray": [
     ["taskbar_show_clock", "Show time and date in the system tray", "Shows the calendar and clock on the taskbar."],

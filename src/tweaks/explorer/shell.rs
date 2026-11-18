@@ -115,6 +115,7 @@ shell_preferences! {
     TaskbarShareWindow => None, toggle(ADVANCED_KEY, "TaskbarSn", 1);
     TaskbarShowDesktop => None, toggle(ADVANCED_KEY, "TaskbarSd", 0);
     TaskbarCombine => None, Dword(ADVANCED_KEY, "TaskbarGlomLevel", 0, &[0, 1, 2]);
+    TaskbarLastActiveClick => None, toggle(ADVANCED_KEY, "LastActiveClick", 0);
     TaskbarMultipleDisplays => None, Retired(&[0, 1]);
     TaskbarSecondaryApps => None, Retired(&[0, 1, 2]);
     TaskbarSecondaryCombine => None, Retired(&[0, 1, 2]);
@@ -389,7 +390,11 @@ mod tests {
     fn shell_changes_preserve_retired_preferences_and_restore_layout_flags() {
         let registry = super::super::tests::TestRegistry::new();
         let user = &registry.key;
-        let selected = BTreeMap::from([(TaskbarCombine, 2), (TaskbarAutoHide, 1)]);
+        let selected = BTreeMap::from([
+            (TaskbarCombine, 2),
+            (TaskbarAutoHide, 1),
+            (TaskbarLastActiveClick, 1),
+        ]);
         let layout = user.create_subkey(TASKBAR_LAYOUT_KEY).unwrap().0;
         let mut layout_bytes = vec![0; 48];
         layout_bytes[0] = 48;
@@ -407,7 +412,7 @@ mod tests {
         key.set_value("TaskbarLocation", &1u32).unwrap();
         save_originals(user, 26300, 9711).unwrap();
         let changes = changes_in(user, &selected).unwrap();
-        assert_eq!(changes.len(), 2);
+        assert_eq!(changes.len(), selected.len());
         apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
         let state = settings_in(user, 26300, 9711).unwrap();
         assert_eq!(state[&TaskbarAutoHide].recommended, None);
@@ -426,9 +431,10 @@ mod tests {
 
         save_originals(user, 26300, 9711).unwrap();
         let restore = pending_changes(original_changes(user, 26300, 9711).unwrap()).unwrap();
-        assert_eq!(restore.len(), 2);
+        assert_eq!(restore.len(), selected.len());
         apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
         assert_eq!(key.get_value::<u32, _>("TaskbarLocation").unwrap(), 2);
+        assert!(read_original(user, ADVANCED_KEY, "LastActiveClick").unwrap().is_none());
         let restored = layout.get_raw_value("Settings").unwrap();
         assert_eq!(restored.bytes[8], 2);
         assert_eq!(restored.bytes[16], 8);
