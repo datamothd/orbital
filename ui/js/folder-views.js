@@ -136,6 +136,29 @@ function createFolderPicker(id, choices, placeholder, fallback, matches = (a, b)
   };
 }
 
+function addFolderPicker(row, title, id, labels) {
+  row.classList.add("folder-view-preference");
+  title.id = `${id}-label`;
+  const value = element("p", "preference-value", "Loading…");
+  value.id = `${id}-value`;
+  title.parentElement.append(value);
+  const controls = element("div", "folder-view-controls");
+  controls.innerHTML = `<button id="${id}-picker" class="folder-view-picker" role="combobox" aria-labelledby="${title.id} ${id}-selection" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-options" disabled>
+    <span id="${id}-selection">Choose an option</span>
+    <span class="picker-arrow" aria-hidden="true"></span>
+  </button>`;
+  row.append(controls);
+  const menu = element("div", "folder-view-options");
+  menu.id = `${id}-options`;
+  menu.hidden = true;
+  menu.tabIndex = -1;
+  menu.setAttribute("role", "listbox");
+  menu.setAttribute("aria-labelledby", title.id);
+  document.body.append(menu);
+  return createFolderPicker(id, labels.map((label, value) => ({ label, value })).filter(choice => choice.label),
+    "Choose an option", "Unavailable");
+}
+
 const folderSorting = createFolderPicker("folder-sort", [
   ["name", false, "Name · A to Z"],
   ["name", true, "Name · Z to A"],

@@ -15,17 +15,21 @@ function importedRows(profile) {
       matching, blocked,
     };
   });
-  for (const { field, picker, label } of explorerChoices) {
-    const value = profile[field];
+  for (const preference of [...explorerChoices, ...explorerPreferences.filter(preference => preference.shell)]) {
+    const { field, picker, label, shell } = preference;
+    const value = shell ? profile.shell_preferences?.[field] : profile[field];
     if (value == null) continue;
-    const current = settings[field];
+    const current = currentPreferenceValue(preference);
+    const imported = picker ? value : value === 1;
+    const labelFor = picker ? picker.labelFor : preferenceValue;
     rows.push({
       field,
       label,
-      current: picker.labelFor(current),
-      imported: picker.labelFor(value),
-      matching: picker.matches(value, current),
-      blocked: picker.choices.some(choice => picker.matches(choice.value, value)) ? "" : "Unavailable",
+      current: preferenceAvailable(preference) ? labelFor(current) : "Unavailable",
+      imported: labelFor(imported),
+      matching: preferenceMatches(preference, imported, current),
+      blocked: preferenceRestriction(preference, "Unavailable")
+        || (picker && !picker.choices.some(choice => picker.matches(choice.value, value)) ? "Unavailable" : ""),
     });
   }
   for (const app of profile.apps_to_remove || []) {
@@ -52,7 +56,7 @@ function previewImport(profile) {
   const rows = importedRows(profile);
   byId("import-description").textContent = rows.length
     ? "Compare the imported settings. App selections are saved for future exports only; importing does not uninstall apps. Uncheck any changes you want to skip."
-    : "This file contains no tweaks or folder settings.";
+    : "This file contains no supported tweaks or folder settings.";
   byId("import-options").open = true;
   byId("import-options").hidden = !rows.length;
   byId("import-list").replaceChildren(...rows.map((row) => {
@@ -112,7 +116,8 @@ byId("import-tweaks").addEventListener("click", async () => {
       apps_to_remove: [],
       tweaks: profile.tweaks.filter(field => selected.has(field)),
       disabled_tweaks: (profile.disabled_tweaks || []).filter(field => selected.has(field)),
-      ...Object.fromEntries(explorerChoices.map(({ field }) => [field, selected.has(field) ? profile[field] : null])),
+      ...Object.fromEntries(explorerChoices.filter(choice => !choice.shell).map(({ field }) => [field, selected.has(field) ? profile[field] : null])),
+      shell_preferences: Object.fromEntries(Object.entries(profile.shell_preferences || {}).filter(([field]) => selected.has(field))),
     };
     setStatus("Importing tweaks and restarting Explorer…");
     const { changed: count, error, cancelled } = await savePreferences("apply_imported_tweaks", { profile: selection });

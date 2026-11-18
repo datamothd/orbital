@@ -69,8 +69,117 @@ const explorerChoices = [
   { id: "folder-grouping", picker: folderGrouping, field: "folder_grouping", personal: true, recommendedValue: "none", recommendation: "Set folder grouping to None" },
 ];
 
+const combineButtons = ["Always, hide labels", "When taskbar is full", "Never"];
+for (const [group, preferences] of Object.entries({
+  "explorer-behavior": [
+    ["browse_folders_in_new_window", "Open folders in", "Choose whether opening a folder uses the current window or creates one.", ["Same window", "New window"]],
+    ["separate_folder_process", "Launch folder windows in a separate process", "Keeps folder windows separate from the desktop and taskbar process."],
+    ["sharing_wizard", "Use the Sharing Wizard", "Uses the guided file and folder sharing interface."],
+    ["hide_folder_merge_conflicts", "Hide folder merge conflicts", "Skips the folder merge confirmation when destination folders share the same name."],
+    ["explorer_typing", "When typing in a folder", "Choose how File Explorer handles typing while the file list has focus.", ["Select the typed item", "Type into the search box"]],
+  ],
+  "explorer-visibility": [
+    ["drive_letters", "Drive letters", "Choose where drive letters appear relative to drive names.", ["After drive names", "Before network drive names", "Hidden", null, "Before all drive names"]],
+  ],
+  "explorer-appearance": [
+    ["folder_size_tips", "Show folder size in hover descriptions", "Includes folder size when hover descriptions are enabled."],
+    ["highlight_compressed_files", "Color encrypted and compressed files", "Uses distinct colors for NTFS-encrypted and NTFS-compressed items."],
+    ["file_type_overlay", "Show file icons on thumbnails", "Overlays a file type icon on thumbnails."],
+    ["preview_handlers", "Show previews in the preview pane", "Lets File Explorer display previews for supported file types."],
+    ["explorer_status_bar", "Show status bar", "Shows item counts and selection details at the bottom of File Explorer."],
+  ],
+  "explorer-navigation": [
+    ["expand_navigation_to_folder", "Expand to the open folder", "Expands the navigation tree to the folder you are viewing."],
+    ["all_navigation_folders", "Show all folders in the navigation pane", "Shows the full desktop folder tree in the navigation pane."],
+    ["navigation_cloud_status", "Show cloud availability status", "Shows availability indicators for synced folders in the navigation pane."],
+  ],
+  "explorer-privacy": [
+    ["sync_provider_notifications", "Show sync provider notifications", "Shows storage and sync provider messages in File Explorer."],
+  ],
+  "start-layout": [
+    ["start_pinned_section", "Show Pinned section", "Shows pinned apps in Start."],
+    ["start_recent_section", "Show Recent section", "Shows the Recent section when it has items to display."],
+    ["start_all_apps_section", "Show All apps section", "Shows the installed apps section in Start."],
+    ["start_hide_profile", "Hide name and profile picture", "Hides your name and profile picture in the Start menu."],
+  ],
+  "start-recent": [
+    ["start_recently_added_apps", "Show recently added apps", "Shows newly installed apps in Start."],
+    ["start_most_used_apps", "Show most used apps", "Shows frequently used apps when app launch tracking is enabled."],
+    ["start_recent_items", "Show recently opened items", "Controls recent items in Start, Jump Lists and File Explorer."],
+    ["start_tips_and_suggestions", "Show tips and app suggestions", "Shows suggested apps, shortcuts and tips in Start."],
+    ["start_account_notifications", "Show account-related notifications", "Shows account reminders on the Start profile menu."],
+    ["track_app_launches", "Track app launches", "Lets Windows personalize Start and Search based on the apps you open."],
+  ],
+  "start-search": [
+    ["search_highlights", "Show search highlights", "Shows featured moments and other highlights in Windows Search."],
+    ["search_web_suggestions", "Show web suggestions", "Includes suggestions from the web in Windows Search."],
+    ["search_store_suggestions", "Show Microsoft Store suggestions", "Includes app suggestions from Microsoft Store in Windows Search."],
+  ],
+  "taskbar-items": [
+    ["taskbar_search", "Search on the taskbar", "Choose how Windows Search appears. Win+S always opens Search.", ["Hidden", "Search icon", "Search box", "Search icon and label"]],
+    ["taskbar_widgets_button", "Show Widgets button", "Shows the taskbar entry point when Widgets are allowed."],
+  ],
+  "taskbar-behavior": [
+    ["taskbar_auto_hide", "Automatically hide the taskbar", "Shows the taskbar when you move the pointer to its edge of the screen."],
+    ["taskbar_badges", "Show badges on taskbar apps", "Shows unread counts and other app status indicators."],
+    ["taskbar_share_window", "Share windows from the taskbar", "Shows a window sharing shortcut during supported calls."],
+    ["taskbar_show_desktop", "Use the far corner to show the desktop", "Minimizes open windows when you click the far edge of the taskbar."],
+    ["taskbar_combine", "Combine taskbar buttons", "Choose when buttons and labels are combined on the primary taskbar.", combineButtons],
+  ],
+  "taskbar-tray": [
+    ["taskbar_show_clock", "Show time and date in the system tray", "Shows the calendar and clock on the taskbar."],
+    ["taskbar_clock_seconds", "Show seconds in the system tray clock", "Adds seconds to the clock display."],
+    ["taskbar_abbreviated_clock", "Use abbreviated time and date", "Uses a compact clock and calendar format."],
+    ["taskbar_notification_bell", "Show notification bell", "Shows the notification center icon in the system tray."],
+    ["notification_center_clock", "Show clock in Notification Center", "Shows a clock above the calendar and notifications."],
+  ],
+  "desktop-icon-settings": [
+    ["desktop_icons", "Hide desktop icons", "Hides icons on the desktop without removing them."],
+  ],
+})) {
+  const heading = byId(group);
+  let nextGroup = heading.nextElementSibling;
+  while (nextGroup && !nextGroup.classList.contains("preference-group")) nextGroup = nextGroup.nextElementSibling;
+  for (const [field, label, description, options] of preferences) {
+    const id = field.replaceAll("_", "-");
+    const row = element("div", "preference");
+    const content = element("div");
+    const title = element("h3", "", label);
+    content.append(title);
+    if (description) content.append(element("p", "preference-description", description));
+    row.append(content);
+    heading.parentElement.insertBefore(row, nextGroup);
+    const preference = { id, field, shell: true };
+    if (options) {
+      preference.picker = addFolderPicker(row, title, id, options);
+      preference.personal = true;
+      explorerChoices.push(preference);
+    } else {
+      row.dataset.preference = id;
+      explorerPreferences.push(preference);
+    }
+  }
+}
+
+function currentPreferenceValue(preference) {
+  if (!preference.shell) return settings?.[preference.field];
+  const value = settings?.shell_preferences?.[preference.field]?.value;
+  return preference.picker || value === undefined ? value : value === 1;
+}
+
 function preferenceRecommendation(preference) {
+  if (preference.shell) {
+    const value = settings?.shell_preferences?.[preference.field]?.recommended ?? undefined;
+    return preference.picker || value === undefined ? value : value === 1;
+  }
+  if (preference.picker) return preference.recommendedValue;
   return settings?.recommended_preferences?.find(([field]) => field === preference.field)?.[1];
+}
+
+function preferenceRecommendationLabel(preference) {
+  const value = preferenceRecommendation(preference);
+  if (preference.recommendation) return preference.recommendation;
+  return `${preference.label} · ${preference.picker ? preference.picker.labelFor(value) : preferenceValue(value)}`;
 }
 
 function preferenceRecommended(preference) {
@@ -82,7 +191,8 @@ function preferencePersonal(preference) {
 }
 
 function preferenceAvailable(preference) {
-  return Boolean(settings) && (!preference.supported || settings[preference.supported]);
+  return Boolean(settings) && (preference.shell ? currentPreferenceValue(preference) !== undefined
+    : !preference.supported || settings[preference.supported]);
 }
 
 function preferenceRestriction(preference, unavailable = "Unavailable on this system") {
@@ -112,7 +222,7 @@ function setBusy(value) {
   for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
-  for (const view of explorerChoices) view.picker.setDisabled(busy || !settings);
+  for (const view of explorerChoices) view.picker.setDisabled(busy || !preferenceAvailable(view));
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !preferenceAvailable(preference);
   }
@@ -127,12 +237,11 @@ function setPreferenceValue(id, value, visual = false) {
 
 function renderBohr() {
   if (!settings) return;
-  const available = [
-    ...explorerPreferences.filter(preference => preferenceRecommended(preference) && preferenceAvailable(preference))
-      .map(preference => ({ ...preference, label: `${preference.label} · ${preferenceValue(preferenceRecommendation(preference))}`, enabled: settings[preference.field] === preferenceRecommendation(preference) })),
-    ...explorerChoices.filter(choice => choice.recommendedValue !== undefined && choice.picker.choices.some(option => choice.picker.matches(option.value, choice.recommendedValue)))
-      .map(choice => ({ ...choice, label: choice.recommendation, enabled: choice.picker.matches(choice.recommendedValue, settings[choice.field]) })),
-  ];
+  const available = [...explorerPreferences, ...explorerChoices]
+    .filter(preference => preferenceAvailable(preference) && preferenceRecommended(preference)
+      && (!preference.picker || preference.picker.choices.some(option => preference.picker.matches(option.value, preferenceRecommendation(preference)))))
+    .map(preference => ({ ...preference, label: preferenceRecommendationLabel(preference),
+      enabled: preferenceMatches(preference, preferenceRecommendation(preference), currentPreferenceValue(preference)) }));
   const changes = available.filter(preference => preference.enabled);
   const count = byId("preferences-made");
   if (count) {
@@ -179,11 +288,13 @@ function renderSettings() {
   });
   for (const view of explorerChoices) {
     const selected = pendingValue(view);
-    view.picker.load(selected ?? null, Boolean(settings));
+    const available = preferenceAvailable(view);
+    const recommended = preferenceRecommendation(view);
+    view.picker.load(selected ?? null, available);
     const value = byId(`${view.id}-value`);
-    if (settings && pendingPreferences.get(view)?.selected) value.textContent += " · Pending";
-    value.dataset.state = view.personal || view.recommendedValue === undefined ? "visual" : !settings ? "other"
-      : view.picker.matches(view.recommendedValue, selected) ? "enabled" : "disabled";
+    if (available && pendingPreferences.get(view)?.selected) value.textContent += " · Pending";
+    value.dataset.state = !available ? "other" : view.personal || recommended === undefined ? "visual"
+      : view.picker.matches(recommended, selected) ? "enabled" : "disabled";
   }
   for (const preference of explorerPreferences) {
     const available = preferenceAvailable(preference);
@@ -341,10 +452,9 @@ function confirmChange(description, title = "Change preference?", recommendation
   byId("recommended-options").hidden = !recommendations.length;
   byId("recommended-options").open = true;
   byId("recommendation-list").replaceChildren(...recommendations.map((id) => {
-    const preference = explorerPreferences.find(preference => preference.field === id);
-    const view = explorerChoices.find(view => view.field === id);
-    const { row, text } = createChangeRow(id, preference ? `${preference.label} · ${preferenceValue(preferenceRecommendation(preference))}` : view.recommendation,
-      (preference || view).description, preference ? preferencePersonal(preference) : Boolean(view.personal));
+    const preference = [...explorerPreferences, ...explorerChoices].find(preference => preference.field === id);
+    const { row, text } = createChangeRow(id, preferenceRecommendationLabel(preference),
+      preference.description, preferencePersonal(preference));
     if (preference?.requiresAdmin) text.append(adminWarning());
     return row;
   }));
@@ -460,7 +570,7 @@ for (const view of explorerChoices) {
 for (const preference of explorerPreferences) {
   const row = document.querySelector(`[data-preference="${preference.id}"]`);
   const title = row.querySelector("h3");
-  preference.description = row.querySelector(".preference-description").textContent.trim();
+  preference.description = row.querySelector(".preference-description")?.textContent.trim() || "";
   preference.label = title.textContent.trim();
   if (preference.requiresAdmin) title.append(adminWarning());
   const value = document.createElement("p");
@@ -478,7 +588,8 @@ for (const preference of explorerPreferences) {
       setStatus("This preference requires administrator access. Close Orbital and run it as administrator.", true);
       return;
     }
-    stagePreference(preference, pendingPreferences.get(preference)?.selected ? settings[preference.field] : !settings[preference.field]);
+    const current = currentPreferenceValue(preference);
+    stagePreference(preference, pendingPreferences.get(preference)?.selected ? current : !current);
   });
 }
 

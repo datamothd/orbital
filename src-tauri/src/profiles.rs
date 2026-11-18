@@ -195,4 +195,36 @@ mod tests {
                 .is_err()
         );
     }
+
+    #[test]
+    fn shell_choice_profiles_and_recommendation_ids_round_trip() {
+        let json = serde_json::json!({
+            "format": "orbital-tweaks",
+            "version": 4,
+            "tweaks": [],
+            "folder_sort": null,
+            "folder_grouping": null,
+            "shell_preferences": { "taskbar_position": 3, "start_settings_shortcut": 1 }
+        });
+        let profile: TweakProfile = serde_json::from_value(json.clone()).unwrap();
+        profile.validate().unwrap();
+        assert_eq!(serde_json::to_value(profile).unwrap(), json);
+        let mut invalid = json;
+        invalid["shell_preferences"]["taskbar_position"] = 4.into();
+        assert!(serde_json::from_value::<TweakProfile>(invalid).unwrap().validate().is_err());
+
+        let mut profile: TweakProfile = serde_json::from_value(serde_json::json!({
+            "format": "orbital-tweaks",
+            "version": 4,
+            "tweaks": [],
+            "shell_preferences": { "taskbar_position": 3, "taskbar_combine": 2 }
+        })).unwrap();
+        profile.normalize().unwrap();
+        assert_eq!(serde_json::to_value(profile).unwrap()["shell_preferences"],
+            serde_json::json!({ "taskbar_combine": 2 }));
+
+        let ids = serde_json::json!(["folder_view", "taskbar_position", "start_settings_shortcut"]);
+        let decoded: Vec<explorer::Recommendation> = serde_json::from_value(ids.clone()).unwrap();
+        assert_eq!(serde_json::to_value(decoded).unwrap(), ids);
+    }
 }

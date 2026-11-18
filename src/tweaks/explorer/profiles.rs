@@ -16,6 +16,8 @@ pub struct TweakProfile {
     pub folder_grouping: Option<FolderGrouping>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_explorer_to: Option<ExplorerLaunch>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub shell_preferences: BTreeMap<ShellPreference, u32>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -75,11 +77,15 @@ impl TweakProfile {
                 "The file contains duplicate or conflicting tweaks.",
             ));
         }
+        if self.shell_preferences.iter().any(|(&preference, &value)| !preference.accepts(value)) {
+            return Err(io::Error::other("The file contains invalid Windows shell preference values."));
+        }
         Ok(())
     }
 
     pub fn normalize(&mut self) -> io::Result<()> {
         self.validate()?;
+        self.shell_preferences.retain(|preference, _| !preference.retired());
         if self.version < 3 {
             if !self.tweaks.contains(&Preference::ShowRecommendations)
                 && !self
@@ -118,9 +124,13 @@ impl TweakProfile {
             + usize::from(self.folder_sort.is_some())
             + usize::from(self.folder_grouping.is_some())
             + usize::from(self.open_explorer_to.is_some())
+            + self.shell_preferences.len()
     }
 
     fn retain_changes(&mut self, current: &ExplorerSettings) {
+        self.shell_preferences.retain(|preference, value| {
+            current.shell_preferences.get(preference).map(|setting| setting.value) != Some(*value)
+        });
         self.open_explorer_to = self
             .open_explorer_to
             .filter(|target| current.open_explorer_to != Some(*target));
@@ -326,6 +336,9 @@ fn profile_from_settings(current: &ExplorerSettings) -> TweakProfile {
         open_explorer_to: current
             .open_explorer_to
             .filter(|target| current.explorer_launch_options.contains(target)),
+        shell_preferences: current.shell_preferences.iter()
+            .map(|(&preference, setting)| (preference, setting.value))
+            .collect(),
     }
 }
 
@@ -353,6 +366,9 @@ fn batch_profile(
                 }
             }
             SettingsCommand::Recommended => {
+                profile.shell_preferences = current.shell_preferences.iter()
+                    .filter_map(|(&preference, setting)| setting.recommended.map(|value| (preference, value)))
+                    .collect();
                 for preference in Preference::ALL {
                     if let Some(enabled) = preference
                         .recommended_value()
@@ -413,6 +429,9 @@ pub fn apply_batch(commands: &[SettingsCommand], yes: bool) -> io::Result<()> {
     if profile.open_explorer_to == Some(ExplorerLaunch::Downloads) {
         println!("  - Open Explorer to Downloads");
     }
+    if !profile.shell_preferences.is_empty() {
+        println!("  - Apply {} Windows shell preferences", profile.shell_preferences.len());
+    }
     if !yes && !confirm("Apply these changes and restart Explorer?")? {
         println!("Cancelled.");
         return Ok(());
@@ -434,6 +453,7 @@ pub fn set_explorer_launch(target: ExplorerLaunch) -> io::Result<()> {
             folder_sort: None,
             folder_grouping: None,
             open_explorer_to: Some(target),
+            shell_preferences: BTreeMap::new(),
         },
         false,
     )
@@ -544,6 +564,9 @@ fn apply_profile(
             "Some imported tweaks are unavailable on this system.",
         ));
     }
+    if profile.shell_preferences.keys().any(|preference| !current.shell_preferences.contains_key(preference)) {
+        return Err(io::Error::other("Some imported Windows shell preferences are unavailable on this system."));
+    }
     if selected().any(|tweak| tweak.requires_administrator() && !current.is_administrator) {
         return Err(io::Error::other(
             "This preference requires administrator access. Close Orbital and run it as administrator.",
@@ -556,6 +579,7 @@ fn apply_profile(
     let icon = blank_icon_path()?;
     let mut changes =
         imported_changes(HKCU, HKLM, &profile.tweaks, &profile.disabled_tweaks, &icon)?;
+    changes.extend(shell::changes_in(HKCU, &profile.shell_preferences)?);
     if let Some(target) = profile.open_explorer_to {
         changes.push(RegistryChange::new(
             HKCU,
@@ -586,6 +610,7 @@ fn apply_profile(
         selected().any(|tweak| *tweak == Preference::HideShortcutArrow),
         !views.is_empty(),
     )?;
+    shell::refresh_start(&changes)?;
     Ok(count)
 }
 
@@ -850,6 +875,7 @@ mod tests {
                     folder_sort: None,
                     folder_grouping: None,
                     open_explorer_to: None,
+                    shell_preferences: BTreeMap::new(),
                 };
                 profile.normalize().unwrap();
                 profile.normalize().unwrap();
@@ -1058,6 +1084,7 @@ mod tests {
             folder_sort: None,
             folder_grouping: None,
             open_explorer_to: None,
+            shell_preferences: BTreeMap::new(),
         };
         assert!(profile.validate().is_ok());
         profile.version = 6;

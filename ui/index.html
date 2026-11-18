@@ -86,50 +86,12 @@
             <summary>
               <h3 id="preferences-title" class="tweak-heading">
                 <span class="icon icon-folder" aria-hidden="true"></span>
-                <span>Explorer Settings</span>
+                <span>File Explorer</span>
               </h3>
             </summary>
             <hr class="preferences-divider" aria-hidden="true">
-            <p class="note">Windows Explorer restarts once when you apply your pending changes. Your taskbar and desktop will briefly disappear. Hold Shift while clicking Continue to skip confirmation.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
-            <h3 class="preference-group">Taskbar</h3>
-            <div class="preference" data-preference="taskbar-centering">
-              <div>
-                <h3>Center taskbar icons</h3>
-                <p class="preference-description">Centers taskbar icons. Disable to align them to the left.</p>
-              </div>
-            </div>
-            <div class="preference" data-preference="task-view">
-              <div>
-                <h3>Show Task View button</h3>
-                <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
-              </div>
-            </div>
-            <div class="preference" data-preference="taskbar-flashing">
-              <div>
-                <h3>Show flashing on taskbar apps</h3>
-                <p class="preference-description">Allows app icons on the taskbar to flash when they need your attention.</p>
-              </div>
-            </div>
-            <div class="preference" data-preference="widgets">
-              <div>
-                <h3>Allow Widgets</h3>
-                <p class="preference-description">Allows the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
-              </div>
-            </div>
-            <div class="preference" data-preference="taskbar-end-task">
-              <div>
-                <h3>Enable taskbar End task</h3>
-                <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
-              </div>
-            </div>
-            <h3 class="preference-group">Desktop</h3>
-            <div class="preference" data-preference="shortcut-arrow">
-              <div>
-                <h3>Hide shortcut arrow icon</h3>
-                <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
-              </div>
-            </div>
-            <h3 class="preference-group">File Explorer · Behavior</h3>
+            <p class="note">Applying changes briefly restarts Windows Explorer. Changes to Start can also reload the Start menu. Hold Shift while clicking Continue to skip confirmation.<br><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
+            <h3 class="preference-group" id="explorer-behavior">Behavior</h3>
             <div class="preference folder-view-preference">
               <div>
                 <h3 id="explorer-launch-label">Open Explorer to</h3>
@@ -213,7 +175,7 @@
                 </button>
               </div>
             </div>
-            <h3 class="preference-group">File Explorer · File visibility</h3>
+            <h3 class="preference-group" id="explorer-visibility">File visibility</h3>
             <div class="preference" data-preference="file-extensions">
               <div>
                 <h3>Hide known file extensions</h3>
@@ -238,7 +200,7 @@
                 <p class="preference-description">Reveals protected system files when Show hidden files is also enabled.</p>
               </div>
             </div>
-            <h3 class="preference-group">File Explorer · Appearance</h3>
+            <h3 class="preference-group" id="explorer-appearance">Appearance</h3>
             <div class="preference" data-preference="explorer-spacing">
               <div>
                 <h3>Use compact spacing</h3>
@@ -269,7 +231,7 @@
                 <p class="preference-description">Shows pop-up descriptions when pointing at files and folders.</p>
               </div>
             </div>
-            <h3 class="preference-group">File Explorer · Navigation pane</h3>
+            <h3 class="preference-group" id="explorer-navigation">Navigation pane</h3>
             <div class="preference" data-preference="network">
               <div>
                 <h3>Show Network in navigation pane</h3>
@@ -294,7 +256,7 @@
                 <p class="preference-description">Shows Gallery in the navigation pane. <span class="admin-requirement">Requires administrator access.</span></p>
               </div>
             </div>
-            <h3 class="preference-group">File Explorer · Home and privacy</h3>
+            <h3 class="preference-group" id="explorer-privacy">Home and privacy</h3>
             <div class="preference" data-preference="recent-files">
               <div>
                 <h3>Show recently used files</h3>
@@ -317,6 +279,76 @@
               <div>
                 <h3>Show cloud files in Quick access</h3>
                 <p class="preference-description">Shows account and cloud-provider content in File Explorer. Availability depends on your account.</p>
+              </div>
+            </div>
+          </details>
+          <details id="start-preferences" aria-labelledby="start-preferences-title">
+            <summary>
+              <h3 id="start-preferences-title" class="tweak-heading">
+                <span class="icon icon-start-menu" aria-hidden="true"></span>
+                <span>Start Menu</span>
+              </h3>
+            </summary>
+            <hr class="preferences-divider" aria-hidden="true">
+            <h3 class="preference-group" id="start-layout">Layout</h3>
+            <h3 class="preference-group" id="start-recent">Recent and recommendations</h3>
+            <h3 class="preference-group" id="start-search">Windows Search</h3>
+          </details>
+          <details id="taskbar-preferences" aria-labelledby="taskbar-preferences-title">
+            <summary>
+              <h3 id="taskbar-preferences-title" class="tweak-heading">
+                <span class="icon icon-taskbar" aria-hidden="true"></span>
+                <span>Taskbar</span>
+              </h3>
+            </summary>
+            <hr class="preferences-divider" aria-hidden="true">
+            <h3 class="preference-group" id="taskbar-items">Taskbar items</h3>
+            <div class="preference" data-preference="task-view">
+              <div>
+                <h3>Show Task View button</h3>
+                <p class="preference-description">Shows the Task View button on the taskbar. Win+Tab works either way.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="widgets">
+              <div>
+                <h3>Allow Widgets</h3>
+                <p class="preference-description">Allows the widgets board and its taskbar content. <span class="admin-requirement">Requires administrator access.</span></p>
+              </div>
+            </div>
+            <h3 class="preference-group" id="taskbar-behavior">Behavior</h3>
+            <div class="preference" data-preference="taskbar-centering">
+              <div>
+                <h3>Center taskbar icons</h3>
+                <p class="preference-description">Centers taskbar icons. Disable to align them to the left.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="taskbar-flashing">
+              <div>
+                <h3>Show flashing on taskbar apps</h3>
+                <p class="preference-description">Allows app icons on the taskbar to flash when they need your attention.</p>
+              </div>
+            </div>
+            <div class="preference" data-preference="taskbar-end-task">
+              <div>
+                <h3>Enable taskbar End task</h3>
+                <p class="preference-description">Adds End task to app menus on the taskbar to force-close apps. Unsaved work may be lost.</p>
+              </div>
+            </div>
+            <h3 class="preference-group" id="taskbar-tray">System tray</h3>
+          </details>
+          <details id="desktop-preferences" aria-labelledby="desktop-preferences-title">
+            <summary>
+              <h3 id="desktop-preferences-title" class="tweak-heading">
+                <span class="icon icon-desktop" aria-hidden="true"></span>
+                <span>Desktop</span>
+              </h3>
+            </summary>
+            <hr class="preferences-divider" aria-hidden="true">
+            <h3 class="preference-group" id="desktop-icon-settings">Icons</h3>
+            <div class="preference" data-preference="shortcut-arrow">
+              <div>
+                <h3>Hide shortcut arrow icon</h3>
+                <p class="preference-description">Hides the arrow overlay on desktop shortcuts. <span class="admin-requirement">Requires administrator access.</span></p>
               </div>
             </div>
           </details>

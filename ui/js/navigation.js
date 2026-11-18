@@ -6,6 +6,18 @@ byId("tweaks-collapse").addEventListener("click", () => {
   for (const section of byId("tweaks-panel").querySelectorAll("details")) section.open = false;
 });
 
+const visualSections = [...byId("visual-settings").querySelectorAll(".tweak-subgroups > details")];
+for (const section of visualSections) {
+  section.addEventListener("toggle", () => {
+    closeChoicePicker();
+    if (!section.open) return;
+    for (const other of visualSections) {
+      if (other !== section) other.open = false;
+    }
+    section.querySelector("summary").scrollIntoView({ block: "nearest" });
+  });
+}
+
 function selectNavigationTab(selectedTab) {
   for (const tab of navigationTabs) {
     const selected = tab === selectedTab;

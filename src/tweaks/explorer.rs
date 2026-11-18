@@ -6,9 +6,12 @@ mod folder_views;
 mod options;
 #[path = "explorer/profiles.rs"]
 mod profiles;
+#[path = "explorer/shell.rs"]
+mod shell;
 
 pub use options::ExplorerLaunch;
 use options::*;
+pub use shell::{ShellPreference, ShellSetting};
 
 pub use folder_views::{FolderGrouping, FolderSort, FolderView, SortColumn};
 pub use profiles::{
@@ -21,6 +24,7 @@ use std::os::windows::{
     process::CommandExt,
 };
 use std::{
+    collections::BTreeMap,
     fs::OpenOptions,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -36,6 +40,7 @@ const CLASSIC_CONTEXT_MENU_KEY: &str =
     r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32";
 const EXPLORER_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer";
 const APP_SETTINGS_KEY: &str = r"Software\Orbital\Settings";
+const WINDOWS_VERSION_KEY: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
 const ADVANCED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
 const TASKBAR_DEVELOPER_KEY: &str =
     r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings";
@@ -94,18 +99,16 @@ pub fn is_administrator() -> io::Result<bool> {
 }
 
 fn windows_build() -> io::Result<u32> {
-    let key = HKLM.open_subkey_with_flags(
-        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-        KEY_QUERY_VALUE,
-    )?;
+    let key = HKLM.open_subkey_with_flags(WINDOWS_VERSION_KEY, KEY_QUERY_VALUE)?;
     let build: String = key.get_value("CurrentBuildNumber")?;
     build
         .parse()
         .map_err(|_| io::Error::other("Invalid Windows build number"))
 }
 
-fn supports_windows11() -> io::Result<bool> {
-    Ok(windows_build()? >= 22000)
+fn windows_revision() -> io::Result<u32> {
+    let key = HKLM.open_subkey_with_flags(WINDOWS_VERSION_KEY, KEY_QUERY_VALUE)?;
+    Ok(optional(key.get_value("UBR"))?.unwrap_or_default())
 }
 
 fn supports_taskbar_end_task(build: u32) -> io::Result<bool> {
@@ -115,11 +118,7 @@ fn supports_taskbar_end_task(build: u32) -> io::Result<bool> {
     if build != 22621 {
         return Ok(false);
     }
-    let key = HKLM.open_subkey_with_flags(
-        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-        KEY_QUERY_VALUE,
-    )?;
-    Ok(optional(key.get_value::<u32, _>("UBR"))?.is_some_and(|revision| revision >= 3958))
+    Ok(windows_revision()? >= 3958)
 }
 
 fn classic_context_menu_enabled() -> io::Result<bool> {
@@ -174,6 +173,7 @@ pub struct ExplorerSettings {
     pub open_explorer_to: Option<ExplorerLaunch>,
     pub explorer_launch_options: Vec<ExplorerLaunch>,
     pub recommended_preferences: Vec<(Preference, bool)>,
+    pub shell_preferences: BTreeMap<ShellPreference, ShellSetting>,
 }
 
 pub fn settings() -> io::Result<ExplorerSettings> {
@@ -230,6 +230,7 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         )?,
         open_explorer_to: explorer_launch_in(HKCU)?,
         explorer_launch_options: launch_options_in(HKCU, build)?,
+        shell_preferences: shell::settings_in(HKCU, build, windows_revision()?)?,
         recommended_preferences: Preference::ALL
             .into_iter()
             .filter_map(|preference| {
@@ -754,7 +755,9 @@ fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io:
 }
 
 pub fn save_original_settings() -> io::Result<()> {
-    original_settings_in(HKCU, HKLM, supports_windows11()?).map(|_| ())
+    let build = windows_build()?;
+    original_settings_in(HKCU, HKLM, build >= 22000)?;
+    shell::save_originals(HKCU, build, windows_revision()?)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -783,6 +786,8 @@ pub enum Recommendation {
     FolderSort,
     FolderGrouping,
     FolderView,
+    #[serde(untagged)]
+    Shell(ShellPreference),
 }
 
 pub fn apply_recommended_settings(
@@ -812,10 +817,19 @@ pub fn apply_recommended_settings(
     let missing_icon = selected(Recommendation::HideShortcutArrow) && !blank_icon_valid(&icon)?;
     let mut preferences = changed_preferences(&changes, missing_icon);
     preferences.extend(view_changes.iter().map(view_id));
+    let shell_preferences: BTreeMap<_, _> = shell::settings_in(HKCU, build, windows_revision()?)?
+        .into_iter()
+        .filter_map(|(preference, setting)| {
+            setting.recommended.filter(|&target| setting.value != target && selected(Recommendation::Shell(preference)))
+                .map(|target| (preference, target))
+        })
+        .collect();
+    preferences.extend(shell_preferences.keys().copied().map(Recommendation::Shell));
     if preview || preferences.is_empty() {
         return Ok(preferences);
     }
-    original_settings_in(HKCU, HKLM, windows11)?;
+    changes.extend(shell::changes_in(HKCU, &shell_preferences)?);
+    save_original_settings()?;
     let prepared = prepare_changes(&changes)?;
     if missing_icon {
         ensure_blank_icon_at(&icon, replace_blank_icon)?;
@@ -828,6 +842,7 @@ pub fn apply_recommended_settings(
         preferences.contains(&Recommendation::HideShortcutArrow),
         !view_changes.is_empty(),
     )?;
+    shell::refresh_start(&changes)?;
     Ok(preferences)
 }
 
@@ -896,8 +911,11 @@ fn original_changes<'a>(
 }
 
 pub fn restore_original_settings() -> io::Result<bool> {
-    let backup = original_settings_in(HKCU, HKLM, supports_windows11()?)?;
-    let changes = pending_changes(original_changes(HKCU, HKLM, &backup)?)?;
+    let build = windows_build()?;
+    let backup = original_settings_in(HKCU, HKLM, build >= 22000)?;
+    let mut changes = original_changes(HKCU, HKLM, &backup)?;
+    changes.extend(shell::original_changes(HKCU, build, windows_revision()?)?);
+    let changes = pending_changes(changes)?;
     let prepared = prepare_changes(&changes)?;
     let views_restored = folder_views::restore_in(HKCU)?;
     if changes.is_empty() && !views_restored {
@@ -911,6 +929,7 @@ pub fn restore_original_settings() -> io::Result<bool> {
             .any(|change| recommendation(change) == Some(Recommendation::HideShortcutArrow)),
         views_restored,
     )?;
+    shell::refresh_start(&changes)?;
     Ok(true)
 }
 

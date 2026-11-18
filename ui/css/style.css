@@ -147,6 +147,9 @@ summary::after {
 .icon-collapse { --icon-image: url("../icons/collapse.png"); }
 .icon-monitor { --icon-image: url("../icons/monitor.png"); }
 .icon-folder { --icon-image: url("../icons/folder.png"); }
+.icon-desktop { --icon-image: url("../icons/desktop.png"); }
+.icon-start-menu { --icon-image: url("../icons/start-menu.png"); }
+.icon-taskbar { --icon-image: url("../icons/taskbar.png"); }
 .icon-chip { --icon-image: url("../icons/chip.png"); }
 .icon-sparkle { --icon-image: url("../icons/sparkle.png"); }
 .icon-apps { --icon-image: url("../icons/apps.png"); }
@@ -771,8 +774,30 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
   border-top: 1px solid var(--border);
 }
 
-#explorer-preferences > .preference:last-child {
+#visual-settings .tweak-subgroups > details[open]:has(+ details) {
+  background: linear-gradient(#777, #777) 5px 0 / 1px 100% no-repeat;
+  padding-bottom: var(--space-4);
+}
+
+#visual-settings .tweak-subgroups > details[open]:has(+ details) > summary {
+  background: none;
+}
+
+#visual-settings .tweak-subgroups > details > :not(summary) {
+  margin-inline-start: 36px;
+}
+
+#visual-settings .tweak-subgroups > details > .preference:last-child {
   padding-bottom: 0;
+}
+
+#visual-settings .tweak-subgroups > details > .preferences-divider {
+  margin-block-end: var(--space-3);
+}
+
+#visual-settings .preferences-divider + .preference-group {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .preference p {

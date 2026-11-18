@@ -1,7 +1,7 @@
 use super::*;
 
 const LIBRARIES_KEY: &str = r"Software\Classes\CLSID\{031E4825-7B94-4dc3-B131-E946B44C8DD5}";
-const CABINET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState";
+pub(super) const CABINET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState";
 pub(super) const POLICIES_KEY: &str =
     r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer";
 

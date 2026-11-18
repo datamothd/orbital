@@ -7,13 +7,13 @@ const preferenceMatches = (preference, value, current) => preference.picker?.mat
 
 function pendingValue(preference) {
   const change = pendingPreferences.get(preference);
-  return change?.selected ? change.value : settings?.[preference.field];
+  return change?.selected ? change.value : currentPreferenceValue(preference);
 }
 
 function renderPendingChanges() {
   if (settings) {
     for (const [preference, { value }] of pendingPreferences) {
-      if (preferenceMatches(preference, value, settings[preference.field])) pendingPreferences.delete(preference);
+      if (!preferenceAvailable(preference) || preferenceMatches(preference, value, currentPreferenceValue(preference))) pendingPreferences.delete(preference);
     }
   }
   const count = [...pendingPreferences.values()].filter(change => change.selected).length;
@@ -65,7 +65,8 @@ pendingContinue.addEventListener("click", async event => {
     if (!skip && !await confirmChange("", `Apply ${label}?`, [], note)) return;
     const profile = { format: "orbital-tweaks", version: 4, tweaks: [], disabled_tweaks: [] };
     for (const [preference, { value }] of selected) {
-      if (preference.picker) profile[preference.field] = value;
+      if (preference.shell) (profile.shell_preferences ??= {})[preference.field] = Number(value);
+      else if (preference.picker) profile[preference.field] = value;
       else profile[value ? "tweaks" : "disabled_tweaks"].push(preference.field);
     }
     setStatus("Saving preferences and restarting Explorer…");
