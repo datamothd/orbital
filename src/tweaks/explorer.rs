@@ -230,7 +230,7 @@ pub fn settings() -> io::Result<ExplorerSettings> {
         )?,
         open_explorer_to: explorer_launch_in(HKCU)?,
         explorer_launch_options: launch_options_in(HKCU, build)?,
-        shell_preferences: shell::settings_in(HKCU, build, windows_revision()?)?,
+        shell_preferences: shell::settings_in(HKCU, HKLM, build, windows_revision()?)?,
         recommended_preferences: Preference::ALL
             .into_iter()
             .filter_map(|preference| {
@@ -791,7 +791,7 @@ pub fn apply_recommended_settings(
     let missing_icon = selected(Recommendation::HideShortcutArrow) && !blank_icon_valid(&icon)?;
     let mut preferences = changed_preferences(&changes, missing_icon);
     preferences.extend(view_changes.iter().map(view_id));
-    let shell_preferences: BTreeMap<_, _> = shell::settings_in(HKCU, build, windows_revision()?)?
+    let shell_preferences: BTreeMap<_, _> = shell::settings_in(HKCU, HKLM, build, windows_revision()?)?
         .into_iter()
         .filter_map(|(preference, setting)| {
             setting.recommended.filter(|&target| setting.value != target && selected(Recommendation::Shell(preference)))

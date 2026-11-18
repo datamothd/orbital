@@ -7,10 +7,13 @@ const SEARCH_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Search";
 const SEARCH_SETTINGS_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\SearchSettings";
 const TASKBAR_LAYOUT_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3";
 const BACKUP_KEY: &str = r"Software\Orbital\OriginalExplorerSettings\Shell";
+const DELEGATE_FOLDERS_KEY: &str =
+    r"Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\DelegateFolders";
 
 #[derive(Clone, Copy)]
 enum Backing {
     Dword(&'static str, &'static str, u32, &'static [u32]),
+    Text(&'static str, &'static str, &'static str),
     Retired(&'static [u32]),
     Flag(RegistryFlag),
 }
@@ -79,6 +82,8 @@ shell_preferences! {
     AllNavigationFolders => None, toggle(ADVANCED_KEY, "NavPaneShowAllFolders", 0);
     NavigationCloudStatus => None, toggle(ADVANCED_KEY, "NavPaneShowAllCloudStates", 0);
     ExplorerTyping => None, Dword(ADVANCED_KEY, "TypeAhead", 0, &[0, 1]);
+    OmitShortcutSuffix => None, Backing::Text(r"Software\Microsoft\Windows\CurrentVersion\Explorer\NamingTemplates", "ShortcutNameTemplate", r#""%s.lnk""#);
+    RemovableDrivesOnlyInThisPc => None, toggle(NON_ENUM_KEYS[0], REMOVABLE_CLSID, 0);
     DriveLetters => None, Dword(EXPLORER_KEY, "ShowDriveLettersFirst", 0, &[0, 1, 2, 4]);
     StartMenuSize => None, Retired(&[0, 1, 2]);
     StartAllAppsView => None, Retired(&[0, 1, 2]);
@@ -136,7 +141,7 @@ impl ShellPreference {
     pub(super) fn accepts(self, value: u32) -> bool {
         match self.definition().1 {
             Dword(_, _, _, values) | Retired(values) => values.contains(&value),
-            Flag(_) => value <= 1,
+            Backing::Text(..) | Flag(_) => value <= 1,
         }
     }
 
@@ -186,6 +191,7 @@ pub struct ShellSetting {
 
 pub(super) fn settings_in(
     user: &RegKey,
+    machine: &RegKey,
     build: u32,
     revision: u32,
 ) -> io::Result<BTreeMap<ShellPreference, ShellSetting>> {
@@ -195,6 +201,17 @@ pub(super) fn settings_in(
     }
     for &preference in ShellPreference::ALL {
         if !preference.supported(build, revision) {
+            continue;
+        }
+        if preference == ShellPreference::RemovableDrivesOnlyInThisPc
+            && (optional(machine.open_subkey_with_flags(
+                format!(r"{DELEGATE_FOLDERS_KEY}\{REMOVABLE_CLSID}"),
+                KEY_QUERY_VALUE,
+            ))?
+                .is_none()
+                || read_original(machine, NON_ENUM_KEYS[0], REMOVABLE_CLSID)?
+                    .is_some_and(|raw| u32::from_reg_value(&raw).ok() != Some(0)))
+        {
             continue;
         }
         let (recommended, backing) = preference.definition();
@@ -210,6 +227,12 @@ pub(super) fn settings_in(
                     ))
                 }))?
             }
+            Backing::Text(path, name, enabled) => available(
+                read_original(user, path, name).and_then(|value| match value {
+                    None => Ok(Some(0)),
+                    Some(raw) => Ok((String::from_reg_value(&raw)? == enabled).then_some(1)),
+                }),
+            )?,
             Retired(_) => continue,
             Flag(flag) => available(read_original(user, flag.path, "Settings"))?
                 .as_ref()
@@ -236,7 +259,14 @@ pub(super) fn changes_in<'a>(
                 user,
                 path,
                 name,
-                Some(value.to_reg_value()),
+                (value != 0 || preference != ShellPreference::RemovableDrivesOnlyInThisPc)
+                    .then(|| value.to_reg_value()),
+            )),
+            Backing::Text(path, name, enabled) => changes.push(RegistryChange::new(
+                user,
+                path,
+                name,
+                (value == 1).then(|| enabled.to_reg_value()),
             )),
             Retired(_) => continue,
             Flag(flag) => {
@@ -258,9 +288,12 @@ fn backup_slots(
 ) -> impl Iterator<Item = (&'static str, &'static str, Option<RegistryFlag>)> {
     ShellPreference::ALL
         .iter()
-        .filter(move |preference| preference.supported(build, revision))
+        .filter(move |preference| {
+            preference.supported(build, revision)
+                && **preference != ShellPreference::RemovableDrivesOnlyInThisPc
+        })
         .filter_map(|preference| match preference.definition().1 {
-            Dword(path, name, _, _) => Some((path, name, None)),
+            Dword(path, name, _, _) | Backing::Text(path, name, _) => Some((path, name, None)),
             Retired(_) => None,
             Flag(flag) => Some((flag.path, "Settings", Some(flag))),
         })
@@ -387,6 +420,49 @@ mod tests {
     }
 
     #[test]
+    fn explorer_shortcut_and_removable_drive_preferences_round_trip() {
+        let user = super::super::tests::TestRegistry::new();
+        let machine = super::super::tests::TestRegistry::new();
+        let (user, machine) = (&user.key, &machine.key);
+        let build = 26300;
+        let revision = 9974;
+        let settings = || settings_in(user, machine, build, revision).unwrap();
+        assert!(!settings().contains_key(&RemovableDrivesOnlyInThisPc));
+        machine
+            .create_subkey(format!(r"{DELEGATE_FOLDERS_KEY}\{REMOVABLE_CLSID}"))
+            .unwrap();
+        let original = original_settings_in(user, machine, true).unwrap();
+        save_originals(user, build, revision).unwrap();
+        let selected = BTreeMap::from([(OmitShortcutSuffix, 1), (RemovableDrivesOnlyInThisPc, 1)]);
+        let changes = changes_in(user, &selected).unwrap();
+        apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
+        let state = settings();
+        assert!(selected.iter().all(|(preference, value)| {
+            state[preference].value == *value && state[preference].recommended.is_none()
+        }));
+        let state = settings_in(user, machine, 26200, revision).unwrap();
+        assert!(selected.iter().all(|(preference, value)| state[preference].value == *value));
+        let off = BTreeMap::from([(OmitShortcutSuffix, 0), (RemovableDrivesOnlyInThisPc, 0)]);
+        assert!(changes_in(user, &off).unwrap().iter().all(|change| change.value.is_none()));
+        let policy = machine.create_subkey(NON_ENUM_KEYS[0]).unwrap().0;
+        policy.set_value(REMOVABLE_CLSID, &1u32).unwrap();
+        assert!(!settings().contains_key(&RemovableDrivesOnlyInThisPc));
+        policy.delete_value(REMOVABLE_CLSID).unwrap();
+        let mut restore = super::super::original_changes(user, machine, &original).unwrap();
+        restore.extend(original_changes(user, build, revision).unwrap());
+        let restore = pending_changes(restore).unwrap();
+        assert_eq!(restore.len(), selected.len());
+        apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
+        let state = settings();
+        assert!(selected.keys().all(|preference| state[preference].value == 0));
+        let Backing::Text(path, name, _) = OmitShortcutSuffix.definition().1 else {
+            unreachable!();
+        };
+        user.create_subkey(path).unwrap().0.set_value(name, &"Custom").unwrap();
+        assert!(!settings().contains_key(&OmitShortcutSuffix));
+    }
+
+    #[test]
     fn shell_changes_preserve_retired_preferences_and_restore_layout_flags() {
         let registry = super::super::tests::TestRegistry::new();
         let user = &registry.key;
@@ -414,7 +490,7 @@ mod tests {
         let changes = changes_in(user, &selected).unwrap();
         assert_eq!(changes.len(), selected.len());
         apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
-        let state = settings_in(user, 26300, 9711).unwrap();
+        let state = settings_in(user, user, 26300, 9711).unwrap();
         assert_eq!(state[&TaskbarAutoHide].recommended, None);
         assert_eq!(state[&TaskbarCombine].recommended, None);
         assert!(!state.contains_key(&StartDocumentsShortcut));

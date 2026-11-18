@@ -249,8 +249,8 @@ mod tests {
 
 pub(super) const NETWORK_KEY: &str =
     r"Software\Classes\CLSID\{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}";
-const REMOVABLE_CLSID: &str = "{F5FB2C77-0E2F-4A16-A381-3E560C68BC83}";
-const NON_ENUM_KEYS: [&str; 2] = [
+pub(super) const REMOVABLE_CLSID: &str = "{F5FB2C77-0E2F-4A16-A381-3E560C68BC83}";
+pub(super) const NON_ENUM_KEYS: [&str; 2] = [
     r"Software\Microsoft\Windows\CurrentVersion\Policies\NonEnum",
     r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Policies\NonEnum",
 ];

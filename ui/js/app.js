@@ -78,6 +78,7 @@ for (const [group, preferences] of Object.entries({
     ["sharing_wizard", "Use the Sharing Wizard", "Uses the guided file and folder sharing interface."],
     ["hide_folder_merge_conflicts", "Hide folder merge conflicts", "Skips the folder merge confirmation when destination folders share the same name."],
     ["explorer_typing", "When typing in a folder", "Choose how File Explorer handles typing while the file list has focus.", ["Select the typed item", "Type into the search box"]],
+    ["omit_shortcut_suffix", "Omit the shortcut name suffix", "Leaves “- Shortcut” off the names of newly created shortcuts."],
   ],
   "explorer-visibility": [
     ["drive_letters", "Drive letters", "Choose where drive letters appear relative to drive names.", ["After drive names", "Before network drive names", "Hidden", null, "Before all drive names"]],
@@ -93,6 +94,7 @@ for (const [group, preferences] of Object.entries({
     ["expand_navigation_to_folder", "Expand to the open folder", "Expands the navigation tree to the folder you are viewing."],
     ["all_navigation_folders", "Show all folders in the navigation pane", "Shows the full desktop folder tree in the navigation pane."],
     ["navigation_cloud_status", "Show cloud availability status", "Shows availability indicators for synced folders in the navigation pane."],
+    ["removable_drives_only_in_this_pc", "Show removable drives only under This PC", "Hides duplicate removable drive entries in the navigation pane."],
   ],
   "explorer-privacy": [
     ["sync_provider_notifications", "Show sync provider notifications", "Shows storage and sync provider messages in File Explorer."],
