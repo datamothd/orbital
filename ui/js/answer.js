@@ -24,7 +24,7 @@ const answer = (() => {
       ["disk-mode", "Installation disk", choice([["", "Choose during Setup"], ["erase", "Erase and partition a disk"], ["existing", "Use an existing partition"]], { help: "Existing-partition installation writes Windows to the selected destination; back up its files first." })],
       ["disk", "Target disk number", { ...number("0", 0, 999), when: () => ["erase", "existing"].includes(value("disk-mode")) }],
       ["partition", "Target partition number", { ...number("1", 1, 999), when: () => value("disk-mode") === "existing", help: "Partition numbers start at 1. The partition must already be prepared for Windows Setup." }],
-      ["disk-confirm", "Confirm disk number to erase", { required: true, when: () => value("disk-mode") === "erase", help: "Every partition and file on this disk will be erased during the Windows installation. Type its number again." }]
+      ["disk-confirm", "Confirm disk number to erase", { required: true, wide: true, when: () => value("disk-mode") === "erase", help: "Every partition and file on this disk will be erased during the Windows installation. Type its number again." }]
     ]],
     ["language", ["Language & region", "globe", "Display language, keyboard and regional formats"], [
       ["language", "Language", choice(languages, { help: "Sets the setup and Windows display language, keyboard layout and regional formats. The selected language must be available in your Windows image." })]
@@ -541,6 +541,7 @@ const answer = (() => {
       }
     } finally {
       choosing = false;
+      byId("inject-xml").blur();
     }
   }
   byId("answer-back").addEventListener("click", () => { show(false); if (!injectFiles.xml) choose(); });

@@ -4,20 +4,15 @@ let settings = null;
 let busy = false;
 
 function createSettingToggle(id, key, defaultValue, onChange) {
-  const setting = { enabled: defaultValue };
+  const setting = { enabled: readSetting(key, defaultValue) };
   const toggle = byId(`${id}-toggle`);
-  try {
-    const stored = localStorage.getItem(`orbital.${key}`);
-    setting.enabled = defaultValue ? stored !== "false" : stored === "true";
-  } catch {
-  }
   function render() {
     toggle.setAttribute("aria-checked", String(setting.enabled));
     setPreferenceValue(`${id}-value`, setting.enabled ? "Enabled" : "Disabled");
   }
   toggle.addEventListener("click", () => {
     setting.enabled = !setting.enabled;
-    onChange?.();
+    onChange?.(setting.enabled);
     render();
     try {
       localStorage.setItem(`orbital.${key}`, String(setting.enabled));

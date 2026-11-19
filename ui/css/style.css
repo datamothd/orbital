@@ -26,6 +26,8 @@
   --sidebar-width: 60px;
   --sidebar-duration: 260ms;
   --sidebar-motion: var(--sidebar-duration) cubic-bezier(.2, .75, .25, 1);
+  --border-transition: border-color 160ms ease;
+  --hover-transition: var(--border-transition), background-color 160ms ease, color 160ms ease;
   --text: #fff;
   --background: #000;
   --sidebar-background: #111;
@@ -43,6 +45,15 @@
   background: var(--background);
   color-scheme: dark;
   font-size: 14px;
+}
+
+:root[data-no-animations],
+:root[data-no-animations] *,
+:root[data-no-animations] *::before,
+:root[data-no-animations] *::after,
+:root[data-no-animations] dialog::backdrop {
+  animation: none !important;
+  transition: none !important;
 }
 
 * {
@@ -362,7 +373,7 @@ summary::after {
   margin-top: auto;
   opacity: 0;
   visibility: hidden;
-  transition: opacity calc(var(--sidebar-duration) / 3) linear;
+  transition: opacity calc(var(--sidebar-duration) / 3) linear, var(--hover-transition);
 }
 
 body:where(:has(#tweaks-panel:not([hidden]) details[open], #inject-panel:not([hidden]) #answer-page:not([hidden]) details[open])) .navigation-tabs #collapse-all {
@@ -399,7 +410,7 @@ body:where(:has(#tweaks-panel:not([hidden]) details[open], #inject-panel:not([hi
   border-radius: 6px;
   opacity: 0;
   visibility: hidden;
-  transition: opacity calc(var(--sidebar-duration) / 3) linear;
+  transition: opacity calc(var(--sidebar-duration) / 3) linear, var(--hover-transition);
 }
 
 .navigation-tabs .sidebar-actions button .icon {
@@ -823,6 +834,21 @@ button {
   border: 1px solid #555;
   border-radius: 7px;
   cursor: pointer;
+}
+
+button,
+.inject-file {
+  transition: var(--hover-transition);
+}
+
+summary,
+.answer-source-form > label,
+#answer-groups > details {
+  transition: var(--border-transition);
+}
+
+button:where(:enabled:hover) {
+  border-color: #777;
 }
 
 button:hover:not(:disabled) {

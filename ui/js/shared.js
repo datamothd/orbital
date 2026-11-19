@@ -5,6 +5,26 @@ const byId = (id) => document.getElementById(id);
 const element = (tag, className = "", textContent = "") => Object.assign(document.createElement(tag), { className, textContent });
 const administratorState = value => value === true ? "granted" : value === false ? "missing" : "unknown";
 
+function readSetting(key, defaultValue) {
+  try {
+    const stored = localStorage.getItem(`orbital.${key}`);
+    return defaultValue ? stored !== "false" : stored === "true";
+  } catch {
+    return defaultValue;
+  }
+}
+
+function setAnimationEffects(enabled) {
+  document.documentElement.toggleAttribute("data-no-animations", !enabled);
+}
+
+setAnimationEffects(readSetting("animationEffects", true));
+window.addEventListener("storage", event => {
+  if (event.key === "orbital.animationEffects" || event.key === null) {
+    setAnimationEffects(readSetting("animationEffects", true));
+  }
+});
+
 let backdropDialog = null;
 function dialogOutsideBounds(event) {
   const dialog = event.target;

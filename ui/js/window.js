@@ -2,7 +2,11 @@
 
 let scrollFrame = 0;
 const scrollAnimations = new Map();
-const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", false, stopScrolling);
+createSettingToggle("animation-effects", "animationEffects", true, enabled => {
+  setAnimationEffects(enabled);
+  stopScrolling();
+});
+const smoothScrolling = createSettingToggle("smooth-scroll", "smoothScrolling", true, stopScrolling);
 let waitForWindowLayout = async () => { await new Promise(requestAnimationFrame); };
 
 function stopScrolling() {
@@ -50,7 +54,7 @@ function moveScroll(node, dx, dy) {
   const previous = scrollAnimations.get(node);
   const x = Math.max(0, Math.min((previous?.x ?? node.scrollLeft) + dx, node.scrollWidth - node.clientWidth));
   const y = Math.max(0, Math.min((previous?.y ?? node.scrollTop) + dy, node.scrollHeight - node.clientHeight));
-  if (!smoothScrolling.enabled) {
+  if (!smoothScrolling.enabled || document.documentElement.hasAttribute("data-no-animations")) {
     node.scrollLeft = x;
     node.scrollTop = y;
     return;
@@ -79,7 +83,6 @@ window.addEventListener("wheel", event => {
   }
   if (!movements.size) return;
   event.preventDefault();
-  if (!smoothScrolling.enabled) stopScrolling();
   for (const [node, movement] of movements) moveScroll(node, movement.x, movement.y);
 }, { passive: false });
 
