@@ -480,23 +480,28 @@
         </footer>
       </section>
       <section id="answer-page" aria-labelledby="answer-title" hidden>
-        <header class="answer-actions">
-          <button id="answer-back" type="button"><span class="icon icon-back" aria-hidden="true"></span> Back</button>
-          <button id="answer-reset" type="reset" form="answer-form">
-            <span class="icon icon-trash" aria-hidden="true"></span>
-            <span>Reset all changes</span>
-          </button>
+        <header class="answer-header">
+          <div class="answer-actions answer-navigation">
+            <button id="answer-back" type="button"><span class="icon icon-back" aria-hidden="true"></span> Inject</button>
+            <button id="answer-reset" type="reset" form="answer-form"><span class="icon icon-trash" aria-hidden="true"></span> Reset all</button>
+          </div>
+          <div class="answer-actions">
+            <h1 id="answer-title">Windows answer file</h1>
+            <div class="answer-document">
+              <code>autounattend.xml</code>
+              <p class="note">May contain passwords.</p>
+            </div>
+          </div>
         </header>
-        <h1 id="answer-title">Configure your installation.</h1>
-        <p class="note">Installation and initial setup only. Y = yes, N = no. Use the trashcan to forget a choice and use Windows defaults. Files may contain passwords. Presets are available.</p>
         <div class="answer-actions answer-files">
-          <button id="answer-import" type="button">Import settings / XML</button>
-          <button type="button" data-answer-save="xml">Download XML</button>
+          <button id="answer-import" type="button" title="Import settings or XML"><span class="icon icon-import" aria-hidden="true"></span> Import</button>
+          <button type="button" data-answer-save="xml"><span class="icon icon-export" aria-hidden="true"></span> Download XML</button>
+          <input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting">
         </div>
-        <div class="answer-search"><input id="answer-search" type="search" placeholder="Find a setting…" aria-label="Find an installation setting"></div>
         <form id="answer-form" novalidate autocomplete="off">
           <div id="answer-errors" role="region" aria-label="Answer file issues" tabindex="-1" hidden></div>
           <div id="answer-groups"></div>
+          <p class="note answer-no-results" role="status">No settings match your search.</p>
           <footer class="answer-actions"><p id="answer-status" class="note" role="status">Your draft stays here when you go back.</p><button class="primary" type="submit">Use answer file</button></footer>
         </form>
       </section>

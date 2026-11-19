@@ -14,32 +14,32 @@ const answer = (() => {
   const defaultEditions = ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise", "Enterprise LTSC", "Enterprise N LTSC", "IoT Enterprise LTSC"].map(edition => `Windows 11 ${edition}`);
   let isoEditions = null;
   const groups = [
-    ["installation", "Installation", [
+    ["installation", ["Installation", "chip", "Windows edition, product key and license"], [
       ["edition", "Windows edition", choice([["", "Choose during Setup"], ...defaultEditions], { help: "When an ISO is selected, this list shows its image names. Without an ISO, it shows common Windows 11 editions." })],
-      ["product-key", "Installation product key", { wide: true, placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
+      ["product-key", "Installation product key", { placeholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", help: "Leave blank to skip key entry. A supplied key must match the Windows image.", pattern: "[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}" }],
       ["product-key-ui", "Skip product key screen", choice([["", "Windows default"], ["Never", "Y"], ["Always", "N"]], { toggle: true, help: "Equivalent to skipping product-key entry during installation." })],
       ["accept-eula", "Accept Windows license terms", choice(yesNo)]
     ]],
-    ["storage", "Storage", [
+    ["storage", ["Storage", "drive", "Installation disk and partition"], [
       ["disk-mode", "Installation disk", choice([["", "Choose during Setup"], ["erase", "Erase and partition a disk"], ["existing", "Use an existing partition"]], { help: "Existing-partition installation writes Windows to the selected destination; back up its files first." })],
       ["disk", "Target disk number", { ...number("0", 0, 999), when: () => ["erase", "existing"].includes(value("disk-mode")) }],
       ["partition", "Target partition number", { ...number("1", 1, 999), when: () => value("disk-mode") === "existing", help: "Partition numbers start at 1. The partition must already be prepared for Windows Setup." }],
       ["disk-confirm", "Confirm disk number to erase", { required: true, when: () => value("disk-mode") === "erase", help: "Every partition and file on this disk will be erased during the Windows installation. Type its number again." }]
     ]],
-    ["language", "Language & region", [
+    ["language", ["Language & region", "globe", "Display language, keyboard and regional formats"], [
       ["language", "Language", choice(languages, { help: "Sets the setup and Windows display language, keyboard layout and regional formats. The selected language must be available in your Windows image." })]
     ]],
-    ["identity", "Computer name", [["computer", "Computer name", { help: "Leave blank for Windows defaults or enter * for a random name. Custom names are limited to 15 bytes." }]]],
-    ["accounts", "Local accounts", []],
-    ["welcome", "Windows welcome", [
+    ["identity", ["Computer name", "monitor", "Set a name or let Windows choose"], [["computer", "Computer name", { help: "Leave blank for Windows defaults or enter * for a random name. Custom names are limited to 15 bytes." }]]],
+    ["accounts", ["Local accounts", "users", "Create users and set passwords"], []],
+    ["welcome", ["Windows welcome", "start-menu", "Choose which first-run screens to skip"], [
       ["hide-license", "Skip license terms page", choice(yesNo)], ["hide-oem", "Skip manufacturer registration", choice(yesNo)],
       ["hide-online", "Skip Microsoft account screens", choice(yesNo, { help: "Configure a local account. Support depends on the Windows image." })],
       ["hide-wireless", "Skip Wi-Fi setup screen", choice(yesNo)]
     ]],
-    ["privacy", "Setup privacy", [
+    ["privacy", ["Setup privacy", "shield", "Optional data sharing during setup"], [
       ["protection", "Decline optional setup data sharing", choice([["", "Windows default"], ["3", "Y"], ["1", "N"]], { toggle: true, help: "Y chooses the privacy-friendly answers for the setup privacy page using Microsoft's bundled answer-file setting. Individual choices depend on the Windows image; required diagnostic data can still be sent." })]
     ]],
-    ["advanced", "Advanced XML", [
+    ["advanced", ["Advanced XML", "terminal", "Edit or supply a complete answer file"], [
       ["mode", "Answer file source", choice([["guided", "Installation settings"], ["xml", "Complete XML"]], { value: "guided" })],
       ["xml", "Complete answer file", { type: "textarea", wide: true, required: true, when: () => value("mode") === "xml", help: "This XML is used as the answer file. Copy settings to XML replaces it with the current installation settings." }]
     ]]
@@ -49,37 +49,6 @@ const answer = (() => {
   };
   const rowLabels = { accounts: "local account" };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
-  function layoutFields(grids) {
-    for (const grid of grids) {
-      if (!grid.clientWidth) continue;
-      const style = getComputedStyle(grid), gap = parseFloat(style.columnGap) || 0;
-      const columnWidth = (grid.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0) - gap) / 2;
-      for (const field of grid.querySelectorAll(":scope > .answer-field:not(.answer-wide)")) {
-        if (!field.getClientRects().length) continue;
-        const title = field.querySelector(".answer-field-label"), children = [...title.children];
-        const width = children.reduce((total, child) => total + child.getBoundingClientRect().width, 0) + (children.length - 1) * (parseFloat(getComputedStyle(title).columnGap) || 0);
-        field.classList.toggle("answer-auto-wide", width > columnWidth);
-      }
-      const children = [...grid.children];
-      for (const child of children) child.classList.remove("answer-stacked-dropdown");
-      if (getComputedStyle(grid).gridTemplateColumns.split(" ").length !== 2) continue;
-      const layoutRows = [];
-      for (const child of children) {
-        if (!child.getClientRects().length) continue;
-        const wide = child.classList.contains("answer-wide") || child.classList.contains("answer-auto-wide");
-        const last = layoutRows.at(-1);
-        if (!wide && last?.length === 1 && !last[0].classList.contains("answer-wide") && !last[0].classList.contains("answer-auto-wide")) last.push(child);
-        else layoutRows.push([child]);
-      }
-      for (let index = 0; index < layoutRows.length - 1; index++) {
-        const first = layoutRows[index], second = layoutRows[index + 1];
-        if (first.length === 1 && second.length === 1 && first[0].classList.contains("answer-field") && second[0].classList.contains("answer-field")) {
-          for (const field of [first[0], second[0]]) if (field.querySelector(":scope > .answer-dropdown")) field.classList.add("answer-stacked-dropdown");
-        }
-      }
-    }
-  }
-  const fieldLayout = new ResizeObserver(entries => requestAnimationFrame(() => layoutFields(entries.map(entry => entry.target))));
   let rowId = 0, initialized = false;
   const read = control => control.type === "password" ? control.value : control.value.trim();
   const value = id => !controls.has(id) || controls.get(id).disabled ? "" : read(controls.get(id));
@@ -127,20 +96,17 @@ const answer = (() => {
     wrapper.append(title, input);
     if (config.toggle) {
       const buttons = element("div", "answer-toggle"); buttons.setAttribute("role", "group"); buttons.setAttribute("aria-label", label);
-      for (const [key, text] of config.choices.slice(1)) {
-        const button = actionButton(text === "N" ? "answer-no" : "", text, text === "Y" ? "Yes" : "No");
+      for (const [key, text] of config.choices) {
+        const caption = key === "" ? "Default" : text === "Y" ? "Yes" : "No";
+        const button = actionButton("", caption, key === "" ? "Windows default" : caption);
         button.dataset.value = key;
         button.addEventListener("click", () => { input.value = key; update(); });
         buttons.append(button);
       }
-      const forget = actionButton("answer-forget", "", `Forget change: ${label}`);
-      forget.title = "Forget change (Windows default)";
-      forget.append(element("span", "icon icon-trash"));
-      forget.addEventListener("click", () => { input.value = ""; update(); }); buttons.append(forget); wrapper.append(buttons);
+      wrapper.append(buttons);
     }
     for (const picker of wrapper.querySelectorAll("select")) dropdown(picker, label);
     parent.append(wrapper);
-    fieldLayout.observe(parent);
     return input;
   }
   function addRow(kind, values = {}) {
@@ -161,10 +127,13 @@ const answer = (() => {
   function initialize() {
     if (initialized) return;
     initialized = true;
-    for (const [id, title, fields] of groups) {
-      const section = element("details"), summary = element("summary", "", title), count = element("span", "answer-count");
+    for (const [id, [title, iconName, description], fields] of groups) {
+      const section = element("details"), summary = element("summary"), count = element("span", "answer-count");
+      const icon = element("span", "answer-group-icon"), label = element("span", "answer-group-label");
+      icon.setAttribute("aria-hidden", "true"); icon.append(element("span", `icon icon-${iconName}`));
+      label.append(element("strong", "", title), element("span", "note", description));
       section.id = `answer-group-${id}`; section.open = id === "installation";
-      count.append(element("span")); count.hidden = true; summary.append(count); section.append(summary);
+      count.append(element("span")); count.hidden = true; summary.append(icon, label, count); section.append(summary);
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
       if (rowFields[id]) {
@@ -181,6 +150,12 @@ const answer = (() => {
     byId("answer-form").addEventListener("input", update);
     byId("answer-form").addEventListener("change", update);
     byId("answer-form").addEventListener("reset", () => { for (const list of lists.values()) list.replaceChildren(); byId("answer-search").value = ""; requestAnimationFrame(update); });
+    const workspace = byId("workspace"), page = byId("answer-page");
+    const syncDivider = () => page.toggleAttribute("data-scroll-end", workspace.scrollHeight - workspace.clientHeight - workspace.scrollTop < 1);
+    workspace.addEventListener("scroll", syncDivider);
+    const footerLayout = new ResizeObserver(syncDivider);
+    footerLayout.observe(page);
+    footerLayout.observe(workspace);
     refreshEditions();
     update();
   }
@@ -204,7 +179,6 @@ const answer = (() => {
       control.closest(".answer-field").hidden = control.disabled = !visible;
       if (config.toggle) {
         for (const button of control.parentElement.querySelectorAll("[data-value]")) button.setAttribute("aria-pressed", String(button.dataset.value === control.value));
-        control.parentElement.querySelector(".answer-forget").disabled = !control.value;
       }
     }
     lists.get("accounts").nextElementSibling.disabled = rows("accounts").length >= 500;
@@ -215,13 +189,12 @@ const answer = (() => {
       control.setDisabled(picker.disabled);
     }
     filterSearch(byId("answer-search").value.trim().toLowerCase());
-    requestAnimationFrame(() => layoutFields(byId("answer-groups").querySelectorAll(".answer-grid")));
     if (value("mode") === "xml") sections.get("advanced").open = true;
     renderIssues(validate());
   }
   function filterSearch(term) {
     const matches = text => text.toLowerCase().includes(term);
-    for (const [id, title] of groups) {
+    for (const [id, [title]] of groups) {
       const section = sections.get(id), categoryMatches = Boolean(term && matches(title));
       let hasMatch = false;
       for (const child of section.querySelector(":scope > .answer-grid").children) {
@@ -310,7 +283,7 @@ const answer = (() => {
       for (const section of affected) counts.set(section, (counts.get(section) || 0) + 1);
     }
     for (const section of [...sections.values(), ...Object.keys(rowFields).flatMap(rows)]) { const badge = section.querySelector(".answer-count"), count = counts.get(section) || 0; badge.hidden = !count; badge.firstChild.textContent = count; badge.setAttribute("aria-label", `${count} blocking issues`); }
-    if (scroll && issues.length) { const page = byId("workspace"); page.scrollTo(0, page.scrollTop + byId("answer-search").getBoundingClientRect().bottom); summary.focus({ preventScroll: true }); }
+    if (scroll && issues.length) { summary.scrollIntoView({ block: "start" }); summary.focus({ preventScroll: true }); }
   }
   function status(text, error = false) {
     const notice = byId("answer-status");
@@ -489,7 +462,7 @@ const answer = (() => {
   presetSelection.id = "answer-preset-selection";
   presetButton.setAttribute("aria-labelledby", presetSelection.id);
   presetMenu.setAttribute("aria-label", "Presets");
-  byId("answer-page").querySelector(".answer-files").append(presetButton);
+  byId("answer-page").querySelector(".answer-files").prepend(presetButton);
   document.body.append(presetMenu);
   const presetPicker = createChoicePicker(
     presetButton, presetMenu, presetSelection,

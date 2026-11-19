@@ -138,7 +138,7 @@ if (appWindow) {
         workspace.setAttribute("data-window-content-fits", "");
         const contentHeight = Math.ceil(main.getBoundingClientRect().height);
         const workspaceHeight = workspace.clientHeight;
-        const height = workspaceHeight + titleBar.offsetHeight + pendingBar.offsetHeight;
+        const height = workspace.offsetHeight + titleBar.offsetHeight + pendingBar.offsetHeight;
         needsScrollbar = contentHeight > workspaceHeight;
         const width = baseWidth + (needsScrollbar ? scrollbarWidth : 0);
         if (width !== lastWidth || height !== lastHeight) {
