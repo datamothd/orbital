@@ -711,6 +711,12 @@ dl {
   max-width: 100%;
   height: auto;
   aspect-ratio: 1;
+  filter: drop-shadow(0 0 6px transparent);
+  transition: filter 140ms ease;
+}
+
+body:has(.navigation-tabs:is(:hover, :has(:focus-visible))) #bohr {
+  filter: drop-shadow(0 0 6px #fff3);
 }
 
 .changes-count,
