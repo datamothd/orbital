@@ -173,7 +173,6 @@ body:not(:has(#window-titlebar)) .workspace-corners {
   flex: 1;
   height: 100%;
   -webkit-app-region: drag;
-  app-region: drag;
 }
 
 #window-titlebar button {
