@@ -17,7 +17,7 @@ async function openTerminal() {
   }
 }
 
-function writeTweaksOutput(message, { error = false } = {}) {
+function writeTweaksOutput(message, { error = false, openOnError = true } = {}) {
   const text = String(message || "").replace(/\r\n?/g, "\n").trim() || "Ready.";
   const previous = terminalEntries.at(-1);
   if (previous?.text !== text || previous.error !== error) {
@@ -25,7 +25,7 @@ function writeTweaksOutput(message, { error = false } = {}) {
     if (terminalEntries.length > 200) terminalEntries.shift();
     terminalChannel.postMessage(terminalEntries);
   }
-  if (error) openTerminal();
+  if (error && openOnError) openTerminal();
 }
 
 if (terminalHistory) {

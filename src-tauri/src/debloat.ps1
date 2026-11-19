@@ -65,7 +65,10 @@ function Get-NativeInventory {
     $admin = Test-Administrator
     $parameters = @{ PackageTypeFilter = @('Main', 'Bundle', 'Framework') }
     if ($admin) { $parameters.AllUsers = $true }
-    $packages = @(Get-AppxPackage @parameters)
+    $packages = @()
+    try { $packages = @(Get-AppxPackage @parameters) }
+    catch { $warnings.Add("Could not read installed Windows apps: $($_.Exception.Message)") }
+    if ($admin) { $packages = @($packages | Where-Object { 'Installed' -in $_.PackageUserInformation.InstallState }) }
     $provisioned = @()
     if ($admin) {
         try { $provisioned = @(Get-AppxProvisionedPackage -Online) }
@@ -96,11 +99,12 @@ function Get-NativeInventory {
         if (-not (Test-Path -LiteralPath $root)) { continue }
         foreach ($key in Get-ChildItem -LiteralPath $root) {
             $id = $root + '\' + $key.PSChildName
-            $entry = Get-ItemProperty -LiteralPath $id
+            $entry = Get-ItemProperty -LiteralPath $id -ErrorAction SilentlyContinue
             if (-not $entry.DisplayName -or $entry.SystemComponent -eq 1 -or $entry.ParentKeyName) { continue }
             $blocked = ''
             $catalog = Get-CatalogId $entry
-            $noUninstaller = -not $entry.UninstallString -and -not $entry.QuietUninstallString -and $entry.WindowsInstaller -ne 1
+            $noUninstaller = $entry.WindowsInstaller -ne 1 -and
+                (-not ($entry.UninstallString -or $entry.QuietUninstallString) -or ($catalog -and -not (Get-RegisteredUninstaller $entry)))
             if ($noUninstaller -and -not $catalog) {
                 $blocked = 'This program has no registered uninstaller.'
             }
@@ -164,6 +168,14 @@ function Split-UninstallCommand([string]$CommandLine) {
         return @($matches[1].Trim(), [string]$matches[2])
     }
     throw 'This program does not register a supported executable uninstaller.'
+}
+
+function Get-RegisteredUninstaller($Entry) {
+    foreach ($line in @($Entry.QuietUninstallString, $Entry.UninstallString) | Where-Object { $_ } | Select-Object -Unique) {
+        try { $parts = Split-UninstallCommand $line }
+        catch { continue }
+        if ([IO.Path]::IsPathRooted($parts[0]) -and (Test-Path -LiteralPath $parts[0] -PathType Leaf)) { return $parts }
+    }
 }
 
 function Invoke-Uninstaller([string]$Executable, [string]$Arguments) {
@@ -259,6 +271,14 @@ function Get-RemovalProvisioning([switch]$Refresh) {
     return $script:removalProvisioning
 }
 
+function Get-InstalledAppPackages($Id, [bool]$AllUsers) {
+    $parameters = @{ Name = [WildcardPattern]::Escape($Id); PackageTypeFilter = @('Main', 'Bundle', 'Framework') }
+    if ($AllUsers) { $parameters.AllUsers = $true }
+    Get-AppxPackage @parameters | Where-Object {
+        $_.Name -eq $Id -and (-not $AllUsers -or 'Installed' -in $_.PackageUserInformation.InstallState)
+    }
+}
+
 function Remove-NativeApp($Request) {
     $script:messages = [Collections.Generic.List[string]]::new()
     $script:restart = $false
@@ -269,76 +289,89 @@ function Remove-NativeApp($Request) {
         if ($Request.kind -ne 'appx') { $script:provisioningValid = $false }
         switch ($Request.kind) {
             'appx' {
-                Assert-Administrator
-                $packageName = [WildcardPattern]::Escape($id)
-                $packages = @(Get-AppxPackage -AllUsers -Name $packageName -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.Name -eq $id })
-                $staged = @(Get-RemovalProvisioning | Where-Object { $_.DisplayName -eq $id })
+                $admin = Test-Administrator
+                $packages = @(Get-InstalledAppPackages $id $admin)
                 if (@($packages | Where-Object { $_.NonRemovable -or $_.IsFramework -or $_.IsResourcePackage }).Count) { throw 'Windows protects this package or other apps depend on it.' }
-                if (-not $packages.Count -and -not $staged.Count) { throw 'This app is no longer installed or provisioned. Refresh the list.' }
                 $errors = [Collections.Generic.List[string]]::new()
-                foreach ($package in ($packages | Sort-Object @{ Expression = { $_.IsBundle }; Descending = $true })) {
-                    try {
-                        $stillInstalled = @(Get-AppxPackage -AllUsers -Name $packageName -PackageTypeFilter Main, Bundle, Framework | Where-Object { $_.PackageFullName -eq $package.PackageFullName })
-                        if (-not $stillInstalled.Count) { continue }
-                        Remove-AppxPackage -Package $package.PackageFullName -AllUsers
-                        $script:messages.Add("Removed for all users: $($package.PackageFullName)")
-                    } catch { $errors.Add($_.Exception.Message) }
+                $staged = @()
+                $provisioningFailed = $false
+                if ($admin) {
+                    try { $staged = @(Get-RemovalProvisioning | Where-Object { $_.DisplayName -eq $id }) }
+                    catch { $provisioningFailed = $true; $errors.Add($_.Exception.Message) }
                 }
                 foreach ($package in $staged) {
                     try {
-                        $result = Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -AllUsers
+                        $result = Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName
                         $script:restart = $script:restart -or [bool]$result.RestartNeeded
-                        $script:messages.Add("Removed provisioning for new accounts: $($package.PackageName)")
+                        $script:messages.Add("Deprovisioned $($package.PackageName)")
                     } catch { $errors.Add($_.Exception.Message) }
                 }
-                $remaining = @(Get-AppxPackage -AllUsers -Name $packageName | Where-Object { $_.Name -eq $id })
-                $remainingStaged = @(Get-RemovalProvisioning -Refresh | Where-Object { $_.DisplayName -eq $id })
-                if ($remaining.Count -or $remainingStaged.Count) { $errors.Add('Windows still reports installed or provisioned packages. A restart may be required.') }
-                if ($errors.Count) { throw ($errors -join "`n") }
+                if ($staged.Count) { $packages = @(Get-InstalledAppPackages $id $admin) }
+                $scope = @{}
+                if ($admin) { $scope.AllUsers = $true }
+                foreach ($package in $packages | Sort-Object @{ Expression = { $_.IsBundle }; Descending = $true }) {
+                    try {
+                        Remove-AppxPackage -Package $package.PackageFullName @scope
+                    } catch { $errors.Add($_.Exception.Message) }
+                }
+                $remaining = @(Get-InstalledAppPackages $id $admin)
+                $remainingStaged = @()
+                if ($staged.Count) {
+                    try { $remainingStaged = @(Get-RemovalProvisioning -Refresh | Where-Object { $_.DisplayName -eq $id }) }
+                    catch { $provisioningFailed = $true; $errors.Add($_.Exception.Message) }
+                }
+                if ($remaining.Count -or $remainingStaged.Count -or $provisioningFailed) {
+                    $errors.Add('Could not verify complete removal from Windows.')
+                    throw ($errors -join "`n")
+                }
+                $script:messages.Add('Windows reports no remaining packages in the selected scope.')
             }
             'desktop' {
                 if ($id -in @('Microsoft.Edge', 'Microsoft.OneDrive')) {
                     if (-not $permanent) { throw 'Bundled component files require permanent removal to be acknowledged first.' }
-                    $paths = @(Get-BundledPaths $id | Where-Object { Test-Path -LiteralPath (Join-Path $_.Root $_.Relative) })
-                    if (-not $paths.Count) { throw 'These bundled component files are no longer present. Refresh the list.' }
+                    foreach ($root in Get-DesktopRoots) {
+                        foreach ($entry in Get-ItemProperty -Path "$root\*" -ErrorAction SilentlyContinue) {
+                            if ((Get-CatalogId $entry) -eq $id -and ($entry.WindowsInstaller -eq 1 -or (Get-RegisteredUninstaller $entry))) {
+                                throw 'A registered uninstaller is now available. Refresh to use it.'
+                            }
+                        }
+                    }
                     Remove-BundledFiles $id
                     break
                 }
                 Assert-DesktopIdentity $id
                 if ($id -like '*HKEY_LOCAL_MACHINE*') { Assert-Administrator }
+                if (-not (Test-Path -LiteralPath $id)) { break }
                 $entry = Get-ItemProperty -LiteralPath $id
                 if ($entry.SystemComponent -eq 1 -or $entry.ParentKeyName) { throw 'This is a protected component or a child of another installer.' }
                 if ([string]$entry.DisplayVersion -ne [string]$Request.version) { throw 'This program changed since the list was loaded. Refresh before removing it.' }
                 $catalog = Get-CatalogId $entry
-                if ($permanent -and $catalog) { Assert-Administrator }
-                $uninstallError = $null
+                $parts = @(Get-RegisteredUninstaller $entry)
+                if ($entry.WindowsInstaller -ne 1 -and -not $parts.Count) {
+                    if (-not ($permanent -and $catalog)) { throw 'No usable registered uninstaller was found.' }
+                    Remove-BundledFiles $catalog
+                    if (Test-Path -LiteralPath $id) { Remove-Item -LiteralPath $id -Recurse -Force }
+                    break
+                }
                 try {
                     if ($entry.WindowsInstaller -eq 1) {
                         $product = Split-Path $id -Leaf
                         if ($product -notmatch '^\{[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}$') { throw 'Invalid MSI product code.' }
                         Invoke-Uninstaller (Join-Path $env:SystemRoot 'System32\msiexec.exe') "/x $product /passive /norestart"
                     } else {
-                        $line = [string]$entry.QuietUninstallString
-                        if (-not $line) { $line = [string]$entry.UninstallString }
-                        $parts = Split-UninstallCommand $line
                         Invoke-Uninstaller $parts[0] $parts[1]
                     }
                     $script:messages.Add('Completed the registered program uninstaller.')
-                } catch { $uninstallError = $_.Exception.Message }
-                if ($permanent -and $catalog) {
-                    Remove-BundledFiles $catalog
-                    if (Test-Path -LiteralPath $id) { Remove-Item -LiteralPath $id -Recurse -Force }
-                    if ($uninstallError) { $script:messages.Add("The registered uninstaller failed; component files were removed permanently. $uninstallError") }
-                } else {
-                    if ($uninstallError) { throw $uninstallError }
-                    if ((Test-Path -LiteralPath $id) -and -not $script:restart) { throw 'The program is still registered after its uninstaller finished. Complete any installer prompts, then refresh.' }
+                } catch {
+                    if (Test-Path -LiteralPath $id) { throw }
                 }
+                if ((Test-Path -LiteralPath $id) -and -not $script:restart) { throw 'The program is still registered after its uninstaller finished. Complete any installer prompts, then refresh.' }
             }
             'feature' {
                 Assert-Administrator
                 $feature = @(Get-WindowsOptionalFeature -Online | Where-Object { $_.FeatureName -eq $id })
-                if ($feature.Count -ne 1) { throw 'This optional feature is no longer available. Refresh the list.' }
-                if ([string]$feature[0].State -eq 'Disabled' -and -not $permanent) { throw 'This feature is already disabled. Permanent removal must be acknowledged to request payload removal.' }
+                if (-not $feature.Count -or [string]$feature[0].State -eq 'DisabledWithPayloadRemoved' -or
+                    ([string]$feature[0].State -eq 'Disabled' -and -not $permanent)) { break }
                 $parameters = @{ Online = $true; FeatureName = $id; NoRestart = $true }
                 if ($permanent) { $parameters.Remove = $true }
                 $result = Disable-WindowsOptionalFeature @parameters
@@ -350,7 +383,7 @@ function Remove-NativeApp($Request) {
                 if (-not $permanent) { throw 'Removing this capability deletes component files. Enable permanent removal and acknowledge the warning first.' }
                 Assert-Administrator
                 $capability = @(Get-WindowsCapability -Online | Where-Object { $_.Name -eq $id -and [string]$_.State -eq 'Installed' })
-                if ($capability.Count -ne 1) { throw 'This capability is no longer installed. Refresh the list.' }
+                if (-not $capability.Count) { break }
                 $result = Remove-WindowsCapability -Online -Name $id
                 $script:restart = [bool]$result.RestartNeeded
                 $script:messages.Add('Removed the Windows capability and its installed payload. Reinstallation requires Windows Update or installation media.')

@@ -13,6 +13,9 @@ const answer = (() => {
   const number = (value, min, max) => ({ type: "number", value, min, max, required: true });
   const defaultEditions = ["Home", "Home N", "Pro", "Pro N", "Pro Education", "Pro for Workstations", "Education", "Enterprise", "Enterprise LTSC", "Enterprise N LTSC", "IoT Enterprise LTSC"].map(edition => `Windows 11 ${edition}`);
   let isoEditions = null;
+  const setupApps = defaultWindowsApps.filter(app => app.kind === "appx");
+  const widgetApp = setupApps.splice(setupApps.findIndex(app => app.id === "MicrosoftWindows.Client.WebExperience"), 1)[0];
+  setupApps.splice(setupApps.findIndex(app => app.id === "Microsoft.HEVCVideoExtension") + 1, 0, widgetApp);
   const groups = [
     ["installation", ["Installation", "chip", "Windows edition, product key and license"], [
       ["edition", "Windows edition", choice([["", "Choose during Setup"], ...defaultEditions], { help: "When an ISO is selected, this list shows its image names. Without an ISO, it shows common Windows 11 editions." })],
@@ -36,6 +39,14 @@ const answer = (() => {
       ["hide-online", "Skip Microsoft account screens", choice(yesNo, { help: "Configure a local account. Support depends on the Windows image." })],
       ["hide-wireless", "Skip Wi-Fi setup screen", choice(yesNo)]
     ]],
+    ["setup-options", ["Setup options", "chip", "Hardware checks and first-run networking"], [
+      ["skip-hardware-checks", "Skip Windows 11 hardware checks", choice(yesNo, { help: "Attempts to bypass Setup eligibility checks. Success depends on the Windows build and hardware." })],
+      ["offline-setup", "Keep first-run setup offline", choice(yesNo, { help: "Temporarily disables enabled network adapters and restores them at sign-in. Requires a local account configured here." })]
+    ]],
+    ["default-apps", ["Default Windows apps", "apps", "Choose apps to deprovision before first sign-in"], [
+      ["deprovision-apps", "Deprovision selected apps", choice(yesNo, { help: "Removes provisioning for the apps selected below. Apps absent from the target image are skipped." })],
+      ...setupApps.map(app => [app.id, app.name, { checkbox: true, help: app.caution, when: () => value("deprovision-apps") === "true" }])
+    ]],
     ["privacy", ["Setup privacy", "shield", "Optional data sharing during setup"], [
       ["protection", "Decline optional setup data sharing", choice([["", "Windows default"], ["3", "Y"], ["1", "N"]], { toggle: true, help: "Y chooses the privacy-friendly answers for the setup privacy page using Microsoft's bundled answer-file setting. Individual choices depend on the Windows image; required diagnostic data can still be sent." })]
     ]],
@@ -50,7 +61,8 @@ const answer = (() => {
   const rowLabels = { accounts: "local account" };
   const controls = new Map(), sections = new Map(), lists = new Map(), pickers = new WeakMap();
   let rowId = 0, initialized = false;
-  const read = control => control.type === "password" ? control.value : control.value.trim();
+  let syncAppSelection;
+  const read = control => control.type === "checkbox" ? control.checked ? "true" : "" : control.type === "password" ? control.value : control.value.trim();
   const value = id => !controls.has(id) || controls.get(id).disabled ? "" : read(controls.get(id));
   const rows = kind => [...lists.get(kind).children];
   const rowControl = (row, key) => row.querySelector(`[data-key="${key}"]`);
@@ -76,9 +88,9 @@ const answer = (() => {
     }));
   }
   function field(parent, id, label, config) {
-    const wrapper = element(config.choices ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}`), title = element("span", "answer-field-label"), caption = element("span", "", label);
+    const wrapper = element(config.choices ? "div" : "label", `answer-field${config.wide || config.toggle ? " answer-wide" : ""}${config.toggle ? " answer-binary" : ""}${config.checkbox ? " answer-app-choice" : ""}`), title = element("span", "answer-field-label"), caption = element("span", "", label);
     title.append(caption);
-    if (!config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) caption.append(element("small", "answer-optional", "(optional)"));
+    if (!config.checkbox && !config.toggle && !config.required && !config.value && (!config.choices || config.choices.some(([key]) => key === ""))) caption.append(element("small", "answer-optional", "(optional)"));
     if (config.help) {
       const help = element("span", "answer-info icon icon-info");
       help.title = config.help; help.tabIndex = 0; help.setAttribute("aria-label", config.help);
@@ -87,7 +99,7 @@ const answer = (() => {
     const input = element(config.toggle ? "input" : config.choices ? "select" : config.type === "textarea" ? "textarea" : "input");
     if (config.toggle) input.hidden = true;
     else if (config.choices) for (const [key, text] of config.choices) input.add(new Option(text, key, key === (config.value ?? ""), key === (config.value ?? "")));
-    else if (input.tagName === "INPUT") input.type = config.type || "text";
+    else if (input.tagName === "INPUT") input.type = config.checkbox ? "checkbox" : config.type || "text";
     input.id = `answer-${id}`; input.dataset.key = id; input.dataset.label = label;
     for (const key of ["placeholder", "min", "max", "maxLength", "pattern", "required"]) if (config[key] != null) input[key] = config[key];
     if (input.type === "number") input.step = "1";
@@ -124,6 +136,133 @@ const answer = (() => {
     remove.addEventListener("click", event => { event.preventDefault(); const focus = (row.nextElementSibling || row.previousElementSibling)?.querySelector("summary") || lists.get(kind).nextElementSibling; row.remove(); update(); focus.focus(); });
     summary.append(title, count, remove); row.append(summary, grid); lists.get(kind).append(row); update();
   }
+  function addAppSelection(sectionGrid) {
+    const grid = element("div", "answer-grid answer-wide answer-app-scroll");
+    grid.tabIndex = 0;
+    grid.setAttribute("role", "region");
+    grid.setAttribute("aria-label", "Default Windows apps");
+    grid.append(...sectionGrid.querySelectorAll(".answer-app-choice"));
+    sectionGrid.append(grid);
+    const choices = [...grid.querySelectorAll(".answer-app-choice input")];
+    const available = () => choices.filter(input => !input.disabled && !input.parentElement.classList.contains("answer-search-hidden"));
+    const toggleRow = controls.get("deprovision-apps").parentElement;
+    const bulk = element("div", "answer-toggle answer-app-bulk");
+    const selectAll = actionButton("answer-app-select-all", "Select all");
+    const workspace = byId("workspace");
+    const footer = byId("answer-form").querySelector("footer");
+    let drag = null, frame = 0, suppressClick = false;
+    selectAll.removeAttribute("aria-label");
+    selectAll.removeAttribute("title");
+    bulk.append(selectAll);
+    toggleRow.querySelector(".answer-toggle").before(bulk);
+    selectAll.addEventListener("click", () => {
+      const inputs = available();
+      const checked = inputs.some(input => !input.checked);
+      for (const input of inputs) input.checked = checked;
+      update();
+    });
+
+    function finishDrag(cancelled = false) {
+      if (!drag) return;
+      const previous = drag;
+      drag = null;
+      cancelAnimationFrame(frame);
+      grid.classList.remove("is-selecting");
+      if (grid.hasPointerCapture(previous.pointerId)) grid.releasePointerCapture(previous.pointerId);
+      if (previous.active) {
+        suppressClick = true;
+        if (cancelled) {
+          for (const [input, checked] of previous.initial) input.checked = checked;
+          update();
+        }
+      }
+    }
+
+    function paintChoice(input) {
+      if (!input || input.disabled || !grid.contains(input) || input.checked === drag.selecting) return;
+      drag.initial.set(input, input.checked);
+      input.checked = drag.selecting;
+      syncAppSelection();
+    }
+
+    function paintAt(x, y) {
+      paintChoice(document.elementFromPoint(x, y)?.closest(".answer-app-choice")?.querySelector("input"));
+    }
+
+    function scrollWhileSelecting() {
+      if (!drag?.active) return;
+      const bounds = grid.getBoundingClientRect(), viewport = workspace.getBoundingClientRect();
+      const top = Math.max(bounds.top, viewport.top);
+      const bottom = Math.min(bounds.bottom, viewport.bottom, footer.getBoundingClientRect().top);
+      if (bottom - top > 2 && drag.x >= bounds.left && drag.x < bounds.right) {
+        const edge = Math.min(36, (bottom - top) / 4);
+        const speed = drag.y < top + edge ? -Math.min(12, (top + edge - drag.y) / 3)
+          : drag.y > bottom - edge ? Math.min(12, (drag.y - bottom + edge) / 3) : 0;
+        if (speed) {
+          grid.scrollTop += speed;
+          paintAt(drag.x, Math.max(top + 1, Math.min(drag.y, bottom - 1)));
+        }
+      }
+      frame = requestAnimationFrame(scrollWhileSelecting);
+    }
+
+    grid.addEventListener("pointerdown", event => {
+      finishDrag(true);
+      suppressClick = false;
+      if (event.button !== 0 || event.pointerType !== "mouse") return;
+      const input = event.target.closest(".answer-app-choice")?.querySelector("input");
+      if (!input || input.disabled) return;
+      grid.classList.add("is-selecting");
+      drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+        originX: event.clientX, originY: event.clientY, start: input,
+        selecting: !input.checked, initial: new Map(), active: false };
+    });
+    window.addEventListener("pointermove", event => {
+      if (drag?.pointerId !== event.pointerId) return;
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      if (!drag.active) {
+        if (Math.hypot(drag.x - drag.originX, drag.y - drag.originY) < 6) return;
+        drag.active = true;
+        grid.setPointerCapture(drag.pointerId);
+        paintChoice(drag.start);
+        frame = requestAnimationFrame(scrollWhileSelecting);
+      }
+      event.preventDefault();
+      for (const point of event.getCoalescedEvents?.() || []) paintAt(point.clientX, point.clientY);
+      paintAt(drag.x, drag.y);
+    }, { passive: false });
+    window.addEventListener("pointerup", event => {
+      if (drag?.pointerId !== event.pointerId) return;
+      const changed = drag.active;
+      if (changed) paintAt(event.clientX, event.clientY);
+      finishDrag();
+      if (changed) update();
+    });
+    grid.addEventListener("click", event => {
+      if (!suppressClick) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClick = false;
+    }, true);
+    window.addEventListener("pointercancel", event => { if (drag?.pointerId === event.pointerId) finishDrag(true); });
+    grid.addEventListener("lostpointercapture", event => { if (drag?.pointerId === event.pointerId) finishDrag(true); });
+    window.addEventListener("blur", () => finishDrag(true));
+    window.addEventListener("keydown", event => {
+      if (event.key === "Escape" && drag?.active) {
+        event.preventDefault();
+        finishDrag(true);
+      } else if (!drag) suppressClick = false;
+    });
+    byId("answer-form").addEventListener("reset", () => finishDrag());
+    syncAppSelection = () => {
+      const inputs = available();
+      bulk.hidden = grid.hidden = !inputs.length;
+      if (inputs.length) toggleRow.classList.remove("answer-search-hidden");
+      const action = inputs.every(input => input.checked) ? "Deselect all" : "Select all";
+      selectAll.textContent = action + (inputs.length < choices.length ? " matches" : "");
+    };
+  }
   function initialize() {
     if (initialized) return;
     initialized = true;
@@ -136,6 +275,7 @@ const answer = (() => {
       count.append(element("span")); count.hidden = true; summary.append(icon, label, count); section.append(summary);
       const grid = element("div", "answer-grid");
       for (const [key, label, config] of fields) controls.set(key, field(grid, key, label, config));
+      if (id === "default-apps") addAppSelection(grid);
       if (rowFields[id]) {
         const list = element("div", "answer-wide answer-list"), add = actionButton("answer-add answer-wide", `Add ${rowLabels[id]}`);
         add.addEventListener("click", () => addRow(id)); lists.set(id, list); grid.append(list, add);
@@ -189,6 +329,7 @@ const answer = (() => {
       control.setDisabled(picker.disabled);
     }
     filterSearch(byId("answer-search").value.trim().toLowerCase());
+    syncAppSelection();
     if (value("mode") === "xml") sections.get("advanced").open = true;
     renderIssues(validate());
   }
@@ -197,7 +338,9 @@ const answer = (() => {
     for (const [id, [title]] of groups) {
       const section = sections.get(id), categoryMatches = Boolean(term && matches(title));
       let hasMatch = false;
-      for (const child of section.querySelector(":scope > .answer-grid").children) {
+      const fields = [...section.querySelector(":scope > .answer-grid").children]
+        .flatMap(child => child.classList.contains("answer-app-scroll") ? [...child.children] : [child]);
+      for (const child of fields) {
         if (child.classList.contains("answer-list")) {
           let listMatches = false;
           for (const row of child.children) {
@@ -255,6 +398,7 @@ const answer = (() => {
     if (name && name !== "*" && (utf8.encode(name).length > 15 || !/^[\p{L}\p{M}\p{N}_-]+$/u.test(name) || /^\d+$/.test(name))) add("computer", "Use a computer name up to 15 bytes with letters, numbers, underscores or hyphens; it cannot contain only numbers.");
     if (value("disk-mode") === "erase" && value("disk-confirm") && value("disk-confirm") !== String(Number(value("disk")))) add(["disk", "disk-confirm"], "Confirm disk erasure by typing the target disk number again.");
     const seen = new Map();
+    if (value("offline-setup") === "true" && !rows("accounts").length) add("offline-setup", "Add a local account before enabling offline setup.");
     for (const row of rows("accounts")) {
       const control = rowControl(row, "name"), name = rowValue(row, "name");
       if (name && (name.length > 256 || /["/\\\[\]:|<>+=;,?*%@\u0000-\u001f]/.test(name) || name.endsWith(".") || name.toUpperCase() === "NONE")) add(control, "Use a valid local account name without reserved characters.");
@@ -312,7 +456,7 @@ const answer = (() => {
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid settings entry.");
       for (const [key, text] of Object.entries(data)) {
         const config = fields.find(([id]) => id === key)?.[2];
-        if (!config || typeof text !== "string" || config.choices && !config.choices.some(([value]) => value === text) && key !== "edition") throw new Error(`Unsupported setting or value: ${key}.`);
+        if (!config || typeof text !== "string" || config.checkbox && text !== "" && text !== "true" || config.choices && !config.choices.some(([value]) => value === text) && key !== "edition") throw new Error(`Unsupported setting or value: ${key}.`);
       }
     };
     check(profile.values, groups.flatMap(([, , fields]) => fields));
@@ -324,7 +468,11 @@ const answer = (() => {
     }
     byId("answer-form").reset();
     if (isoEditions === null && profile.values.edition && ![...controls.get("edition").options].some(option => option.value === profile.values.edition)) controls.get("edition").add(new Option(profile.values.edition, profile.values.edition));
-    for (const [key, text] of Object.entries(profile.values)) controls.get(key).value = text;
+    for (const [key, text] of Object.entries(profile.values)) {
+      const control = controls.get(key);
+      if (control.type === "checkbox") control.checked = text === "true";
+      else control.value = text;
+    }
     if (!Object.hasOwn(profile.values, "product-key-ui")) controls.get("product-key-ui").value = "Never";
     for (const kind of Object.keys(rowFields)) for (const row of profile[kind] || []) addRow(kind, row);
     controls.get("disk-confirm").value = ""; update();
@@ -417,6 +565,25 @@ const answer = (() => {
       node(account, "Password/Value", rowValue(row, "password")); node(account, "Password/PlainText", "true");
     }
     const orders = {}, commands = [];
+    if (value("skip-hardware-checks") === "true") {
+      for (const check of ["TPM", "SecureBoot", "RAM", "CPU", "Storage"]) {
+        commands.push(["windowsPE", `reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v Bypass${check}Check /t REG_DWORD /d 1 /f`, `Skip the ${check} eligibility check`]);
+      }
+    }
+    const apps = setupApps.filter(app => value(app.id) === "true");
+    const offline = value("offline-setup") === "true";
+    if (apps.length || offline) {
+      const script = xml.createElementNS(extraNs, "SetupActions");
+      script.textContent = answerSetupScript(apps.map(app => app.id), offline);
+      root.append(script);
+      commands.push(["specialize", `powershell.exe -NoProfile -NonInteractive -Command "iex (([xml](gc $env:windir\\Panther\\unattend.xml -Raw)).GetElementsByTagName('SetupActions','${extraNs}')[0].InnerText)"`, "Apply Orbital setup options"]);
+    }
+    if (offline) {
+      const restore = node(component("oobeSystem", "shell"), "FirstLogonCommands/SynchronousCommand", undefined, true);
+      node(restore, "Order", 1);
+      node(restore, "Description", "Restore network adapters after first-run setup");
+      node(restore, "CommandLine", `powershell.exe -NoProfile -NonInteractive -Command "Get-ScheduledTask -TaskName 'Orbital Restore Network' -ErrorAction SilentlyContinue | Start-ScheduledTask"`);
+    }
     if (value("disk-mode") === "erase") {
       const disk = Number(value("disk"));
       const lines = [`select disk ${disk}`, "clean", "convert gpt", "create partition efi size=300", "format quick fs=fat32 label=System", "create partition msr size=16", "create partition primary", "format quick fs=ntfs label=Windows"];

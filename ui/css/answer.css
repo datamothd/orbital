@@ -260,6 +260,95 @@
   line-height: 1.5;
 }
 
+#answer-group-default-apps .answer-grid {
+  gap: 0 var(--space-2);
+}
+
+.answer-app-scroll {
+  max-height: min(240px, 50vh);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.answer-app-scroll:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: -1px;
+}
+
+#answer-group-default-apps .answer-toggle:last-child {
+  margin-inline-start: auto;
+}
+
+#answer-group-default-apps .answer-binary:has(.answer-app-bulk:not([hidden])) {
+  margin-bottom: var(--space-2);
+}
+
+.answer-app-select-all {
+  white-space: nowrap;
+}
+
+.answer-app-choice {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-start;
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.answer-grid:not(.is-selecting) .answer-app-choice:is(:hover, :has(:focus-visible)) {
+  background: var(--control);
+}
+
+.answer-app-choice .answer-field-label {
+  flex: 1;
+  align-items: flex-start;
+}
+
+.answer-app-choice .answer-info {
+  margin: 2px 0 0 auto;
+}
+
+#answer-page .answer-app-choice input {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  order: -1;
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  margin: 2px 0 0;
+  padding: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+#answer-page .answer-app-choice input:checked {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.answer-app-choice input:checked::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--background);
+  mask: url("../icons/check.png") center / contain no-repeat;
+}
+
+@media (forced-colors: active) {
+  #answer-page .answer-app-choice input {
+    appearance: auto;
+    display: block;
+  }
+
+  .answer-app-choice input:checked::before {
+    content: none;
+  }
+}
+
 .answer-field-label {
   display: flex;
   align-items: center;
@@ -285,6 +374,9 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2) var(--space-4);
+}
+
+:where(.answer-grid > :not([hidden], .answer-search-hidden)) ~ .answer-binary {
   padding-top: var(--space-2);
   border-top: 1px solid var(--border);
 }

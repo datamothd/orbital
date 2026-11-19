@@ -16,6 +16,7 @@
   <script src="js/profiles.js" defer></script>
   <script src="js/default-apps.js" defer></script>
   <script src="js/debloat.js" defer></script>
+  <script src="js/answer-setup.js" defer></script>
   <script src="js/answer.js" defer></script>
   <script src="js/inject.js" defer></script>
   <script src="js/window.js" defer></script>
@@ -363,10 +364,7 @@
                   <div class="tweaks-output uninstall-terminal" aria-label="Installed apps terminal">
                     <div class="tweaks-output-header">
                       <span class="icon icon-terminal tweaks-output-icon" aria-hidden="true"></span>
-                      <div class="uninstall-view-switch" role="group" aria-label="App list">
-                        <button id="apps-installed" type="button" aria-pressed="true">Installed apps</button>
-                        <button id="apps-default" type="button" aria-pressed="false">Default Windows apps</button>
-                      </div>
+                      <span>Installed apps</span>
                       <button id="uninstall-refresh" type="button" aria-label="Refresh installed apps" title="Refresh installed apps">
                         <span class="icon icon-refresh" aria-hidden="true"></span>
                         <span>Refresh</span>
@@ -400,6 +398,7 @@
                   <div class="uninstall-footer">
                     <div class="uninstall-feedback">
                       <p id="uninstall-selection">0 apps selected</p>
+                      <p id="uninstall-status" class="note" role="status" hidden></p>
                     </div>
                     <button id="uninstall-start" type="button" class="primary" disabled>Uninstall apps</button>
                   </div>
@@ -601,7 +600,7 @@
   </dialog>
   <dialog id="permanent-removal-confirm" aria-labelledby="permanent-removal-title" aria-describedby="permanent-removal-description">
     <h2 id="permanent-removal-title">Enable permanent removal?</h2>
-    <p id="permanent-removal-description" class="note">Allows permanent deletion of bundled app files and Windows component payloads after you confirm an uninstall. Orbital cannot undo this; dependent apps or features may need reinstallation or repair. Permission lasts until you turn this off or close Orbital.</p>
+    <p id="permanent-removal-description" class="note">Allows deletion of bundled Edge or OneDrive files when no usable uninstaller exists, and removal of selected Windows component payloads. Orbital cannot undo these changes. Permission lasts until you turn this off or close Orbital.</p>
     <form method="dialog">
       <button value="cancel" autofocus>Cancel</button>
       <button value="apply" class="primary">I understand, enable</button>

@@ -277,8 +277,7 @@
   background: transparent;
 }
 
-.uninstall-app-toggle:focus-visible,
-.uninstall-view-switch button:focus-visible {
+.uninstall-app-toggle:focus-visible {
   outline: 1px solid var(--green);
   outline-offset: -3px;
 }
@@ -369,6 +368,11 @@
   font-size: 12px;
 }
 
+#uninstall-status {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
 #uninstall-selection {
   color: var(--muted);
 }
@@ -411,24 +415,6 @@
   color: var(--muted);
 }
 
-.uninstall-view-switch {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  overflow: hidden;
-}
-.uninstall-view-switch button {
-  border: 0;
-  border-radius: 0;
-  padding: 5px 9px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.uninstall-view-switch button + button { border-left: 1px solid var(--border); }
-.uninstall-view-switch button[aria-pressed="true"] { background: #102018; color: var(--green); }
 .uninstall-terminal .tweaks-output-header { flex-wrap: nowrap; }
 .uninstall-app-state {
   display: inline-flex;
@@ -442,14 +428,7 @@
   font-size: 10px;
   white-space: nowrap;
 }
-.uninstall-app-row[data-state="installed"] .uninstall-app-state {
-  border-color: #244a32;
-  background: #102018;
-  color: var(--green);
-}
-.uninstall-app-row[data-state="not-reported"] .uninstall-app-state { border-style: dashed; }
 .uninstall-app-row[data-state="protected"] .uninstall-app-state {
   border-color: #59492a;
   color: var(--yellow);
 }
-.uninstall-app-row[data-state="not-reported"] .uninstall-app-toggle > span:first-child { color: var(--muted); }

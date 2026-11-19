@@ -29,10 +29,10 @@ const defaultWindowsApps = (() => {
     ["Windows Web Experience Pack / Widgets", "MicrosoftWindows.Client.WebExperience"],
   ];
   return [
-    ...current.map(([name, id]) => ({ name, id, kind: "appx", availability: "Windows 11; availability varies by image, region and edition" })),
-    ...components.map(([name, id]) => ({ name, id, kind: "appx", availability: "Bundled component; release/device dependent", caution: "Other apps may depend on this component." })),
-    { name: "Microsoft Edge", id: "Microsoft.Edge", kind: "desktop", availability: "Windows 11; removal availability varies by region" },
-    { name: "OneDrive", id: "Microsoft.OneDrive", kind: "desktop", availability: "Windows 11; availability varies by edition and image" },
+    ...current.map(([name, id]) => ({ name, id, kind: "appx" })),
+    ...components.map(([name, id]) => ({ name, id, kind: "appx", caution: "Other apps may depend on this component." })),
+    { name: "Microsoft Edge", id: "Microsoft.Edge", kind: "desktop" },
+    { name: "OneDrive", id: "Microsoft.OneDrive", kind: "desktop" },
   ].sort((a, b) => a.name.localeCompare(b.name));
 })();
 
