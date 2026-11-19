@@ -28,9 +28,19 @@ function openDialog(dialog) {
   dialog.showModal();
   const titleBar = byId("window-titlebar");
   if (titleBar) {
+    const logo = titleBar.querySelector(".window-logo");
+    const spin = () => logo?.getAnimations().find(animation => animation.animationName === "orbit-spin");
+    const startTime = spin()?.startTime ?? document.timeline.currentTime;
+    const restoreSpin = () => {
+      const animation = spin();
+      if (animation && startTime != null) animation.startTime = startTime;
+    };
     dialog.append(titleBar);
+    restoreSpin();
     dialog.addEventListener("close", () => {
-      if (titleBar.parentElement === dialog) document.body.prepend(titleBar);
+      if (titleBar.parentElement !== dialog) return;
+      document.body.prepend(titleBar);
+      restoreSpin();
     }, { once: true });
   }
 }
