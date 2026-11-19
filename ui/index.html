@@ -52,7 +52,7 @@
       <button id="import-tweaks" type="button" disabled aria-label="Import tweaks" title="Import tweaks from a JSON file">
         <span class="icon icon-import" aria-hidden="true"></span>
       </button>
-      <button id="export-tweaks" type="button" disabled aria-label="Export tweaks" title="Export current tweak values as JSON">
+      <button id="export-tweaks" type="button" disabled aria-label="Export tweaks" title="Review and export tweaks as JSON">
         <span class="icon icon-export" aria-hidden="true"></span>
       </button>
     </div>
@@ -541,6 +541,7 @@
   </main></div>
   <div class="workspace-corners" aria-hidden="true"><span></span><span></span><span></span></div>
   <footer id="pending-bar" aria-label="Pending preference changes" hidden>
+    <button id="pending-export-mode" type="button" aria-pressed="false">Export mode</button>
     <p id="pending-count" role="status"></p>
     <button id="pending-review" type="button" aria-haspopup="dialog" aria-controls="pending-dialog">List of changes</button>
     <button id="pending-ignore" type="button">Ignore</button>
@@ -644,7 +645,7 @@
     <h2 id="pending-title">Pending changes</h2>
     <p id="pending-description">Uncheck any changes you want to skip.</p>
     <details id="pending-options" class="changes-options" open>
-      <summary>List of changes</summary>
+      <summary id="pending-summary">List of changes</summary>
       <div class="changes-scroll recommendation-scroll">
         <p class="note"><span class="recommended-color">Recommended</span> · <span class="visual-preference">Personal preference</span></p>
         <hr class="preferences-divider" aria-hidden="true">
@@ -653,7 +654,7 @@
     </details>
     <form method="dialog">
       <button value="cancel">Cancel</button>
-      <button value="apply" class="primary" autofocus>Done</button>
+      <button id="pending-apply" value="apply" class="primary" autofocus>Done</button>
     </form>
   </dialog>
   <dialog id="import-preview" class="changes-dialog" aria-labelledby="import-title" aria-describedby="import-description">

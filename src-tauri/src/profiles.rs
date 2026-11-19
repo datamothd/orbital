@@ -1,4 +1,4 @@
-use orbital::explorer::{self, AppRemoval, TweakProfile};
+use orbital::explorer::{self, TweakProfile};
 use std::path::{Path, PathBuf};
 use windows_sys::core::w;
 
@@ -17,20 +17,23 @@ fn choose_file(owner: usize, save: bool) -> Result<Option<PathBuf>, String> {
 }
 
 #[tauri::command]
+pub async fn preview_export_tweaks() -> Result<TweakProfile, String> {
+    explorer::export_tweaks().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn export_tweaks(
     window: tauri::Window,
-    apps_to_remove: Option<Vec<AppRemoval>>,
+    mut profile: TweakProfile,
 ) -> Result<bool, String> {
+    if !profile.apps_to_remove.is_empty() {
+        profile.version = 5;
+    }
+    profile.validate().map_err(|error| error.to_string())?;
     crate::files::with_dialog(window, move |owner| {
         let Some(path) = choose_file(owner, true)? else {
             return Ok(false);
         };
-        let mut profile = explorer::export_tweaks().map_err(|error| error.to_string())?;
-        profile.apps_to_remove = apps_to_remove.unwrap_or_default();
-        if !profile.apps_to_remove.is_empty() {
-            profile.version = 5;
-        }
-        profile.validate().map_err(|error| error.to_string())?;
         let json = serde_json::to_string_pretty(&profile).map_err(|error| error.to_string())?;
         std::fs::write(path, format!("{json}\n"))
             .map_err(|error| format!("Could not save the export: {error}"))?;
@@ -68,6 +71,7 @@ pub async fn apply_imported_tweaks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use orbital::explorer::AppRemoval;
 
     #[test]
     fn app_removal_profiles_preserve_absent_apps_and_reject_ambiguous_entries() {

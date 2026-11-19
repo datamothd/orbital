@@ -80,17 +80,77 @@ function previewImport(profile) {
 
 byId("import-list").addEventListener("change", updateImportSelection);
 
-byId("export-tweaks").addEventListener("click", async () => {
+async function previewExport(profile) {
+  profile.disabled_tweaks ??= [];
+  const preferences = preferencesInPageOrder().filter(preferenceAvailable);
+  const fields = preferences.map(preference => {
+    const { field, picker, shell, label } = preference;
+    const current = shell ? profile.shell_preferences?.[field]
+      : picker ? profile[field]
+      : profile.tweaks.includes(field) ? true : profile.disabled_tweaks.includes(field) ? false : null;
+    const original = shell && !picker && current != null ? current === 1 : current ?? null;
+    const pending = pendingPreferences.get(preference);
+    let value = pending?.selected ? pending.value : original;
+    const visual = preferencePersonal(preference);
+    let row;
+    if (picker) {
+      row = element("div", visual ? "export-choice visual-preference" : "export-choice");
+      const choice = reviewChoice(preference, original, value);
+      row.append(element("span", "", label), choice.button);
+      return { row, menu: choice.menu, save() {
+        if (!preferenceMatches(preference, choice.control.selected, original)) {
+          setProfilePreference(profile, preference, choice.control.selected);
+        }
+      } };
+    } else {
+      const control = createChangeRow(field, label, preference.description, visual);
+      const { checkbox } = control;
+      row = control.row;
+      const update = () => {
+        checkbox.checked = value === true;
+        checkbox.indeterminate = value === null;
+      };
+      checkbox.addEventListener("change", () => {
+        value = original === null && value === false ? null : checkbox.checked;
+        update();
+      });
+      update();
+    }
+    return { row, save() {
+      if (value !== original) setProfilePreference(profile, preference, value);
+    } };
+  });
+  try {
+    if (!await reviewPreferences(fields.map(({ row }) => row), true)) return false;
+    for (const field of fields) field.save();
+    return true;
+  } finally {
+    closeChoicePicker();
+    for (const field of fields) field.menu?.remove();
+  }
+}
+
+async function exportPreferences(changes) {
   if (busy || !settings) return;
   setBusy(true);
   try {
-    if (await invoke("export_tweaks", { appsToRemove: window.orbitalAppSelections?.export() || [] })) showResult("Tweaks exported", "Your tweaks, folder settings and selected apps to remove were saved as JSON. App selections include apps not installed on this PC; automatic removal will be handled by future post-installation configuration.");
+    const profile = await invoke("preview_export_tweaks");
+    if (changes) {
+      profile.disabled_tweaks ??= [];
+      for (const [preference, { value }] of changes) {
+        setProfilePreference(profile, preference, value);
+      }
+    } else if (!await previewExport(profile)) return;
+    profile.apps_to_remove = window.orbitalAppSelections?.export() || [];
+    if (await invoke("export_tweaks", { profile })) showResult("Tweaks exported", "Your tweaks, folder settings and selected apps to remove were saved as JSON. App selections include apps not installed on this PC; automatic removal will be handled by future post-installation configuration.");
   } catch (error) {
     showResult("Could not export tweaks", String(error));
   } finally {
     setBusy(false);
   }
-});
+}
+
+byId("export-tweaks").addEventListener("click", () => exportPreferences());
 
 byId("import-tweaks").addEventListener("click", async () => {
   if (busy || !settings) return;

@@ -180,6 +180,7 @@ fn main() {
             inject::clear_injection_file,
             inject::inject_iso,
             inject::cancel_injection,
+            profiles::preview_export_tweaks,
             profiles::export_tweaks,
             profiles::import_tweaks,
             profiles::apply_imported_tweaks,
