@@ -39,9 +39,10 @@ const answer = (() => {
       ["hide-online", "Skip Microsoft account screens", choice(yesNo, { help: "Configure a local account. Support depends on the Windows image." })],
       ["hide-wireless", "Skip Wi-Fi setup screen", choice(yesNo)]
     ]],
-    ["setup-options", ["Setup options", "chip", "Hardware checks and first-run networking"], [
+    ["setup-options", ["Setup options", "chip", "Hardware checks, first-run networking and command windows"], [
       ["skip-hardware-checks", "Skip Windows 11 hardware checks", choice(yesNo, { help: "Attempts to bypass Setup eligibility checks. Success depends on the Windows build and hardware." })],
-      ["offline-setup", "Keep first-run setup offline", choice(yesNo, { help: "Temporarily disables enabled network adapters and restores them at sign-in. Requires a local account configured here." })]
+      ["offline-setup", "Keep first-run setup offline", choice(yesNo, { help: "Temporarily disables enabled network adapters and restores them at sign-in. Requires a local account configured here." })],
+      ["setup-command-windows", "Hide command windows", choice(yesNo, { help: "Hides Orbital’s PowerShell windows for app removal and first-run networking. WinPE commands, including disk partitioning, may still show a window." })]
     ]],
     ["default-apps", ["Default Windows apps", "apps", "Choose apps to deprovision before first sign-in"], [
       ["deprovision-apps", "Deprovision selected apps", choice(yesNo, { help: "Removes provisioning for the apps selected below. Apps absent from the target image are skipped." })],
@@ -572,29 +573,42 @@ const answer = (() => {
     }
     const apps = setupApps.filter(app => value(app.id) === "true");
     const offline = value("offline-setup") === "true";
+    const windowStyle = value("setup-command-windows") === "true" ? " -WindowStyle Hidden" : "";
+    const powershell = `powershell.exe -NoProfile -NonInteractive${windowStyle} -Command`;
     if (apps.length || offline) {
       const script = xml.createElementNS(extraNs, "SetupActions");
       script.textContent = answerSetupScript(apps.map(app => app.id), offline);
       root.append(script);
-      commands.push(["specialize", `powershell.exe -NoProfile -NonInteractive -Command "iex (([xml](gc $env:windir\\Panther\\unattend.xml -Raw)).GetElementsByTagName('SetupActions','${extraNs}')[0].InnerText)"`, "Apply Orbital setup options"]);
+      commands.push(["specialize", `${powershell} "iex (([xml](gc $env:windir\\Panther\\unattend.xml -Raw)).GetElementsByTagName('SetupActions','${extraNs}')[0].InnerText)"`, "Apply Orbital setup options"]);
     }
     if (offline) {
       const restore = node(component("oobeSystem", "shell"), "FirstLogonCommands/SynchronousCommand", undefined, true);
       node(restore, "Order", 1);
       node(restore, "Description", "Restore network adapters after first-run setup");
-      node(restore, "CommandLine", `powershell.exe -NoProfile -NonInteractive -Command "Get-ScheduledTask -TaskName 'Orbital Restore Network' -ErrorAction SilentlyContinue | Start-ScheduledTask"`);
+      node(restore, "CommandLine", `${powershell} "Get-ScheduledTask -TaskName 'Orbital Restore Network' -ErrorAction SilentlyContinue | Start-ScheduledTask"`);
     }
     if (value("disk-mode") === "erase") {
       const disk = Number(value("disk"));
-      const lines = [`select disk ${disk}`, "clean", "convert gpt", "create partition efi size=300", "format quick fs=fat32 label=System", "create partition msr size=16", "create partition primary", "format quick fs=ntfs label=Windows"];
-      lines.push("shrink desired=2048 minimum=2048", "create partition primary", "format quick fs=ntfs label=Recovery", "set id=de94bba4-06d1-4d40-a16a-bfd50179d6ac", "gpt attributes=0x8000000000000001");
-      lines.push("exit");
-      commands.push(["windowsPE", `cmd.exe /d /c "wpeutil.exe UpdateBootInfo && (reg.exe query HKLM\\SYSTEM\\CurrentControlSet\\Control /v PEFirmwareType | findstr.exe /c:0x2 >nul) && (${lines.map(line => `echo ${line}`).join("&")}) > \"%TEMP%\\OrbitalDisk.txt\" && diskpart.exe /s \"%TEMP%\\OrbitalDisk.txt\""`, "Verify firmware and partition the confirmed disk", ""]);
+      const script = '"%SystemDrive%\\OrbitalDisk.txt"';
+      const log = '"%SystemDrive%\\OrbitalDisk.log"';
+      const scriptSections = [
+        [`select disk ${disk}`, "clean", "convert gpt", "create partition efi size=300", "format quick fs=fat32 label=System", "create partition msr size=16"],
+        ["create partition primary", "format quick fs=ntfs label=Windows", "shrink desired=2048 minimum=2048", "create partition primary"],
+        ["format quick fs=ntfs label=Recovery", "set id=de94bba4-06d1-4d40-a16a-bfd50179d6ac", "gpt attributes=0x8000000000000001", "exit"]
+      ];
+      commands.push(["windowsPE", "wpeutil.exe UpdateBootInfo", "Read WinPE firmware information"]);
+      for (const [index, lines] of scriptSections.entries()) {
+        const redirect = index === 0 ? ">" : ">>";
+        commands.push(["windowsPE", `cmd.exe /d /c "${redirect}${script} (${lines.map(line => `echo ${line}`).join("&")})"`, "Write Orbital DiskPart script"]);
+      }
+      // Some stock Setup images omit findstr.exe. WinPE includes find.exe.
+      const firmware = 'reg.exe query HKLM\\SYSTEM\\CurrentControlSet\\Control /v PEFirmwareType | find.exe "0x2"';
+      commands.push(["windowsPE", `cmd.exe /d /c "(${firmware}) > ${log} 2>&1 && diskpart.exe /s ${script} >> ${log} 2>&1"`, "Verify UEFI and partition the confirmed disk"]);
       for (const [path, text] of [["DiskID", disk], ["PartitionID", 3]]) setting("windowsPE", "setup", `${destination}/${path}`, text);
       setting("windowsPE", "setup", "ImageInstall/OSImage/WillShowUI", "OnError");
     }
     for (const [pass, path, description, reboot] of commands) {
-      if (path.length > (pass === "windowsPE" ? 1024 : 259)) throw new Error("A generated installation command exceeds the Windows limit.");
+      if (path.length > (pass === "windowsPE" ? 255 : 259)) throw new Error("A generated installation command exceeds the Windows limit.");
       const kind = "RunSynchronous", orderKey = pass;
       const order = orders[orderKey] = (orders[orderKey] || 0) + 1;
       if (order > 500) throw new Error("Windows supports up to 500 commands per configuration pass.");
