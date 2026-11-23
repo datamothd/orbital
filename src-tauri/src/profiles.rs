@@ -208,7 +208,7 @@ mod tests {
             "tweaks": [],
             "folder_sort": null,
             "folder_grouping": null,
-            "shell_preferences": { "taskbar_position": 3, "start_settings_shortcut": 1 }
+            "shell_preferences": { "taskbar_position": 3, "taskbar_size": 1, "start_settings_shortcut": 1 }
         });
         let profile: TweakProfile = serde_json::from_value(json.clone()).unwrap();
         profile.validate().unwrap();
@@ -221,11 +221,11 @@ mod tests {
             "format": "orbital-tweaks",
             "version": 4,
             "tweaks": [],
-            "shell_preferences": { "taskbar_position": 3, "taskbar_combine": 2 }
+            "shell_preferences": { "taskbar_position": 3, "taskbar_size": 1, "taskbar_combine": 2, "start_settings_shortcut": 1 }
         })).unwrap();
         profile.normalize().unwrap();
         assert_eq!(serde_json::to_value(profile).unwrap()["shell_preferences"],
-            serde_json::json!({ "taskbar_combine": 2 }));
+            serde_json::json!({ "taskbar_position": 3, "taskbar_size": 1, "taskbar_combine": 2 }));
 
         let ids = serde_json::json!(["folder_view", "taskbar_position", "start_settings_shortcut"]);
         let decoded: Vec<explorer::Recommendation> = serde_json::from_value(ids.clone()).unwrap();

@@ -130,8 +130,8 @@ shell_preferences! {
     TaskbarSearch => None, Dword(SEARCH_KEY, "SearchboxTaskbarMode", 2, &[0, 1, 2, 3]);
     TaskbarWidgetsButton => Some(0), toggle(ADVANCED_KEY, "TaskbarDa", 1);
     TaskbarAutoHide => None, Flag(RegistryFlag { path: TASKBAR_LAYOUT_KEY, length: 48, offset: 8, mask: 1 });
-    TaskbarPosition => None, Retired(&[0, 1, 2, 3]);
-    TaskbarSize => None, Retired(&[0, 1]);
+    TaskbarPosition => None, Dword(ADVANCED_KEY, "TaskbarLocation", 3, &[0, 1, 2, 3]);
+    TaskbarSize => None, Dword(ADVANCED_KEY, "TaskbarSize", 0, &[0, 1]);
     TaskbarSmallerButtons => None, Retired(&[0, 1, 2]);
     TaskbarBadges => None, toggle(ADVANCED_KEY, "TaskbarBadges", 1);
     TaskbarShareWindow => None, toggle(ADVANCED_KEY, "TaskbarSn", 1);
@@ -196,7 +196,9 @@ impl ShellPreference {
                 | Self::StartAllAppsSection
                 | Self::StartHideProfile
                 | Self::SearchWebSuggestions
-                | Self::SearchStoreSuggestions => refreshed_layouts,
+                | Self::SearchStoreSuggestions
+                | Self::TaskbarPosition
+                | Self::TaskbarSize => refreshed_layouts,
                 _ if self.retired() => false,
                 _ => true,
             }
@@ -571,7 +573,11 @@ mod tests {
         }
         assert!(TaskbarCombine.supported(26200, 6584));
         assert!(!TaskbarCombine.supported(26200, 6583));
-        assert!(!TaskbarPosition.supported(26300, 9711));
+        for preference in [TaskbarPosition, TaskbarSize] {
+            assert!(preference.supported(26300, 9711));
+            assert!(preference.supported(26200, 9278));
+            assert!(!preference.supported(26200, 9277));
+        }
         assert!(!StartDocumentsShortcut.supported(26200, 9974));
         assert!(!StartPinnedSection.supported(26200, 9277));
         assert!(StartPinnedSection.supported(26200, 9278));
@@ -630,10 +636,15 @@ mod tests {
     fn shell_changes_preserve_retired_preferences_and_restore_layout_flags() {
         let registry = super::super::tests::TestRegistry::new();
         let user = &registry.key;
+        let initial = settings_in(user, user, 26300, 9711).unwrap();
+        assert_eq!(initial[&TaskbarPosition].value, 3);
+        assert_eq!(initial[&TaskbarSize].value, 0);
         let selected = BTreeMap::from([
             (TaskbarCombine, 2),
             (TaskbarAutoHide, 1),
             (TaskbarLastActiveClick, 1),
+            (TaskbarPosition, 2),
+            (TaskbarSize, 1),
         ]);
         let layout = user.create_subkey(TASKBAR_LAYOUT_KEY).unwrap().0;
         let mut layout_bytes = vec![0; 48];
@@ -667,13 +678,13 @@ mod tests {
         let mut updated = layout.get_raw_value("Settings").unwrap();
         updated.bytes.to_mut()[16] = 8;
         layout.set_raw_value("Settings", &updated).unwrap();
-        key.set_value("TaskbarLocation", &2u32).unwrap();
 
         save_originals(user, user, 26300, 9711).unwrap();
         let restore = pending_changes(original_changes(user, user, 26300, 9711).unwrap()).unwrap();
         assert_eq!(restore.len(), selected.len());
         apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
-        assert_eq!(key.get_value::<u32, _>("TaskbarLocation").unwrap(), 2);
+        assert_eq!(key.get_value::<u32, _>("TaskbarLocation").unwrap(), 1);
+        assert!(read_original(user, ADVANCED_KEY, "TaskbarSize").unwrap().is_none());
         assert!(read_original(user, ADVANCED_KEY, "LastActiveClick").unwrap().is_none());
         let restored = layout.get_raw_value("Settings").unwrap();
         assert_eq!(restored.bytes[8], 2);

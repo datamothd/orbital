@@ -119,6 +119,8 @@ for (const [group, preferences] of Object.entries({
     ["taskbar_widgets_button", "Show Widgets button", "Shows the taskbar entry point when Widgets are allowed."],
   ],
   "taskbar-behavior": [
+    ["taskbar_position", "Taskbar position", "Choose which edge of the screen shows the taskbar.", ["Left", "Top", "Right", "Bottom"]],
+    ["taskbar_size", "Taskbar size", "Small reduces the taskbar height and icon size when the taskbar is at the top or bottom.", ["Default", "Small"]],
     ["taskbar_auto_hide", "Automatically hide the taskbar", "Shows the taskbar when you move the pointer to its edge of the screen."],
     ["taskbar_badges", "Show badges on taskbar apps", "Shows unread counts and other app status indicators."],
     ["taskbar_share_window", "Share windows from the taskbar", "Shows a window sharing shortcut during supported calls."],
