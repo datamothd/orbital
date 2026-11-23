@@ -66,6 +66,7 @@ const explorerChoices = [
 const folderViewFields = new Set(["folder_view", "folder_sort", "folder_grouping"]);
 
 const combineButtons = ["Always, hide labels", "When taskbar is full", "Never"];
+const appPermissionOptions = ["Use Windows permissions", "Force allow", "Force deny"];
 for (const [group, preferences] of Object.entries({
   "explorer-behavior": [
     ["browse_folders_in_new_window", "Open folders in", "Choose whether opening a folder uses the current window or creates one.", ["Same window", "New window"]],
@@ -135,11 +136,40 @@ for (const [group, preferences] of Object.entries({
   "desktop-icon-settings": [
     ["desktop_icons", "Hide desktop icons", "Hides icons on the desktop without removing them."],
   ],
+  "privacy-offers": [
+    ["block_advertising_id", "Block the Windows advertising ID", "Stops Windows apps from using the advertising ID for personalized ads.", null, true],
+    ["block_website_language_list", "Block website access to your language list", "Stops Windows from giving supported websites your preferred language list."],
+    ["personalized_offers", "Personalized offers", "Lets Windows use your activity and diagnostic data for personalized tips, ads and recommendations."],
+  ],
+  "privacy-diagnostics": [
+    ["diagnostic_data", "Windows diagnostic data policy", "Choose how much Windows diagnostic data the device can send. Required data includes basic device and compatibility information.", ["Off", "Required only", null, "Optional", "Use Windows settings"], true],
+    ["block_feedback_requests", "Block Windows feedback requests", "Stops Windows from prompting you for feedback. You can still submit feedback yourself.", null, true],
+    ["limit_diagnostic_logs", "Block additional diagnostic logs", "Stops collection of extra troubleshooting logs when optional diagnostic data is enabled.", null, true],
+    ["limit_crash_dumps", "Limit diagnostic crash dumps", "Limits Windows Error Reporting to smaller dumps when optional diagnostic data is enabled.", null, true],
+  ],
+  "privacy-activity": [
+    ["cloud_content_search", "Cloud content in Windows Search", "Controls whether Search can include results from services such as OneDrive, Outlook and SharePoint.", ["Block", "Allow", "Use Windows settings"], true],
+    ["publish_user_activities", "Allow apps to publish user activities", "Disabling this policy blocks apps from publishing user activities and can affect Windows Backup.", null, true],
+    ["cross_device_clipboard", "Cross-device clipboard policy", "Controls whether users can sync their clipboard across devices. Local clipboard history is unaffected.", ["Block", "Let users choose"], true],
+  ],
+  "privacy-permissions": [
+    ["block_location_service", "Block the Windows location service", "Prevents Windows and apps from using the Windows location service. Apps may still infer location from your network.", null, true],
+    ["app_camera_access", "Camera access for Windows apps", "Sets the device policy for Windows apps. Per-app policies can override this setting.", appPermissionOptions, true],
+    ["app_microphone_access", "Microphone access for Windows apps", "Sets the device policy for Windows apps. Per-app policies can override this setting.", appPermissionOptions, true],
+    ["app_account_info_access", "Account info access for Windows apps", "Controls access to account details such as your name and picture.", appPermissionOptions, true],
+    ["app_diagnostic_access", "Diagnostic access for Windows apps", "Controls whether Windows apps can read diagnostic information about other apps.", appPermissionOptions, true],
+  ],
+  "privacy-voice-ai": [
+    ["online_speech_recognition", "Online speech recognition", "Lets Windows use Microsoft’s online speech service for features such as voice typing."],
+    ["block_recall_snapshots", "Block Recall snapshots", "Prevents new snapshots on Copilot+ PCs. Windows deletes any existing Recall snapshots when this policy is enabled.", null, true],
+  ],
 })) {
-  const heading = byId(group);
-  let nextGroup = heading.nextElementSibling;
+  const groupNode = byId(group);
+  const section = groupNode.matches("details");
+  const container = section ? groupNode : groupNode.parentElement;
+  let nextGroup = section ? null : groupNode.nextElementSibling;
   while (nextGroup && !nextGroup.classList.contains("preference-group")) nextGroup = nextGroup.nextElementSibling;
-  for (const [field, label, description, options] of preferences) {
+  for (const [field, label, description, options, requiresAdmin] of preferences) {
     const id = field.replaceAll("_", "-");
     const row = element("div", "preference");
     const content = element("div");
@@ -147,11 +177,12 @@ for (const [group, preferences] of Object.entries({
     content.append(title);
     if (description) content.append(element("p", "preference-description", description));
     row.append(content);
-    heading.parentElement.insertBefore(row, nextGroup);
-    const preference = { id, field, shell: true };
+    container.insertBefore(row, nextGroup);
+    const preference = { id, field, shell: true, requiresAdmin };
     if (options) {
       title.id = `${id}-label`;
-      preference.picker = createFolderPicker(id, options.map((label, value) => ({ label, value })).filter(choice => choice.label),
+      const choices = options.map((label, value) => ({ label, value })).filter(choice => choice.label);
+      preference.picker = createFolderPicker(id, () => choices.filter(({ value }) => preferenceChoiceAvailable(preference, value)),
         "Choose an option", "Unavailable");
       preference.personal = true;
       explorerChoices.push(preference);
@@ -160,6 +191,10 @@ for (const [group, preferences] of Object.entries({
       explorerPreferences.push(preference);
     }
   }
+}
+
+function preferenceChoiceAvailable(preference, value) {
+  return settings?.shell_preferences?.[preference.field]?.choices?.includes(value) ?? true;
 }
 
 function currentPreferenceValue(preference) {
@@ -223,7 +258,7 @@ function setBusy(value) {
   for (const id of ["apply-recommended", "restore-original", "import-tweaks", "export-tweaks"]) {
     byId(id).disabled = busy || !settings;
   }
-  for (const view of explorerChoices) view.picker.setDisabled(busy || !preferenceAvailable(view));
+  for (const view of explorerChoices) view.picker.setDisabled(busy || Boolean(preferenceRestriction(view)));
   for (const preference of explorerPreferences) {
     byId(`${preference.id}-toggle`).disabled = busy || !preferenceAvailable(preference);
   }
@@ -434,7 +469,7 @@ function preferenceChangeRow(preference, label, checked = true) {
 
 function missingAdminCount(ids) {
   if (settings?.is_administrator) return 0;
-  return ids.filter(id => explorerPreferences.some(preference => preference.field === id && preference.requiresAdmin)).length;
+  return ids.filter(id => [...explorerPreferences, ...explorerChoices].some(preference => preference.field === id && preference.requiresAdmin)).length;
 }
 
 function selectedValues(id) {
@@ -571,6 +606,7 @@ for (const view of explorerChoices) {
   const title = byId(`${view.id}-label`);
   view.label = title.textContent.trim();
   view.description = title.parentElement.querySelector(".preference-description").textContent.trim();
+  if (view.requiresAdmin) title.append(adminWarning());
 }
 for (const preference of explorerPreferences) {
   const row = document.querySelector(`[data-preference="${preference.id}"]`);

@@ -9,10 +9,19 @@ const TASKBAR_LAYOUT_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Exp
 const BACKUP_KEY: &str = r"Software\Orbital\OriginalExplorerSettings\Shell";
 const DELEGATE_FOLDERS_KEY: &str =
     r"Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\DelegateFolders";
+const PRIVACY_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Privacy";
+const ADVERTISING_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo";
+const ADVERTISING_POLICY: &str = r"Software\Policies\Microsoft\Windows\AdvertisingInfo";
+const DATA_COLLECTION_POLICY: &str = r"Software\Policies\Microsoft\Windows\DataCollection";
+const SYSTEM_POLICY: &str = r"Software\Policies\Microsoft\Windows\System";
+const APP_PRIVACY_POLICY: &str = r"Software\Policies\Microsoft\Windows\AppPrivacy";
+const WINDOWS_AI_POLICY: &str = r"Software\Policies\Microsoft\Windows\WindowsAI";
+const FEEDBACK_RULES: &str = r"Software\Microsoft\Siuf\Rules";
 
 #[derive(Clone, Copy)]
 enum Backing {
     Dword(&'static str, &'static str, u32, &'static [u32]),
+    MachinePolicy(&'static str, &'static str, u32, &'static [u32]),
     Text(&'static str, &'static str, &'static str),
     Retired(&'static [u32]),
     Flag(RegistryFlag),
@@ -65,7 +74,15 @@ const fn toggle(path: &'static str, name: &'static str, default: u32) -> Backing
     Backing::Dword(path, name, default, &[0, 1])
 }
 
-use Backing::{Dword, Flag, Retired};
+use Backing::{Dword, Flag, MachinePolicy, Retired};
+
+const fn machine_toggle(path: &'static str, name: &'static str, default: u32) -> Backing {
+    MachinePolicy(path, name, default, &[0, 1])
+}
+
+const fn app_permission(name: &'static str) -> Backing {
+    MachinePolicy(APP_PRIVACY_POLICY, name, 0, &[0, 1, 2])
+}
 
 shell_preferences! {
     BrowseFoldersInNewWindow => None, Flag(RegistryFlag { path: CABINET_KEY, length: 12, offset: 4, mask: 0x20 });
@@ -130,6 +147,23 @@ shell_preferences! {
     TaskbarNotificationBell => None, toggle(ADVANCED_KEY, "ShowNotificationIcon", 1);
     NotificationCenterClock => None, toggle(ADVANCED_KEY, "ShowClockInNotificationCenter", 0);
     DesktopIcons => None, toggle(ADVANCED_KEY, "HideIcons", 0);
+    BlockAdvertisingId => Some(1), machine_toggle(ADVERTISING_POLICY, "DisabledByGroupPolicy", 0);
+    BlockWebsiteLanguageList => Some(1), toggle(r"Control Panel\International\User Profile", "HttpAcceptLanguageOptOut", 0);
+    PersonalizedOffers => None, toggle(PRIVACY_KEY, "TailoredExperiencesWithDiagnosticDataEnabled", 0);
+    DiagnosticData => None, MachinePolicy(DATA_COLLECTION_POLICY, "AllowTelemetry", 4, &[0, 1, 3, 4]);
+    BlockFeedbackRequests => Some(1), machine_toggle(DATA_COLLECTION_POLICY, "DoNotShowFeedbackNotifications", 0);
+    LimitDiagnosticLogs => None, machine_toggle(DATA_COLLECTION_POLICY, "LimitDiagnosticLogCollection", 0);
+    LimitCrashDumps => None, machine_toggle(DATA_COLLECTION_POLICY, "LimitDumpCollection", 0);
+    CloudContentSearch => None, MachinePolicy(r"Software\Policies\Microsoft\Windows\Windows Search", "AllowCloudSearch", 2, &[0, 1, 2]);
+    PublishUserActivities => None, machine_toggle(SYSTEM_POLICY, "PublishUserActivities", 1);
+    CrossDeviceClipboard => None, machine_toggle(SYSTEM_POLICY, "AllowCrossDeviceClipboard", 1);
+    OnlineSpeechRecognition => None, toggle(r"Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy", "HasAccepted", 0);
+    BlockRecallSnapshots => None, machine_toggle(WINDOWS_AI_POLICY, "DisableAIDataAnalysis", 0);
+    BlockLocationService => None, machine_toggle(r"Software\Policies\Microsoft\Windows\LocationAndSensors", "DisableLocation", 0);
+    AppCameraAccess => None, app_permission("LetAppsAccessCamera");
+    AppMicrophoneAccess => None, app_permission("LetAppsAccessMicrophone");
+    AppAccountInfoAccess => None, app_permission("LetAppsAccessAccountInfo");
+    AppDiagnosticAccess => None, app_permission("LetAppsGetDiagnosticInfo");
     WindowsColorMode => None, Retired(&[0, 1]);
     AppColorMode => None, Retired(&[0, 1]);
     TransparencyEffects => None, Retired(&[0, 1]);
@@ -140,9 +174,13 @@ shell_preferences! {
 impl ShellPreference {
     pub(super) fn accepts(self, value: u32) -> bool {
         match self.definition().1 {
-            Dword(_, _, _, values) | Retired(values) => values.contains(&value),
+            Dword(_, _, _, values) | MachinePolicy(_, _, _, values) | Retired(values) => values.contains(&value),
             Backing::Text(..) | Flag(_) => value <= 1,
         }
+    }
+
+    pub(super) fn requires_administrator(self) -> bool {
+        matches!(self.definition().1, MachinePolicy(..))
     }
 
     pub(super) fn retired(self) -> bool {
@@ -169,6 +207,37 @@ fn supported_build(build: u32, revision: u32) -> bool {
     matches!((build, revision), (26200, 6584..) | (26300, 9457..))
 }
 
+fn windows_edition(machine: &RegKey) -> io::Result<String> {
+    let edition = read_original(machine, WINDOWS_VERSION_KEY, "EditionID")?;
+    Ok(edition.as_ref().map(String::from_reg_value).transpose()?.unwrap_or_default())
+}
+
+fn enterprise_or_education(edition: &str) -> bool {
+    ["Enterprise", "Education", "IoTEnterprise"].iter().any(|prefix| edition.starts_with(prefix))
+}
+
+fn supports_device_privacy_policies(edition: &str) -> bool {
+    edition.starts_with("Professional") || enterprise_or_education(edition)
+}
+
+fn privacy_recommendable(preference: ShellPreference, user: &RegKey) -> io::Result<bool> {
+    Ok(match preference {
+        ShellPreference::BlockAdvertisingId => {
+            let consent = read_original(user, r"Software\Microsoft\Windows\CurrentVersion\CPSS\Store\AdvertisingInfo", "Value")?;
+            let consent = match consent {
+                Some(_) => consent,
+                None => read_original(user, ADVERTISING_KEY, "Enabled")?,
+            };
+            consent.as_ref().is_none_or(|raw| u32::from_reg_value(raw).ok() == Some(1))
+        }
+        ShellPreference::BlockFeedbackRequests => {
+            read_original(user, FEEDBACK_RULES, "NumberOfSIUFInPeriod")?.is_none()
+                && read_original(user, FEEDBACK_RULES, "PeriodInNanoSeconds")?.is_none()
+        }
+        _ => true,
+    })
+}
+
 fn available<T>(result: io::Result<Option<T>>) -> io::Result<Option<T>> {
     match result {
         Err(error)
@@ -187,6 +256,8 @@ fn available<T>(result: io::Result<Option<T>>) -> io::Result<Option<T>> {
 pub struct ShellSetting {
     pub value: u32,
     pub recommended: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub choices: Option<&'static [u32]>,
 }
 
 pub(super) fn settings_in(
@@ -199,8 +270,23 @@ pub(super) fn settings_in(
     if !supported_build(build, revision) {
         return Ok(settings);
     }
+    let edition = windows_edition(machine)?;
     for &preference in ShellPreference::ALL {
-        if !preference.supported(build, revision) {
+        if !preference.supported(build, revision)
+            || preference.requires_administrator() && !supports_device_privacy_policies(&edition)
+        {
+            continue;
+        }
+        let policy = match preference {
+            ShellPreference::PersonalizedOffers => Some((user, r"Software\Policies\Microsoft\Windows\CloudContent", "DisableTailoredExperiencesWithDiagnosticData", 1)),
+            ShellPreference::OnlineSpeechRecognition => Some((machine, r"Software\Policies\Microsoft\InputPersonalization", "AllowInputPersonalization", 0)),
+            _ => None,
+        };
+        if let Some((root, path, name, blocked)) = policy
+            && available(read_original(root, path, name).and_then(|value| {
+                value.as_ref().map(u32::from_reg_value).transpose()
+            }))? == Some(blocked)
+        {
             continue;
         }
         if preference == ShellPreference::RemovableDrivesOnlyInThisPc
@@ -215,9 +301,10 @@ pub(super) fn settings_in(
             continue;
         }
         let (recommended, backing) = preference.definition();
+        let root = if preference.requires_administrator() { machine } else { user };
         let value = match backing {
-            Dword(path, name, default, _) => {
-                available(read_original(user, path, name).and_then(|value| {
+            Dword(path, name, default, _) | MachinePolicy(path, name, default, _) => {
+                available(read_original(root, path, name).and_then(|value| {
                     Ok(Some(
                         value
                             .as_ref()
@@ -238,11 +325,26 @@ pub(super) fn settings_in(
                 .as_ref()
                 .and_then(|raw| flag.state(raw)),
         };
-        if let Some(value) = value.filter(|&value| preference.accepts(value)) {
+        if let Some(mut value) = value.filter(|&value| preference.accepts(value)) {
+            let choices: Option<&'static [u32]> = if preference == ShellPreference::DiagnosticData
+                && !enterprise_or_education(&edition)
+            {
+                if value == 0 { value = 1; }
+                Some(&[1, 3, 4])
+            } else {
+                None
+            };
             let recommended = recommended.filter(|&target| {
-                value == target || matches!(backing, Dword(_, _, default, _) if value == default)
+                value == target || matches!(backing, Dword(_, _, default, _) | MachinePolicy(_, _, default, _) if value == default)
             });
-            settings.insert(preference, ShellSetting { value, recommended });
+            let recommended = if recommended.is_some_and(|target| value != target)
+                && available(privacy_recommendable(preference, user).map(Some))? != Some(true)
+            {
+                None
+            } else {
+                recommended
+            };
+            settings.insert(preference, ShellSetting { value, recommended, choices });
         }
     }
     Ok(settings)
@@ -250,6 +352,7 @@ pub(super) fn settings_in(
 
 pub(super) fn changes_in<'a>(
     user: &'a RegKey,
+    machine: &'a RegKey,
     preferences: &BTreeMap<ShellPreference, u32>,
 ) -> io::Result<Vec<RegistryChange<'a>>> {
     let mut changes = Vec::new();
@@ -261,6 +364,12 @@ pub(super) fn changes_in<'a>(
                 name,
                 (value != 0 || preference != ShellPreference::RemovableDrivesOnlyInThisPc)
                     .then(|| value.to_reg_value()),
+            )),
+            MachinePolicy(path, name, default, _) => changes.push(RegistryChange::new(
+                machine,
+                path,
+                name,
+                (value != default).then(|| value.to_reg_value()),
             )),
             Backing::Text(path, name, enabled) => changes.push(RegistryChange::new(
                 user,
@@ -283,29 +392,34 @@ pub(super) fn changes_in<'a>(
 }
 
 fn backup_slots(
+    device_privacy: bool,
     build: u32,
     revision: u32,
-) -> impl Iterator<Item = (&'static str, &'static str, Option<RegistryFlag>)> {
+) -> impl Iterator<Item = (&'static str, &'static str, Option<RegistryFlag>, bool)> {
     ShellPreference::ALL
         .iter()
         .filter(move |preference| {
             preference.supported(build, revision)
                 && **preference != ShellPreference::RemovableDrivesOnlyInThisPc
+                && (device_privacy || !preference.requires_administrator())
         })
         .filter_map(|preference| match preference.definition().1 {
-            Dword(path, name, _, _) | Backing::Text(path, name, _) => Some((path, name, None)),
+            Dword(path, name, _, _) | Backing::Text(path, name, _) => Some((path, name, None, false)),
+            MachinePolicy(path, name, _, _) => Some((path, name, None, true)),
             Retired(_) => None,
-            Flag(flag) => Some((flag.path, "Settings", Some(flag))),
+            Flag(flag) => Some((flag.path, "Settings", Some(flag), false)),
         })
 }
 
-pub(super) fn save_originals(user: &RegKey, build: u32, revision: u32) -> io::Result<()> {
-    for (path, name, flag) in backup_slots(build, revision) {
+pub(super) fn save_originals(user: &RegKey, machine: &RegKey, build: u32, revision: u32) -> io::Result<()> {
+    let device_privacy = supports_device_privacy_policies(&windows_edition(machine)?);
+    for (path, name, flag, machine_policy) in backup_slots(device_privacy, build, revision) {
         let backup = format!(r"{BACKUP_KEY}\{path}\{name}");
         if read_original(user, &backup, "Saved")?.is_some() {
             continue;
         }
-        let Some(original) = available(read_original(user, path, name).map(Some))? else {
+        let root = if machine_policy { machine } else { user };
+        let Some(original) = available(read_original(root, path, name).map(Some))? else {
             continue;
         };
         if flag.is_some_and(|flag| original.as_ref().and_then(|raw| flag.state(raw)).is_none()) {
@@ -318,18 +432,21 @@ pub(super) fn save_originals(user: &RegKey, build: u32, revision: u32) -> io::Re
     Ok(())
 }
 
-pub(super) fn original_changes(
-    user: &RegKey,
+pub(super) fn original_changes<'a>(
+    user: &'a RegKey,
+    machine: &'a RegKey,
     build: u32,
     revision: u32,
-) -> io::Result<Vec<RegistryChange<'_>>> {
+) -> io::Result<Vec<RegistryChange<'a>>> {
     let mut changes = Vec::new();
-    for (path, name, flag) in backup_slots(build, revision) {
+    let device_privacy = supports_device_privacy_policies(&windows_edition(machine)?);
+    for (path, name, flag, machine_policy) in backup_slots(device_privacy, build, revision) {
         let backup = format!(r"{BACKUP_KEY}\{path}\{name}");
         if read_original(user, &backup, "Saved")?.is_none() {
             continue;
         }
-        let Some(current) = available(read_original(user, path, name).map(Some))? else {
+        let root = if machine_policy { machine } else { user };
+        let Some(current) = available(read_original(root, path, name).map(Some))? else {
             continue;
         };
         let mut original = read_original(user, &backup, "Value")?;
@@ -343,7 +460,7 @@ pub(super) fn original_changes(
             };
             original = Some(restored);
         }
-        changes.push(RegistryChange::new(user, path, name, original));
+        changes.push(RegistryChange::new(root, path, name, original));
     }
     Ok(changes)
 }
@@ -397,6 +514,53 @@ mod tests {
     use ShellPreference::*;
 
     #[test]
+    fn privacy_preferences_respect_default_consent_and_restore_device_policies() {
+        let user = super::super::tests::TestRegistry::new();
+        let machine = super::super::tests::TestRegistry::new();
+        let (user, machine) = (&user.key, &machine.key);
+        let edition = machine.create_subkey(WINDOWS_VERSION_KEY).unwrap().0;
+        let diagnostics = machine.create_subkey(DATA_COLLECTION_POLICY).unwrap().0;
+        let settings = |build, revision| settings_in(user, machine, build, revision).unwrap();
+
+        edition.set_value("EditionID", &"Core").unwrap();
+        assert!(!settings(26200, 6584).contains_key(&DiagnosticData));
+        assert_eq!(settings(26200, 6584)[&BlockWebsiteLanguageList].recommended, Some(1));
+        edition.set_value("EditionID", &"Professional").unwrap();
+        let pro = settings(26200, 6584);
+        assert_eq!(pro[&DiagnosticData].choices, Some(&[1, 3, 4][..]));
+        assert_eq!(pro[&BlockAdvertisingId].recommended, Some(1));
+        assert_eq!(pro[&BlockFeedbackRequests].recommended, Some(1));
+        assert_eq!(pro[&DiagnosticData].recommended, None);
+        assert_eq!(pro[&BlockRecallSnapshots].recommended, None);
+        assert_eq!(pro[&AppCameraAccess].recommended, None);
+
+        user.create_subkey(ADVERTISING_KEY).unwrap().0.set_value("Enabled", &0u32).unwrap();
+        user.create_subkey(FEEDBACK_RULES).unwrap().0.set_value("NumberOfSIUFInPeriod", &0u32).unwrap();
+        assert_eq!(settings(26300, 9457)[&BlockAdvertisingId].recommended, None);
+        assert_eq!(settings(26300, 9457)[&BlockFeedbackRequests].recommended, None);
+
+        diagnostics.set_value("AllowTelemetry", &0u32).unwrap();
+        assert_eq!(settings(26300, 9457)[&DiagnosticData].value, 1);
+        edition.set_value("EditionID", &"Enterprise").unwrap();
+        assert_eq!(settings(26300, 9457)[&DiagnosticData].value, 0);
+        save_originals(user, machine, 26300, 9457).unwrap();
+        let selected = BTreeMap::from([(BlockWebsiteLanguageList, 1), (DiagnosticData, 4), (AppCameraAccess, 2)]);
+        let changes = changes_in(user, machine, &selected).unwrap();
+        apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
+        let current = settings(26300, 9457);
+        assert!(selected.iter().all(|(preference, value)| current[preference].value == *value));
+        assert!(read_original(user, APP_PRIVACY_POLICY, "LetAppsAccessCamera").unwrap().is_none());
+        assert!(read_original(machine, DATA_COLLECTION_POLICY, "AllowTelemetry").unwrap().is_none());
+        let restore = pending_changes(original_changes(user, machine, 26300, 9457).unwrap()).unwrap();
+        assert_eq!(restore.len(), 3);
+        apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
+        let restored = settings(26300, 9457);
+        assert_eq!(restored[&DiagnosticData].value, 0);
+        assert_eq!(restored[&AppCameraAccess].value, 0);
+        assert_eq!(restored[&BlockWebsiteLanguageList].value, 0);
+    }
+
+    #[test]
     fn shell_preferences_follow_the_target_releases_and_feature_updates() {
         for build in [22631, 26100, 26220, 28000] {
             assert!(
@@ -432,9 +596,9 @@ mod tests {
             .create_subkey(format!(r"{DELEGATE_FOLDERS_KEY}\{REMOVABLE_CLSID}"))
             .unwrap();
         let original = original_settings_in(user, machine, true).unwrap();
-        save_originals(user, build, revision).unwrap();
+        save_originals(user, machine, build, revision).unwrap();
         let selected = BTreeMap::from([(OmitShortcutSuffix, 1), (RemovableDrivesOnlyInThisPc, 1)]);
-        let changes = changes_in(user, &selected).unwrap();
+        let changes = changes_in(user, machine, &selected).unwrap();
         apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
         let state = settings();
         assert!(selected.iter().all(|(preference, value)| {
@@ -443,13 +607,13 @@ mod tests {
         let state = settings_in(user, machine, 26200, revision).unwrap();
         assert!(selected.iter().all(|(preference, value)| state[preference].value == *value));
         let off = BTreeMap::from([(OmitShortcutSuffix, 0), (RemovableDrivesOnlyInThisPc, 0)]);
-        assert!(changes_in(user, &off).unwrap().iter().all(|change| change.value.is_none()));
+        assert!(changes_in(user, machine, &off).unwrap().iter().all(|change| change.value.is_none()));
         let policy = machine.create_subkey(NON_ENUM_KEYS[0]).unwrap().0;
         policy.set_value(REMOVABLE_CLSID, &1u32).unwrap();
         assert!(!settings().contains_key(&RemovableDrivesOnlyInThisPc));
         policy.delete_value(REMOVABLE_CLSID).unwrap();
         let mut restore = super::super::original_changes(user, machine, &original).unwrap();
-        restore.extend(original_changes(user, build, revision).unwrap());
+        restore.extend(original_changes(user, machine, build, revision).unwrap());
         let restore = pending_changes(restore).unwrap();
         assert_eq!(restore.len(), selected.len());
         apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
@@ -486,8 +650,8 @@ mod tests {
             .unwrap();
         let (key, _) = user.create_subkey(ADVANCED_KEY).unwrap();
         key.set_value("TaskbarLocation", &1u32).unwrap();
-        save_originals(user, 26300, 9711).unwrap();
-        let changes = changes_in(user, &selected).unwrap();
+        save_originals(user, user, 26300, 9711).unwrap();
+        let changes = changes_in(user, user, &selected).unwrap();
         assert_eq!(changes.len(), selected.len());
         apply_changes(&changes, &prepare_changes(&changes).unwrap()).unwrap();
         let state = settings_in(user, user, 26300, 9711).unwrap();
@@ -505,8 +669,8 @@ mod tests {
         layout.set_raw_value("Settings", &updated).unwrap();
         key.set_value("TaskbarLocation", &2u32).unwrap();
 
-        save_originals(user, 26300, 9711).unwrap();
-        let restore = pending_changes(original_changes(user, 26300, 9711).unwrap()).unwrap();
+        save_originals(user, user, 26300, 9711).unwrap();
+        let restore = pending_changes(original_changes(user, user, 26300, 9711).unwrap()).unwrap();
         assert_eq!(restore.len(), selected.len());
         apply_changes(&restore, &prepare_changes(&restore).unwrap()).unwrap();
         assert_eq!(key.get_value::<u32, _>("TaskbarLocation").unwrap(), 2);

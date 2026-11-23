@@ -563,13 +563,17 @@ fn apply_profile(
             "Some imported tweaks are unavailable on this system.",
         ));
     }
-    if profile.shell_preferences.keys().any(|preference| !current.shell_preferences.contains_key(preference)) {
+    if profile.shell_preferences.iter().any(|(preference, value)| {
+        current.shell_preferences.get(preference).is_none_or(|setting| {
+            setting.choices.is_some_and(|choices| !choices.contains(value))
+        })
+    }) {
         return Err(io::Error::other("Some imported Windows shell preferences are unavailable on this system."));
     }
-    if selected().any(|tweak| tweak.requires_administrator() && !current.is_administrator) {
-        return Err(io::Error::other(
-            "This preference requires administrator access. Close Orbital and run it as administrator.",
-        ));
+    if !current.is_administrator && (selected().any(|tweak| tweak.requires_administrator())
+        || profile.shell_preferences.keys().any(|preference| preference.requires_administrator()))
+    {
+        return Err(setting_error(io::ErrorKind::PermissionDenied.into()));
     }
     let count = profile.change_count();
     if count == 0 {
@@ -578,7 +582,7 @@ fn apply_profile(
     let icon = blank_icon_path()?;
     let mut changes =
         imported_changes(HKCU, HKLM, &profile.tweaks, &profile.disabled_tweaks, &icon)?;
-    changes.extend(shell::changes_in(HKCU, &profile.shell_preferences)?);
+    changes.extend(shell::changes_in(HKCU, HKLM, &profile.shell_preferences)?);
     if let Some(target) = profile.open_explorer_to {
         changes.push(RegistryChange::new(
             HKCU,

@@ -134,7 +134,8 @@ pendingContinue.addEventListener("click", async event => {
     const count = selected.length;
     const label = `${count} preference ${count === 1 ? "change" : "changes"}`;
     const resetsViews = selected.some(([{ field }]) => folderViewFields.has(field));
-    const note = `${resetsViews ? "Saved folder views will be reset. Desktop icon layouts are preserved. " : ""}Windows Explorer will restart once.`;
+    const deletesSnapshots = selected.some(([{ field }, { value }]) => field === "block_recall_snapshots" && value);
+    const note = `${resetsViews ? "Saved folder views will be reset. Desktop icon layouts are preserved. " : ""}${deletesSnapshots ? "Windows will delete existing Recall snapshots. " : ""}Windows Explorer will restart once.`;
     if (!skip && !await confirmChange("", `Apply ${label}?`, [], note)) return;
     const profile = { format: "orbital-tweaks", version: 4, tweaks: [], disabled_tweaks: [] };
     for (const [preference, { value }] of selected) {

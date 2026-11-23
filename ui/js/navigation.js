@@ -9,14 +9,10 @@ byId("collapse-all").addEventListener("click", () => {
   void waitForWindowLayout();
 });
 
-const visualSections = [...byId("visual-settings").querySelectorAll(".tweak-subgroups > details")];
-for (const section of visualSections) {
+for (const section of byId("visual-settings").querySelectorAll(".tweak-subgroups > details")) {
   section.addEventListener("toggle", () => {
     closeChoicePicker();
     if (!section.open) return;
-    for (const other of visualSections) {
-      if (other !== section) other.open = false;
-    }
     section.querySelector("summary").scrollIntoView({ block: "nearest" });
   });
 }

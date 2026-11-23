@@ -731,7 +731,7 @@ fn original_settings_in(user: &RegKey, machine: &RegKey, windows11: bool) -> io:
 pub fn save_original_settings() -> io::Result<()> {
     let build = windows_build()?;
     original_settings_in(HKCU, HKLM, build >= 22000)?;
-    shell::save_originals(HKCU, build, windows_revision()?)
+    shell::save_originals(HKCU, HKLM, build, windows_revision()?)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -802,7 +802,10 @@ pub fn apply_recommended_settings(
     if preview || preferences.is_empty() {
         return Ok(preferences);
     }
-    changes.extend(shell::changes_in(HKCU, &shell_preferences)?);
+    if shell_preferences.keys().any(|preference| preference.requires_administrator()) && !is_administrator()? {
+        return Err(setting_error(io::ErrorKind::PermissionDenied.into()));
+    }
+    changes.extend(shell::changes_in(HKCU, HKLM, &shell_preferences)?);
     apply_preference_changes(
         "Recommended settings",
         &changes,
@@ -898,7 +901,7 @@ pub fn restore_original_settings() -> io::Result<bool> {
     let build = windows_build()?;
     let backup = original_settings_in(HKCU, HKLM, build >= 22000)?;
     let mut changes = original_changes(HKCU, HKLM, &backup)?;
-    changes.extend(shell::original_changes(HKCU, build, windows_revision()?)?);
+    changes.extend(shell::original_changes(HKCU, HKLM, build, windows_revision()?)?);
     let changes = pending_changes(changes)?;
     let prepared = prepare_changes(&changes)?;
     let views_restored = folder_views::restore_in(HKCU)?;

@@ -601,7 +601,6 @@ const answer = (() => {
         const redirect = index === 0 ? ">" : ">>";
         commands.push(["windowsPE", `cmd.exe /d /c "${redirect}${script} (${lines.map(line => `echo ${line}`).join("&")})"`, "Write Orbital DiskPart script"]);
       }
-      // Some stock Setup images omit findstr.exe. WinPE includes find.exe.
       const firmware = 'reg.exe query HKLM\\SYSTEM\\CurrentControlSet\\Control /v PEFirmwareType | find.exe "0x2"';
       commands.push(["windowsPE", `cmd.exe /d /c "(${firmware}) > ${log} 2>&1 && diskpart.exe /s ${script} >> ${log} 2>&1"`, "Verify UEFI and partition the confirmed disk"]);
       for (const [path, text] of [["DiskID", disk], ["PartitionID", 3]]) setting("windowsPE", "setup", `${destination}/${path}`, text);

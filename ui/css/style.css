@@ -283,6 +283,9 @@ summary::after {
 .icon-chip { --icon-image: url("../icons/chip.png"); }
 .icon-sparkle { --icon-image: url("../icons/sparkle.png"); }
 .icon-apps { --icon-image: url("../icons/apps.png"); }
+.icon-diagnostics { --icon-image: url("../icons/diagnostics.png"); }
+.icon-search { --icon-image: url("../icons/search.png"); }
+.icon-microphone { --icon-image: url("../icons/microphone.png"); }
 .icon-refresh { --icon-image: url("../icons/refresh.png"); }
 .icon-trash { --icon-image: url("../icons/trash.png"); }
 .icon-info { --icon-image: url("../icons/info.png"); }
@@ -924,7 +927,7 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
   margin-bottom: var(--space-3);
 }
 
-#visual-settings {
+.tweak-category:has(+ .tweak-category) {
   margin-bottom: var(--space-2);
 }
 
@@ -962,28 +965,29 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
   border-top: 1px solid var(--border);
 }
 
-#visual-settings .tweak-subgroups > details[open]:has(+ details) {
+:is(#visual-settings, #privacy-settings) .tweak-subgroups > details[open]:has(+ details) {
   background: linear-gradient(#777, #777) 5px 0 / 1px 100% no-repeat;
   padding-bottom: var(--space-4);
 }
 
-#visual-settings .tweak-subgroups > details[open]:has(+ details) > summary {
+:is(#visual-settings, #privacy-settings) .tweak-subgroups > details[open]:has(+ details) > summary {
   background: none;
 }
 
-#visual-settings .tweak-subgroups > details > :not(summary) {
+:is(#visual-settings, #privacy-settings) .tweak-subgroups > details > :not(summary) {
   margin-inline-start: 36px;
 }
 
-#visual-settings .tweak-subgroups > details > .preference:last-child {
+:is(#visual-settings, #privacy-settings) .tweak-subgroups > details > .preference:last-child {
   padding-bottom: 0;
 }
 
-#visual-settings .tweak-subgroups > details > .preferences-divider {
+:is(#visual-settings, #privacy-settings) .tweak-subgroups > details > .preferences-divider {
   margin-block-end: var(--space-3);
 }
 
-#visual-settings .preferences-divider + .preference-group {
+#visual-settings .preferences-divider + .preference-group,
+#privacy-settings .preferences-divider + .preference {
   padding-top: 0;
   border-top: 0;
 }
@@ -1055,6 +1059,10 @@ body:has(#tweaks-panel[hidden]) #pending-bar {
 
 #explorer-preferences > .note {
   margin: var(--space-2) 0;
+}
+
+#explorer-preferences > .note + .preference-group {
+  padding-top: var(--space-3);
 }
 
 .tweaks-output {

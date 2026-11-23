@@ -30,6 +30,7 @@ function importedRows(profile) {
       matching: preferenceMatches(preference, imported, current),
       blocked: preferenceRestriction(preference, "Unavailable")
         || (picker && !picker.choices.some(choice => picker.matches(choice.value, value)) ? "Unavailable" : ""),
+      deletesSnapshots: field === "block_recall_snapshots" && value === 1,
     });
   }
   for (const app of profile.apps_to_remove || []) {
@@ -64,9 +65,12 @@ function previewImport(profile) {
     label.className = "import-row";
     label.dataset.state = row.matching ? "matching" : row.blocked ? "blocked" : "change";
     checkbox.disabled = row.matching || Boolean(row.blocked);
-    checkbox.checked = !checkbox.disabled;
+    checkbox.checked = !checkbox.disabled && !row.deletesSnapshots;
     if (!row.matching) {
       text.append(element("span", "import-comparison", `Current: ${row.current} → Imported: ${row.imported}`));
+      if (row.deletesSnapshots && !row.blocked) {
+        text.append(element("span", "import-comparison", "Enabling this policy deletes existing Recall snapshots."));
+      }
     }
     const state = row.matching
       ? row.imported === "Enabled" ? "Already enabled" : row.imported === "Disabled" ? "Already disabled" : "Already matches"
